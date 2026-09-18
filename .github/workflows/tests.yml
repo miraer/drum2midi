@@ -1,0 +1,65 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r requirements.txt
+
+      - name: Install ADTOF-pytorch
+        run: |
+          git clone --depth 1 https://github.com/xavriley/ADTOF-pytorch.git
+          python -m pip install -e ./ADTOF-pytorch
+
+      - name: Run smoke tests
+        run: python test_smoke.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Byte-compile every script
+        run: python -m compileall -q . -x '\.venv|ADTOF-pytorch|larsnet|ADT_STR|inverse-drum-machine|runtime|drumsep|uvr'
+
+      - name: Check that user-facing text is English
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          skip = {".venv", "ADTOF-pytorch", "larsnet", "drumsep", "uvr"}
+          bad = {}
+          root = pathlib.Path(".")
+          for f in sorted(root.glob("*.py")) + sorted(root.glob("*.pyw")) \
+                  + sorted(root.glob("*.md")) + sorted(root.glob("*.ps1")):
+              if set(f.parts) & skip:
+                  continue
+              found = re.findall(r"[\u0410-\u044f\u0401\u0451]{2,}",
+                                 f.read_text(encoding="utf-8"))
+              if found:
+                  bad[f.name] = found[:5]
+          if bad:
+              for name, words in bad.items():
+                  print(f"{name}: {words}")
+              sys.exit(1)
+          print("every user-facing file is English-only")
+          PY

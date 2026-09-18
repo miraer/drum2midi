@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+runtime/
+*.egg-info/
+
+# Model weights and third-party checkouts (fetched by the install steps)
+ADTOF-pytorch/
+larsnet/
+drumsep/
+uvr/
+tools/
+ADT_STR/
+inverse-drum-machine/
+models/*
+
+# Datasets. All of them are downloaded by the user; several are non-commercial
+# and none of them belong in this repository.
+gmd/
+mdbdrums/
+idmt/
+
+# Benchmark artefacts, caches and intermediate results
+bench/
+cmp/
+work/
+out/
+input/
+restem_in/
+
+# Output produced by ReStem 2 Pro. This is the output of licensed commercial
+# software and must not be redistributed.
+restem_events/
+restem_midi/
+restem_export/
+
+# Local settings
+gui_settings.json
+*.log
+*.mid
+*.wav
+*.flac
+*.npz
+*.npy
+*.pkl
+
+# Exceptions come last: in .gitignore the last matching rule wins, so these have
+# to sit below the *.pkl rule above. Our own trained models, 2.3 MB together --
+# without them the pipeline silently falls back to the handcrafted formulas.
+!models/velocity.pkl
+!models/pedal.pkl

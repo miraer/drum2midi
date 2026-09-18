@@ -1,0 +1,14 @@
+# Shell scripts must keep LF endings or bash fails with "bad interpreter: ^M",
+# even when the repository is cloned on Windows.
+*.sh text eol=lf
+
+# Batch files are the opposite case.
+*.bat text eol=crlf
+
+# Binary artefacts git should not try to normalise.
+*.png binary
+*.ico binary
+*.pkl binary
+*.mid binary
+*.wav binary
+*.flac binary
