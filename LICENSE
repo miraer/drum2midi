@@ -19,22 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------
-
-NOTE ON DEPENDENCIES
-
-This licence covers only the code in this repository. It does NOT cover the
-models and datasets the pipeline downloads and uses, several of which are
-non-commercial:
-
-  ADTOF                 CC BY-NC-SA 4.0     non-commercial
-  ADTOF-pytorch         no licence file     all rights reserved by default
-  LarsNet weights       CC BY-NC 4.0        non-commercial
-  MDX23C DrumSep        not stated          unclear
-  MDB Drums             CC BY-NC-SA 4.0     non-commercial, benchmark only
-  IDMT-SMT-Drums        CC BY-NC-ND 4.0     non-commercial, benchmark only
-
-A non-commercial Creative Commons licence restricts use, not only
-redistribution. Running such a model on a server and charging for access is
-commercial use. See the Licensing section of README.md.

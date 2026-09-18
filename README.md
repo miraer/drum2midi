@@ -988,7 +988,8 @@ python setup_env.py --check
 
 ## Licensing — read before using commercially
 
-The code in this repository is MIT. **The models it depends on are not.**
+The code in this repository is MIT. **The models it depends on are not.** The same table
+lives in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), so it travels with the code.
 
 | Component | License | Commercial use |
 |---|---|---|
