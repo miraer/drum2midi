@@ -304,10 +304,25 @@ def test_trigger_finds_hits():
         assert min(abs(found - t)) < 0.05, f"missed the hit at {t}s"
 
 
+def load_gui():
+    """Imports drum2midi_gui.pyw as a module.
+
+    The loader has to be named explicitly: ".pyw" is only a recognised source suffix
+    on Windows, so on Linux spec_from_file_location returns None and the import fails
+    with a bare AttributeError about 'NoneType' having no 'loader'.
+    """
+    import importlib.util
+    from importlib.machinery import SourceFileLoader
+    path = ROOT / "drum2midi_gui.pyw"
+    spec = importlib.util.spec_from_loader("gui", SourceFileLoader("gui", str(path)))
+    gui = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gui)
+    return gui
+
+
 @test
 def test_gui_builds():
     """The GUI must construct and assemble a valid command line."""
-    import importlib.util
     try:
         import tkinter as tk
         root = tk.Tk()
@@ -316,9 +331,7 @@ def test_gui_builds():
     except Exception:
         return          # no display; tk raises TclError, but be liberal here
     root.withdraw()
-    spec = importlib.util.spec_from_file_location("gui", ROOT / "drum2midi_gui.pyw")
-    gui = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gui)
+    gui = load_gui()
     app = gui.App(root)
     app.v_input.set(str(make_fixture()))
     app.v_output.set(str(_tmp / "gui.mid"))
@@ -530,10 +543,7 @@ def test_gui_table_shows_every_drum_the_pipeline_prints():
     The results table looks each row up by name; a rename in drum2midi.py would make
     rows fall back to plain text without anything failing.
     """
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("gui", ROOT / "drum2midi_gui.pyw")
-    gui = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gui)
+    gui = load_gui()
     import drum2midi
     printed = {name.lower() for name in drum2midi.GM_NAMES.values()}
     missing = sorted(printed - set(gui.LABEL_TO_PITCH))

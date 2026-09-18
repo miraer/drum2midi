@@ -991,6 +991,18 @@ python setup_env.py --check
 The code in this repository is MIT. **The models it depends on are not.** The same table
 lives in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), so it travels with the code.
 
+MIT on this repository is not a claim that the assembled pipeline is free for commercial
+use, and it cannot be: nobody can relicense somebody else's weights by wrapping them.
+What it means is narrower and worth stating plainly:
+
+- **MIT covers this code and the two files in `models/`.** Those two are trained by
+  `train_models.py` on GMD, which is CC BY 4.0, so they carry no non-commercial terms.
+- **The NC models are not in this repository.** The install steps download them from
+  their authors, whose licences reach you directly and unchanged.
+- **With the default models, the assembled pipeline is non-commercial**, because the
+  strictest licence in the set governs the combination. ADTOF and the LarsNet weights
+  are CC BY-NC.
+
 | Component | License | Commercial use |
 |---|---|---|
 | ADTOF | CC BY-NC-SA 4.0 | ❌ |
