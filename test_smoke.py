@@ -648,6 +648,21 @@ def test_midi_is_as_long_as_the_audio():
         f"--no-pad-to-audio ended at {bare_len:.2f}s, last note {max(bare_notes):.2f}s"
 
 
+@test
+def test_nothing_private_is_committed():
+    """No machine paths, account names, private drafts or credentials in the repo.
+
+    A draft letter to a third party was committed once, carrying our reasoning about
+    how and when to approach that company. The history had to be rewritten. This makes
+    the check automatic instead of a good intention, and it covers song titles too, by
+    flagging absolute media paths and non-ASCII audio filenames.
+    """
+    res = subprocess.run([sys.executable, str(ROOT / "check_privacy.py"), "--all"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(ROOT))
+    assert res.returncode == 0, (res.stdout or "")[-900:]
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

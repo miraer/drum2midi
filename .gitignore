@@ -41,6 +41,13 @@ restem_export/
 # Local settings
 gui_settings.json
 *.log
+
+# Correspondence and other drafts that are ours, not the project's. A letter to a
+# third party carries our reasoning about how to approach them, which has no business
+# in a repository that may become public.
+docs/letter-*.md
+docs/private/
+*.draft.md
 *.mid
 *.wav
 *.flac

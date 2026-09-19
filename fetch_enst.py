@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parent
 RECORD = "21506051"
 API = f"https://zenodo.org/api/records/{RECORD}"
 # Zenodo rejects requests without a plausible User-Agent
-HEADERS = {"User-Agent": "drum2midi/1.0 (research use; +https://github.com/miraer/drum2midi)"}
+HEADERS = {"User-Agent": "drum2midi/1.0 (research use)"}
 CHUNK = 1 << 20
 
 
