@@ -61,3 +61,7 @@ docs/private/
 !models/velocity.pkl
 !models/pedal.pkl
 note36.zip
+
+# Vendor documentation: redistribution is explicitly prohibited in the document
+*Users-Guide*.pdf
+*.pdf

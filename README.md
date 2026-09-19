@@ -31,16 +31,15 @@ tom interval is ±0.22 and spans both directions.
 > not neutral parties — we measured a competitor to our own work, using software we had
 > to learn from the outside.
 >
-> One known gap is load-bearing rather than cosmetic: every ReStem figure here comes from
-> its **offline MIDI export**, while its live MIDI port is untested. If hi-hat
-> articulation is decided on that path, the hi-hat row — and therefore the overall row —
-> measures their exporter rather than their model.
-> [What would overturn this, in detail](#where-each-side-wins).
+> The known caveat is a setting: ReStem's hi-hat articulation boundaries are
+> user-adjustable, and we left them at their defaults. At the documented default split,
+> every hi-hat hit in this corpus was labelled closed, which is most of the hi-hat gap.
+> [The detail, and what it does and does not mean](#where-each-side-wins).
 >
 > The ReStem team have been written to and told this is public. If they say the product
 > was used incorrectly, these numbers get rerun and corrected here, and the correction
-> gets stated plainly rather than quietly edited in. That has already happened four times
-> with our own claims.
+> gets stated plainly rather than quietly edited in. That has already happened five times
+> with our own claims — most recently to a caveat in this very section.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
@@ -608,24 +607,25 @@ the same code (`compare_with_restem.py`).
 **Read this section as what it is: one side's measurement of the other side's product.**
 ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
 object before publication. Everything below was learned from the outside — from its
-exports, its `trigger_events.json`, and its interface — by people with an obvious stake
-in the answer. Three specific reasons to hold it loosely:
+exports, its `trigger_events.json`, its interface and its published user's guide — by
+people with an obvious stake in the answer. Three specific reasons to hold it loosely:
 
-- **The export may not be the whole product.** Every figure here comes from ReStem's
-  offline MIDI export. It also emits MIDI live through a virtual loopback port, which we
-  never tested. This is not a remote possibility; it is the single most likely way these
-  numbers are wrong, and it is discussed at length under
-  [Where each side wins](#where-each-side-wins).
+- **Articulation thresholds were left at their defaults.** ReStem's hi-hat and tom
+  classification boundaries are user-adjustable, and the vendor documents adjusting them
+  when articulations land on the wrong note. We adjusted nothing, which is a fair
+  defaults-against-defaults comparison but is not a measurement of the model's ceiling.
 - **The settings were reconstructed, not recorded.** The quality mode in use was
-  established after the fact by matching exports event for event, on two tracks.
+  established after the fact by matching exports event for event, on two tracks. The
+  vendor documents Better and Best as different models; we observed identical MIDI from
+  both on those two tracks, which is an observation about those tracks, not a general
+  claim.
 - **Anything to do with speed or memory is about this machine, not their software.** An
   Intel Arc system with no NVIDIA GPU is not the path their documentation points at, so
   no timing figure from here is quoted as a comparison.
 
 What can be stated without qualification: nothing was extracted from their model files,
 and nothing of theirs is redistributed. The ReStem team have been sent these results and
-asked directly where the articulation is decided. Any correction they send gets applied
-here and labelled as a correction.
+any correction they send gets applied here and labelled as a correction.
 
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
@@ -676,30 +676,24 @@ Stated the way the evidence supports, rather than by reading off the bigger numb
 [+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.033, +0.097]). The overall
 win is essentially the hi-hat win.
 
-> **⚠ The hi-hat result is provisional, and this is the thing most likely to overturn it.**
-> Every ReStem figure here comes from its **offline MIDI export**. ReStem also emits MIDI
-> live through a virtual loopback port — its installer registers "ReStem 2 Feed" and
-> "ReStem 2" via `restem2_midicfg.ps1` — and that path has not been tested here.
+> **⚠ The hi-hat result depends on a setting we left at its default.**
+> ReStem classifies hi-hats by how long each hit rings, converting decay to an
+> "openness" value and splitting it at documented boundaries: below 0.465 closed,
+> 0.465–0.798 pedal, above 0.798 open. Every one of the 188 CC4 values in our exports
+> sat below the first boundary, so everything was labelled closed and no note 46 or 44
+> was ever written.
 >
-> It matters because the hi-hat gap is almost entirely an articulation gap. The exports
-> contain no open hi-hat at all: 42 (closed) appears 188 times on one song, 46 (open) and
-> 44 (pedal) never, and all 188 CC4 values sit below 59, under the "open" threshold of the
-> mapping recovered from the exports themselves.
+> **Those boundaries are user-adjustable**, through a trigger-range editor the vendor
+> documents and recommends when articulations land on the wrong note. We did not touch
+> them — both systems ran at their defaults, which is the comparison we intended, but it
+> means this row measures ReStem's default thresholds against our material rather than
+> the limit of what its model can do. A user tuning the split per song would likely
+> recover open hi-hats that we recorded as closed.
 >
-> Yet the information is demonstrably present in the audio. Measured on ReStem's own
-> separated hi-hat stem, the hits we call open ring **1.51× longer** than the ones we call
-> closed, and that ordering holds for 68% of pairs against 50% for random pairs. So either
-> TrigNet does not use it, or the offline export flattens it. If it is the latter, this
-> section measures ReStem's exporter rather than its model, and both the hi-hat row and
-> the overall row are measuring the wrong thing.
->
-> The test is cheap and has not been run: record the live port on one track and compare
-> its notes and CC4 against the exported file. The catch is that the live port runs in
-> real time, which also switches ReStem's separation to its realtime path, so the two runs
-> would differ in more than one way. If they disagree, both numbers get published.
->
-> The ReStem team have been told this is public and asked directly which path carries the
-> articulation. If the answer changes the figures, the figures change here.
+> Two things that are *not* wrong with it, both checked against the vendor's own
+> documentation after an earlier version of this section guessed otherwise: the offline
+> export is the path they recommend for accuracy over their live MIDI port, and note 60
+> is documented as the "Other" stem's neutral fallback, which is how we read it.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
 intervals that cross zero. The tom row is the starkest: the nominal 0.605 vs 0.699 looks
@@ -711,12 +705,37 @@ This correction was made after the fact. An earlier version of this README claim
 ReStem was better at toms, ghost notes and ride/crash, and us at kick — all read straight
 off the point estimates. Three of those four claims do not survive a bootstrap.
 
+A fifth claim was withdrawn the same day it was published, and it was a caveat rather
+than a boast. This section briefly warned that our hi-hat figure might be measuring
+ReStem's offline exporter rather than its model, since its live MIDI port was untested.
+Their user's guide says the opposite in three separate places: the offline export uses a
+more thorough detector than the live path and is what they recommend when transcription
+accuracy matters. We had guessed at a mechanism instead of reading the manual, and the
+guess happened to be flattering to us — it framed our largest win as possibly unearned,
+which reads as modesty while resting on nothing. The real caveat, which the same document
+supplied, is the adjustable threshold above.
+
+Two of our reverse-engineered findings were confirmed by that document. The articulation
+mapping we recovered blind from the exports — closed below ≈0.46, open above ≈0.76 —
+matches the documented 0.465 and 0.798. And note 60, which we read as "detected but
+unclassified", is documented as the Other stem's neutral fallback.
+
 **Where those claims came from is worth stating.** This project was built largely by an AI
-coding agent (GitHub Copilot) working under direction, and every retracted claim in this
-README was the agent reading a point estimate as though it were a result — confidently,
-fluently, and wrongly. The pattern is consistent enough to be worth naming: it never
-invented a number, and it never hedged one either. What caught them was a standing rule
-that no difference is real until `significance.py` has resampled the tracks around it.
+coding agent (GitHub Copilot) working under direction, and the retractions above fall into
+two kinds, both worth naming.
+
+Four were the agent reading a point estimate as though it were a result — confidently,
+fluently, and wrongly. It never invented a number, and it never hedged one either. What
+caught those was a standing rule that no difference is real until `significance.py` has
+resampled the tracks around it.
+
+The fifth was a different failure and a harder one to guard against: inventing a plausible
+mechanism rather than looking for the documentation that already described it. The
+vendor's user's guide answered the question directly, had anyone gone to find it, and the
+invented explanation survived for a few hours purely because it sounded careful. A rule
+about confidence intervals does nothing against that one. What worked was a person asking
+whether the manual had been read.
+
 The retractions are left in the text rather than quietly edited out, because a write-up
 that shows only the surviving claims tells you nothing about how hard they were tested.
 
