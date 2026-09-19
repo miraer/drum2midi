@@ -431,15 +431,28 @@ all 95 mixes, 7927 annotated onsets:
 | Hi-hat | 4249 | 0.958 | 0.962 | **0.960** |
 | **MICRO** | 7927 | 0.905 | 0.967 | **0.935** |
 
-By recording type: RealDrum 0.938, TechnoDrum 0.922, WaveDrum 0.937 — the settings hold
-across acoustic, electronic and hybrid material.
+By recording type, and this is worth stating with its proportions, because they are
+lopsided (`idmt_by_kind.py`):
+
+| Subset | Files | Onsets | MICRO | What it is |
+|---|---|---|---|---|
+| RealDrum | 14 | 1289 | 0.938 | a real kit in a room |
+| WaveDrum | 70 | 5589 | 0.937 | built from samples |
+| TechnoDrum | 11 | 1049 | 0.922 | a drum machine |
+
+**Three quarters of this corpus is synthetic**, so the obvious worry is that 0.935 is
+flattered by easy material. It does not appear to be: real minus synthetic is **+0.003**,
+95% CI [−0.023, +0.028] — not significant. The caveat is that RealDrum is 14 files, and
+IDMT annotates only kick, snare and hi-hat, so this says nothing about toms or cymbals,
+which are the classes we are actually weakest on.
 
 An earlier version of this table reported **0.942** from the first 20 files. Running the
 remaining 75 moved it to 0.935, so that subset was representative — unlike the stem
 fusion experiment further down, where a small sample was badly misleading.
 
 The score is higher than on MDB because IDMT has no toms or cymbals — the two hardest
-classes.
+classes. [What is actually inside every drum dataset we surveyed](docs/datasets.md),
+including two published descriptions that turned out to be wrong.
 
 **An honest caveat about the separator choice.** On this set the two separators are
 almost tied: `uvr` 0.942 vs `larsnet` 0.939. The large advantage measured on MDB
