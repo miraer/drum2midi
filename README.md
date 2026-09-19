@@ -749,8 +749,8 @@ recall (P 0.764 / R 0.884), we sit closer to balanced (P 0.853 / R 0.914).
 ### Where ReStem breaks
 
 TrigNet sometimes matches the annotation exactly — Disco: kick 118/118, snare 147/147.
-But it **loses the hi-hat entirely on 3 of 23 tracks** (Hendrix, Reggae, Rock), which is
-the same "separator returned an empty stem" failure we handle explicitly, and it
+But it **loses the hi-hat entirely on 4 of 23 tracks** (Hendrix, Reggae, Rock, Zeppelin),
+which is the same "separator returned an empty stem" failure we handle explicitly, and it
 **over-fires on jazz**: 212 hi-hat events against 7 in the reference on FreeJazz.
 
 ### Pedal hi-hat: nobody solves it
@@ -1152,7 +1152,7 @@ Use `--separator larsnet` if you need speed without a GPU.
 instead of an instrument. The pipeline detects this and reads velocity from the mix
 instead, so the output is still usable, just without articulation detail for that drum.
 This is not specific to us: a reviewer measured the same failure on the commercial
-ReStem 2, and our own measurements show it loses the hi-hat entirely on 3 of 23 tracks.
+ReStem 2, and our own measurements show it loses the hi-hat entirely on 4 of 23 tracks.
 
 **Toms come out as kick or snare.** ADTOF's tom class is its weakest — only 1.1% of
 annotated onsets in MDB Drums are toms, so models barely see them. `--rescue-toms on`
