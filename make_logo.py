@@ -152,6 +152,68 @@ def draw_banner(width: int = 1280, height: int = 360) -> Image.Image:
     return img.resize((width, height), Image.LANCZOS)
 
 
+def draw_social(width: int = 1280, height: int = 640) -> Image.Image:
+    """GitHub's social preview card, shown wherever the repo link is pasted.
+
+    Deliberately not the banner at a different aspect ratio. This is often the only
+    thing someone sees before deciding whether to click, so it carries the one claim
+    that distinguishes the project: a measured comparison against a commercial product,
+    with the number that is statistically defensible rather than the flattering one.
+    """
+    scale = 2
+    w, h = width * scale, height * scale
+    img = Image.new("RGB", (w, h), PAPER)
+    d = ImageDraw.Draw(img)
+
+    def font(px: int, bold: bool = True):
+        names = (("segoeuisb.ttf", "seguisb.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf")
+                 if bold else ("segoeui.ttf", "arial.ttf", "DejaVuSans.ttf"))
+        for name in names:
+            try:
+                return ImageFont.truetype(name, px)
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    icon_size = int(h * 0.30)
+    icon = draw_logo(icon_size, transparent=True)
+    left = int(w * 0.075)
+    img.paste(icon, (left, int(h * 0.11)), icon)
+
+    tx = left + icon_size + int(w * 0.035)
+    d.text((tx, int(h * 0.145)), "drum2midi", font=font(int(h * 0.125)), fill=INK)
+    d.text((tx, int(h * 0.285)), "measured, not guessed",
+           font=font(int(h * 0.050), bold=False), fill=WAVE)
+
+    d.text((left, int(h * 0.46)), "Drum recordings to General MIDI,",
+           font=font(int(h * 0.062), bold=False), fill=INK)
+    d.text((left, int(h * 0.545)), "using only open-source models",
+           font=font(int(h * 0.062), bold=False), fill=INK)
+
+    # the comparison, as a small scoreboard rather than a sentence
+    bar_y = int(h * 0.71)
+    d.line([left, bar_y - int(h * 0.035), w - left, bar_y - int(h * 0.035)],
+           fill=(215, 219, 224), width=scale * 2)
+
+    cells = [("0.882", "drum2midi", WAVE),
+             ("0.820", "ReStem 2 Pro, $199", DIM)]
+    x = left
+    for value, label, colour in cells:
+        d.text((x, bar_y), value, font=font(int(h * 0.105)), fill=colour)
+        d.text((x, bar_y + int(h * 0.125)), label,
+               font=font(int(h * 0.040), bold=False), fill=DIM)
+        x += int(w * 0.26)
+
+    d.text((x + int(w * 0.02), bar_y + int(h * 0.015)),
+           "onset F1 on 23 hand-annotated",
+           font=font(int(h * 0.040), bold=False), fill=DIM)
+    d.text((x + int(w * 0.02), bar_y + int(h * 0.070)),
+           "recordings, 95% CI [+0.033, +0.097]",
+           font=font(int(h * 0.040), bold=False), fill=DIM)
+
+    return img.resize((width, height), Image.LANCZOS)
+
+
 def draw_small(size: int) -> Image.Image:
     """A simplified mark for 32 pixels and below.
 
@@ -255,6 +317,10 @@ def main() -> int:
     banner = out / "banner.png"
     draw_banner().save(banner)
     made.append(banner)
+
+    social = out / "social.png"
+    draw_social().save(social)
+    made.append(social)
 
     for p in made:
         print(f"wrote {p}  ({p.stat().st_size // 1024} KB)")

@@ -265,6 +265,11 @@ appears as soon as a file is chosen, and options that do not apply to the select
 separator are greyed out rather than silently ignored. **Folder…** picks a whole folder
 instead of one file; the estimate then reads `12 files, 43.1 min of audio → roughly 7.2 h`.
 
+There is a dark theme too, and the kit behind the results is drawn in code rather than
+photographed, so it carries no licence and matches whichever theme is on:
+
+![drum2midi GUI, dark theme](docs/gui_dark.png)
+
 Each drum has its own colour and icon, used in the results table and in the logo alike:
 
 ![kit icons](docs/kit_icons.png)
