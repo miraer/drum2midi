@@ -10,6 +10,18 @@ This measures decay time on the hi-hat stem at the moments each transcription ma
 and compares the groups.
 
     python check_hihat_decay.py ours.mid path/to/hh.wav
+    python check_hihat_decay.py ours.mid path/to/hh.wav --highpass 1000
+
+`--highpass` exists because of a specific hazard. ReStem's free trial mixes a 603 Hz
+watermark tone into every stem it writes, including offline renders, and the envelope
+here is broadband -- so a tone sitting inside a hit's decay window holds the envelope up
+and inflates the measured decay. A hi-hat's energy is around 12 kHz, so discarding
+everything below 1 kHz costs nothing and removes the watermark entirely. If the ratio
+moves when you add it, the unfiltered number was measuring the watermark.
+
+Note also that the default 22.05 kHz sample rate puts Nyquist at 11 kHz, just below where
+hi-hat energy actually sits. That is fine for a decay envelope, which only needs relative
+amplitude over time, but it is not the tool to reach for if you want spectral detail.
 """
 
 from __future__ import annotations
@@ -22,16 +34,35 @@ import pretty_midi
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-if len(sys.argv) < 3 or {"-h", "--help"} & set(sys.argv[1:]):
+args = [a for a in sys.argv[1:]]
+if {"-h", "--help"} & set(args) or len(args) < 2:
     print(__doc__)
-    raise SystemExit(0 if len(sys.argv) > 1 else 1)
+    raise SystemExit(0 if args else 1)
 
-mid_path, stem_path = Path(sys.argv[1]), Path(sys.argv[2])
+highpass = 0.0
+if "--highpass" in args:
+    i = args.index("--highpass")
+    highpass = float(args[i + 1])
+    del args[i:i + 2]
+
+mid_path, stem_path = Path(args[0]), Path(args[1])
 SR = 22050
 
 import librosa
 
 y, _ = librosa.load(str(stem_path), sr=SR, mono=True)
+if highpass > 0:
+    # one-pole-per-stage Butterworth would need scipy; a windowed-sinc FIR is enough
+    # here and keeps the dependency list as it is
+    n = 257
+    fc = highpass / (SR / 2)
+    k = np.arange(n) - (n - 1) / 2
+    lp = np.sinc(fc * k) * fc * np.hanning(n)
+    lp /= lp.sum()
+    hp = -lp
+    hp[(n - 1) // 2] += 1.0
+    y = np.convolve(y, hp, mode="same")
+    print(f"high-passed above {highpass:.0f} Hz before measuring")
 notes = sorted(((n.start, n.pitch) for inst in pretty_midi.PrettyMIDI(str(mid_path)).instruments
                 for n in inst.notes))
 
