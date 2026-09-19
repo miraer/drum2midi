@@ -707,6 +707,15 @@ snare. That is two tracks, chosen for contrast rather than at random, so it is e
 that the comparison ran at or near ReStem's best — not a proof that the two modes are
 identical in general.
 
+**Why "identical" here is not a collection artefact.** Copying a render out of ReStem's
+cache can pick up the previous one if a wait gives up early, and two files being identical
+is exactly what that looks like — so the claim was re-checked rather than trusted
+(`verify_restem_events.py`). The Better renders come from the 23-track batch of
+**17 September** and the Best renders from **19 September**, two days apart, through
+different scripts, with a different cache state in between. A stale copy cannot cross
+that. Every collected file also has its last onset inside its own audio, 95–96% of the
+way through, which is what rules out a file belonging to a different recording.
+
 Two caveats on the machine rather than the software. Their offline renderer wants around
 5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
 computes through Vulkan; forcing it off — which was tried here on the strength of an older
