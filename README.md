@@ -705,22 +705,31 @@ one with the most. Only Bleed Reduction changed anything, and it lost on both: o
 emits 7 toms where the reference has none; on Beatles it gains 0.009 on toms and loses
 0.011 on snare.
 
-> **⏳ That identity is not yet verified at the point that matters, and it is suspicious.**
-> The vendor documents Better and Best as *different models*, so byte-identical trigger
-> events from both is a strong claim. What is established: the engine is deterministic
-> (two runs of one mode are byte-identical), the Better and Best files were collected two
-> days apart through different scripts so neither is a stale copy of the other, and the
-> Bleed Reduction switch demonstrably does change output.
->
-> What is **not** established is that the Better/Best selector was applied to those
-> renders. The log that records the mode shown in the window was overwritten, and
-> ReStem's guide describes a separate `Reprocess` action, which leaves open that loading
-> a file re-emits a cached result rather than recomputing it.
->
-> The decisive test is the separated audio rather than the MIDI: two different separation
-> models must produce different stems even where the trigger events coincide. That test
-> is queued on the machine that still has a trial. Until it lands, read this row as "we
-> could not make the two modes differ", not as "the two modes are the same".
+**That identity was doubted here and then tested properly**, because the vendor documents
+Better and Best as different models and byte-identical trigger events from both is an
+extraordinary claim. The original evidence could not rule out that the selector had never
+been applied: ReStem's guide describes a separate `Reprocess` action, so a cached result
+re-emitted would advance the cache timestamp, satisfy the old guard and look exactly like
+agreement.
+
+So the test moved off the MIDI and onto the audio, since two different separation models
+must produce different **stems** even where the trigger engine agrees
+(`restem_mode_evidence.ps1`, `compare_mode_evidence.py`). On MusicDelta_FunkJazz — 49
+seconds and 367 events, far richer than the 24-event track the claim first rested on —
+with the mode read from the window before each render and the run refusing if it was
+wrong:
+
+| | Better (Offline) | Best (Offline) |
+|---|---|---|
+| input sha256 | identical | identical |
+| render time | 231.4 s | 163.9 s |
+| separated stems | **all 7 differ** | |
+| `trigger_events.json` | **byte-identical**, 367 events | |
+
+The modes are real and the separation genuinely changes. **TrigNet lands on exactly the
+same events regardless.** That also answers whether the capture was simply blind to
+change: it detected it in the stems, so the agreement in the events is not an artefact of
+the method.
 
 Two caveats on the machine rather than the software. Their offline renderer wants around
 5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
