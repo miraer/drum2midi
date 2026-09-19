@@ -26,6 +26,22 @@ almost entirely by the hi-hat. The per-class rows for kick, snare, cymbals and *
 are not evidence of anything: MDB holds just **90 tom onsets, 1.14% of the set**, so the
 tom interval is ±0.22 and spans both directions.
 
+> **⚠ These are our measurements of someone else's product, and they may be wrong.**
+> ReStem's developers were not involved in any of this and have not reviewed it. We are
+> not neutral parties — we measured a competitor to our own work, using software we had
+> to learn from the outside.
+>
+> One known gap is load-bearing rather than cosmetic: every ReStem figure here comes from
+> its **offline MIDI export**, while its live MIDI port is untested. If hi-hat
+> articulation is decided on that path, the hi-hat row — and therefore the overall row —
+> measures their exporter rather than their model.
+> [What would overturn this, in detail](#where-each-side-wins).
+>
+> The ReStem team have been written to and told this is public. If they say the product
+> was used incorrectly, these numbers get rerun and corrected here, and the correction
+> gets stated plainly rather than quietly edited in. That has already happened four times
+> with our own claims.
+
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
 (`restem_ui.ps1`) and its normal MIDI export was converted with `restem_to_midi.py`;
@@ -588,6 +604,28 @@ still usable, but expect tom fills to suffer.
 As far as I know there are no published accuracy figures for ReStem, so this is the first
 symmetric measurement. Both systems were run over the same 23 MDB tracks and scored by
 the same code (`compare_with_restem.py`).
+
+**Read this section as what it is: one side's measurement of the other side's product.**
+ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
+object before publication. Everything below was learned from the outside — from its
+exports, its `trigger_events.json`, and its interface — by people with an obvious stake
+in the answer. Three specific reasons to hold it loosely:
+
+- **The export may not be the whole product.** Every figure here comes from ReStem's
+  offline MIDI export. It also emits MIDI live through a virtual loopback port, which we
+  never tested. This is not a remote possibility; it is the single most likely way these
+  numbers are wrong, and it is discussed at length under
+  [Where each side wins](#where-each-side-wins).
+- **The settings were reconstructed, not recorded.** The quality mode in use was
+  established after the fact by matching exports event for event, on two tracks.
+- **Anything to do with speed or memory is about this machine, not their software.** An
+  Intel Arc system with no NVIDIA GPU is not the path their documentation points at, so
+  no timing figure from here is quoted as a comparison.
+
+What can be stated without qualification: nothing was extracted from their model files,
+and nothing of theirs is redistributed. The ReStem team have been sent these results and
+asked directly where the articulation is decided. Any correction they send gets applied
+here and labelled as a correction.
 
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
