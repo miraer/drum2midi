@@ -117,3 +117,17 @@ The second rule follows from five claims withdrawn in a single day, four of them
 error: a figure taken from one recording and never counted across the corpus. **An
 observation about one recording is not a finding until something has counted the rest**,
 and the enforcement is a script rather than more care.
+
+The third rule was paid for three times in the same week, once in the published README:
+a figure read out of one run and written beside a figure from another, with nothing in
+either log saying which run produced it. A stale default sent `significance.py` at an
+export that predated a constant; a half-width was a hardcoded number no script computed;
+a tom recall belonged to a rival policy measured elsewhere. **A number is not usable
+until something states what produced it**, so the scripts print the export they scored
+rather than leaving it to the person reading the log.
+
+The fourth comes from the second machine, about E-GMD: its 45 537 files are 1059
+performances rendered through 43 kits, so resampling files instead of performances gives
+intervals 6.6× too narrow. **The resampling unit is the thing that actually varies** —
+the recording on MDB, the performance on E-GMD — and getting it wrong does not look like
+an error, it looks like a stronger result.
