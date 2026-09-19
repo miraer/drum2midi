@@ -19,6 +19,10 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+if {"-h", "--help"} & set(sys.argv[1:]):
+    print(__doc__)
+    raise SystemExit(0)
+
 ROOT = Path(__file__).resolve().parent
 ANN = ROOT / "mdbdrums" / "MDB Drums" / "annotations" / "class"
 RESTEM = ROOT / "restem_midi"
