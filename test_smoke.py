@@ -599,6 +599,55 @@ def test_embedded_runtime_runs_pth_files():
             "runtime/sitecustomize.py is stale; re-run make_embedded.py"
 
 
+@test
+def test_midi_is_as_long_as_the_audio():
+    """The clip must match the recording, not stop at the last drum hit.
+
+    A song whose drums finish before the final chord produced a MIDI file shorter than
+    the audio. Dropped into a DAW, that clip has no anchor at its right-hand edge, and
+    aligning it by eye against the waveform is easy to get wrong -- which is how a
+    correct transcription came to look as though it were missing its ending.
+    """
+    import mido
+    import pretty_midi
+    import soundfile as sf
+
+    out, _ = run_pipeline("--no-separate")
+    duration = sf.info(str(make_fixture())).duration
+    length = mido.MidiFile(str(out)).length
+    assert abs(length - duration) < 0.05, \
+        f"MIDI is {length:.2f}s for {duration:.2f}s of audio"
+
+    # the notes themselves must not be moved or invented by the padding
+    notes = [n.start for i in pretty_midi.PrettyMIDI(str(out)).instruments for n in i.notes]
+    assert notes, "no notes written"
+    assert max(notes) <= duration + 0.01, "a note lands after the end of the audio"
+
+    # and the other end: a track whose first hit arrives late must still start at zero,
+    # or a DAW anchors the clip to the first note instead of to the recording
+    mf = mido.MidiFile(str(out))
+    for i, track in enumerate(mf.tracks):
+        assert track[0].time == 0, f"track {i} starts {track[0].time} ticks in"
+    with_notes = [t for t in mf.tracks if any(m.type == "note_on" for m in t)]
+    assert with_notes, "no track carries notes"
+    for track in with_notes:
+        first_note = next(i for i, m in enumerate(track) if m.type == "note_on")
+        assert any(m.time == 0 for m in track[:first_note]), \
+            "the note track has nothing at tick 0 to anchor the clip"
+
+    # and it must be possible to turn off, in which case the file ends at the last
+    # note. The fixture is short, so compare against the notes rather than against a
+    # fixed margin.
+    bare, _ = run_pipeline("--no-separate", "--no-pad-to-audio")
+    bare_len = mido.MidiFile(str(bare)).length
+    bare_notes = [n.start for i in pretty_midi.PrettyMIDI(str(bare)).instruments
+                  for n in i.notes]
+    assert bare_len < duration - 0.05, \
+        f"--no-pad-to-audio still ran to the end of the audio: {bare_len:.2f}s"
+    assert abs(bare_len - max(bare_notes)) < 0.25, \
+        f"--no-pad-to-audio ended at {bare_len:.2f}s, last note {max(bare_notes):.2f}s"
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

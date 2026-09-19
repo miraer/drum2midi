@@ -107,6 +107,9 @@ def main() -> int:
         (3, "re-transcribe the user's track with current defaults",
          ["drum2midi.py", str(stem), "-o", "bench/overnight_track.mid"]
          if stem else None),
+        # Does the transcriber's blind spot predict where it scores badly? If the
+        # correlation is near zero the fallback idea dies and that is the result.
+        (5, "blind spots across MDB, against per-track F1", ["blind_spots_mdb.py"]),
     ]
 
     with keep_awake() as granted:

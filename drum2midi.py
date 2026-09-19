@@ -868,10 +868,42 @@ def apply_channels(path: Path, channel_by_pitch: Dict[int, int]) -> None:
     mf.save(str(path))
 
 
+def pad_to_duration(path: Path, seconds: float, tempo: float) -> bool:
+    """Extends the file's end-of-track to cover the whole recording.
+
+    By default a MIDI file stops at its last note, so a song whose drums finish before
+    the final chord produces a clip shorter than the audio. Dropped into a DAW that
+    clip has no visual anchor at its right-hand edge, and lining it up by eye against
+    the waveform is easy to get wrong -- which is exactly how a correct transcription
+    came to look like it was missing its ending.
+
+    Making the clip exactly as long as the audio means it can be dropped at bar one and
+    left alone.
+    """
+    import mido
+
+    mf = mido.MidiFile(str(path))
+    target = int(round(seconds * tempo / 60.0 * mf.ticks_per_beat))
+    changed = False
+    for track in mf.tracks:
+        total = sum(msg.time for msg in track)
+        if total >= target:
+            continue
+        for msg in reversed(track):
+            if msg.type == "end_of_track":
+                msg.time += target - total
+                changed = True
+                break
+    if changed:
+        mf.save(str(path))
+    return changed
+
+
 def write_midi(events: List[tuple], out_path: Path, tempo: float,
                note_len: float, grid: Optional[int], split_tracks: bool = False,
                note_map: Optional[Dict[int, int]] = None,
-               channel_map: Optional[Dict[int, int]] = None) -> None:
+               channel_map: Optional[Dict[int, int]] = None,
+               duration: Optional[float] = None) -> None:
     import pretty_midi
 
     note_map = note_map or {}
@@ -926,6 +958,9 @@ def write_midi(events: List[tuple], out_path: Path, tempo: float,
             final.setdefault(p, ch)
         apply_channels(out_path, final)
 
+    if duration:
+        pad_to_duration(out_path, duration, tempo)
+
 
 # --------------------------------------------------------------------------
 
@@ -968,6 +1003,10 @@ def main() -> int:
                         "htdemucs.yaml; compare_extractors.py scores the alternatives")
     p.add_argument("--no-split-ride", action="store_true",
                    help="Keep every cymbal as crash even when a ride stem is available")
+    p.add_argument("--no-pad-to-audio", action="store_true",
+                   help="End the MIDI at the last note instead of at the end of the "
+                        "recording. The default matches the audio length so the clip "
+                        "lines up in a DAW without being dragged into place")
     p.add_argument("--no-separate", action="store_true",
                    help="Skip LarsNet: much faster, but flat velocity 100 and no articulations")
     p.add_argument("--wiener", type=float, default=1.0,
@@ -1305,8 +1344,11 @@ def convert_one(args, src: Path, out_path: Path) -> int:
     tempo = args.tempo or estimate_tempo(audio)
     log(f"[4/4] Writing MIDI at {tempo:.1f} BPM"
         + (f", quantized to 1/{args.quantize}" if args.quantize else ", unquantized"))
+    # The file is made as long as the recording unless asked otherwise, so the clip
+    # lines up with the audio in a DAW instead of stopping at the last drum hit.
+    duration = None if args.no_pad_to_audio else audio.shape[-1] / SR
     write_midi(events, out_path, tempo, args.note_len, args.quantize, args.split_tracks,
-               note_map=note_map, channel_map=channel_map)
+               note_map=note_map, channel_map=channel_map, duration=duration)
     user_notes = {k: v for k, v in note_map.items() if OUTPUT_NOTES.get(k) != v}
     if channel_map or user_notes:
         bits = []
