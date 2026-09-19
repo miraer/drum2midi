@@ -567,11 +567,40 @@ across them:
 Solos hold a third of the tom onsets in a twentieth of the recordings, and score below
 the phrases — density is not the difficulty, the playing is.
 
-**One recording of the 210 transcribed to nothing at all**: `048_phrase_afro_simple_slow_mallets`,
-played with mallets. It is scored as zero estimates rather than dropped, so it is paying
-its full penalty in every figure above. This is [the same deafness as Limitation 7](#limitations),
-but where that one describes passages inside a track, this is a whole recording — 1 of
-210, counted, not estimated.
+**Soft beaters are a measured class failure, not an anecdote.** The run reported one
+recording of 210 that transcribed to nothing at all — `048_phrase_afro_simple_slow_mallets`.
+ENST names the beater in every filename, so the obvious hypothesis was checkable rather
+than arguable (`enst_mallets.py`, scoring the cached transcriptions, no inference):
+
+| beater | recordings | reference onsets | emitted | MICRO F1 |
+|---|---|---|---|---|
+| sticks | 160 | 36 582 | 33 520 | 0.873 |
+| rods | 9 | 1446 | 1295 | 0.832 |
+| brushes | 32 | 5490 | 4271 | 0.616 |
+| **mallets** | **8** | **751** | **311** | **0.409** |
+
+Mallets against every other beater: **−0.433, 95% CI [−0.660, −0.351]**, resampling
+recordings. The gradient runs with how soft the attack is, and so does the share of
+onsets that never get emitted at all — 92% of references are matched by an estimate under
+sticks, 41% under mallets. The pipeline is built on onset detection and a mallet barely
+has an onset.
+
+Seven of those eight recordings are one drummer playing afro material, so the table above
+confounds the beater with the repertoire. ENST has the same material played with sticks,
+which separates them:
+
+| | mallets | sticks | difference |
+|---|---|---|---|
+| afro | 0.347 (7) | 0.775 (10) | **−0.428, CI [−0.653, −0.323]** |
+
+Same style, same corpus, same scoring — so it is the beater. The one other mallet
+recording is a tom solo by a different drummer and it scores 0.531 against 0.599 for the
+stick tom solo, pointing the same way on a sample too small to resample, which the script
+says rather than dressing up.
+
+This is [the same deafness as Limitation 8](#limitations) with a name attached: where
+that one describes passages inside a track, this is the material property that produces
+them.
 
 ENST is **CC BY-NC-ND**: evaluation only. Nothing here is trained on it and no derived
 annotations are redistributed.
@@ -1482,8 +1511,14 @@ python setup_env.py --check
 4. **Ghost notes** — 0.718 vs ReStem's 0.747.
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.
-6. **Jazz** — brushes and swing remain the hardest material.
-7. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
+6. **Jazz** — brushes and swing remain the hardest material. ENST puts a number on the
+   brush half: MICRO 0.616 across 32 brush recordings against 0.873 for sticks.
+7. **Soft beaters.** Mallets score MICRO **0.409** against 0.841 for every other beater,
+   95% CI [−0.660, −0.351], and emit only 41% as many notes as the annotation contains.
+   The same afro material played with sticks scores 0.775 against 0.347, so it is the
+   beater rather than the repertoire. One mallet recording of 210 transcribes to nothing
+   at all. `enst_mallets.py` measures it; nothing yet fixes it.
+8. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
    audible onsets transcribed to nothing. This is not a threshold that could be lowered —
    the activations there peak at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which
    is noise rather than a near miss. The material is percussive but dull, harmonic
@@ -1494,7 +1529,7 @@ python setup_env.py --check
    [was measured and does not
    work](#-a-fallback-for-the-passages-where-adtof-goes-silent). Unsolved, and no approach
    currently proposed.
-8. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
+9. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
 
 What is queued against each of these, and what measurement would settle it, is in
@@ -1576,6 +1611,7 @@ transcriber from scratch.
 | `verify_adt_str.py` | check a third-party model reproduces its own published numbers |
 | `compare_idm.py` | Inverse Drum Machine vs MDX23C for the velocity stage |
 | **Analysis** | |
+| `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
 | `analyze_ghosts.py` | recall by hit strength; is it fixable by threshold |
 | `analyze_ghost_fusion.py` | do stems recover quiet hits |
 | `analyze_pedal.py` | feature separability for pedal hi-hat |
