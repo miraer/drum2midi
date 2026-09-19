@@ -379,9 +379,22 @@ class App(ttk.Frame):
                   style="Ok.TLabel" if gpu else "Dim.TLabel"
                   ).grid(row=len(SEPARATORS), column=0, sticky="w", pady=(6, 0))
 
-        opts = ttk.LabelFrame(self, text="Options", padding=10)
-        opts.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        # Options and the channel map are both "settings you set before converting", so
+        # they live together in one notebook rather than having one of them exiled to
+        # the results pane at the bottom, which is where output belongs.
+        opt_nb = ttk.Notebook(self)
+        opt_nb.grid(row=3, column=0, sticky="ew", pady=(10, 0))
+        opts = ttk.Frame(opt_nb, padding=10)
+        adv = ttk.Frame(opt_nb, padding=10)
+        opt_nb.add(opts, text="Options")
+        opt_nb.add(adv, text="Channels & notes")
         opts.columnconfigure(3, weight=1)
+        # A notebook sizes itself to its tallest tab, and the channel map is three times
+        # the height of the options. Left alone that donates 340px of empty space to the
+        # options tab and takes it from the results pane below, which is the part worth
+        # the room. So it follows whichever tab is actually showing.
+        self._opt_nb = opt_nb
+        opt_nb.bind("<<NotebookTabChanged>>", self._fit_settings_tab, add="+")
         self.cb_fuse = ttk.Checkbutton(
             opts, text="fuse onsets found in stems", variable=self.v_fuse)
         self.cb_fuse.grid(row=0, column=0, sticky="w", columnspan=2)
@@ -414,6 +427,8 @@ class App(ttk.Frame):
         ttk.Entry(tempo_row, textvariable=self.v_tempo, width=7).grid(row=0, column=0)
         ttk.Label(tempo_row, text="BPM — empty = detect automatically",
                   style="Dim.TLabel").grid(row=0, column=1, padx=(6, 0))
+
+        self._build_advanced(adv)
 
         run = ttk.Frame(self)
         run.grid(row=4, column=0, sticky="ew", pady=(10, 2))
@@ -449,15 +464,11 @@ class App(ttk.Frame):
         nb.grid(row=6, column=0, sticky="nsew")
         res = ttk.Frame(nb, padding=6)
         logf = ttk.Frame(nb, padding=6)
-        adv = ttk.Frame(nb, padding=6)
         nb.add(res, text="Result")
         nb.add(logf, text="Log")
-        nb.add(adv, text="Channels & notes")
         for f in (res, logf):
             f.columnconfigure(0, weight=1)
             f.rowconfigure(0, weight=1)
-
-        self._build_advanced(adv)
 
         self.table = ResultTable(res, self)
         self.table.grid(row=0, column=0, sticky="nsew")
@@ -572,6 +583,18 @@ class App(ttk.Frame):
             self._kit = None
 
     # ------------------------------------------------------- advanced tab
+    def _fit_settings_tab(self, event=None) -> None:
+        """Size the settings notebook to the tab on show, not to the tallest one."""
+        nb = getattr(self, "_opt_nb", None)
+        if not nb or not nb.tabs():
+            return
+        try:
+            current = nb.nametowidget(nb.select())
+        except Exception:
+            return
+        current.update_idletasks()
+        nb.configure(height=max(current.winfo_reqheight(), 1))
+
     def _build_advanced(self, frame: ttk.Frame) -> None:
         """Override table: a custom note and channel for every drum.
 
