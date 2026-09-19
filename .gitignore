@@ -60,3 +60,4 @@ docs/private/
 # without them the pipeline silently falls back to the handcrafted formulas.
 !models/velocity.pkl
 !models/pedal.pkl
+note36.zip
