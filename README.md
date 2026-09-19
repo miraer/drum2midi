@@ -19,6 +19,11 @@ product — on 23 hand-annotated recordings:
 | Ride vs crash | 0.917 | 0.953 | — |
 | Hi-hat articulation | 0.690 | 0.691 | — |
 
+![The same table as a plot: Overall and Hi-hat exclude zero, the other four straddle it](docs/comparison.png)
+
+*Drawn by `plot_comparison.py` from `significance.py`'s own output, so the picture cannot
+drift from the table. The last three rows have no interval and are not plotted.*
+
 **Only two of those rows mean anything.** The intervals come from resampling the 23
 recordings 4000 times (`significance.py`), and every row whose interval contains zero is
 a difference this test set cannot resolve. The overall win is real, and it is carried
