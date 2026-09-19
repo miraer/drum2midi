@@ -14,7 +14,7 @@ Almost nothing. The heavy folders here are all reproducible:
 | MDB Drums | 330 MB | `git clone`, see README Install |
 | E-GMD MIDI | 102 MB | `fetch_egmd.py` |
 | virtual environment | 3.4 GB | rebuilt by `setup_env.py` |
-| **ReStem exports** | **202 MB** | **cannot be reproduced — trial is one machine, seven days** |
+| **ReStem exports** | **202 MB** | **copy them; regenerating needs ReStem, and the trial has an end date** |
 | bench cache | 1.1 GB | re-runnable, but it is hours of compute |
 
 Only the last two are worth copying, and the ReStem exports are only needed for work
@@ -47,10 +47,14 @@ that the critical path comes first.
 **Keep here, and these are the only reasons:**
 
 - anything with `--from-song` or `--separator uvr`, which is separation and wants the GPU
-- **everything involving ReStem** — the trial is tied to this machine, it is driven
-  through its own interface by UI automation, and neither the licence nor the window can
-  travel. This is the one category that genuinely cannot be handed over, so the night
-  slot here belongs to it rather than to arithmetic that could have run elsewhere.
+- **everything involving ReStem** — it is driven through its own window by UI automation,
+  which needs an interactive desktop session, and the trial runs for seven days from
+  activation. Whether that trial can be activated on a second machine is **not something
+  the vendor's documentation states either way**; the guide's only mention of an
+  activation limit is a troubleshooting line about what a purchased *licence* allows. So
+  the constraint here is the clock and the desktop session, not a rule we have read.
+  Either way the night slot on this machine is the scarce thing, and it belongs to
+  ReStem rather than to arithmetic that could run elsewhere.
 - the GUI
 
 ## Setting it up
