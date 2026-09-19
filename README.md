@@ -1451,6 +1451,10 @@ python setup_env.py --check
 8. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
 
+What is queued against each of these, and what measurement would settle it, is in
+[ROADMAP.md](ROADMAP.md) — along with the ideas that were tried, measured and abandoned,
+so nobody proposes them again without new evidence.
+
 ---
 
 ## Licensing — read before using commercially
