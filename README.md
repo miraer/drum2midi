@@ -388,6 +388,17 @@ previous one, so launch overhead dominates and an integrated GPU loses to the CP
 Convolution over a spectrogram is the opposite. So the default splits the work:
 **separation on the GPU, transcription on the CPU.**
 
+**On NVIDIA it does not split.** cuDNN provides fused recurrent kernels that XPU and MPS
+do not, so `auto` sends both stages to CUDA there. That is the documented behaviour of
+those libraries rather than something measured here — this machine has no NVIDIA GPU, and
+the table above is Intel Arc. If you have one, `bench_devices.py` will tell you in a
+minute whether the split is worth forcing with `--device`, and a contradicting result is
+worth an issue.
+
+The GUI reports whichever mapping applies rather than assuming the split; an earlier
+version printed "transcription stays on the CPU" unconditionally, which was wrong on
+every NVIDIA machine.
+
 End to end on a 37-second file: 318 s on the CPU, **70 s** with the split. The output is
 not approximately the same, it is *the same* — 126 notes, every onset matched, maximum
 velocity difference 0, maximum timing difference 0.000 ms (`compare_midi.py`).

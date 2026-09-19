@@ -76,19 +76,40 @@ def note_name_from_text(text: str) -> str:
         return "—"
 
 
-def _accelerator() -> str | None:
-    """Name of the GPU the separator will use, or None when it will run on the CPU.
+def _device_plan() -> tuple[str | None, str | None]:
+    """What each stage will actually run on: (separator name, transcriber name).
+
+    Both come from `pick_devices`, because the split is not fixed — CUDA takes the
+    transcriber too, where cuDNN's fused recurrent kernels beat the CPU, while XPU and
+    MPS do not and leave it behind. Reporting a hardcoded split was wrong on any NVIDIA
+    machine, which is most of them.
 
     Imported lazily and defensively: the GUI must still open when torch is missing
     or a driver is broken.
     """
     try:
         sys.path.insert(0, str(ROOT))
-        from devices import SEPARATOR, describe_device, pick_devices
-        dev = pick_devices("auto")[SEPARATOR]
-        return None if dev == "cpu" else describe_device(dev)
+        from devices import SEPARATOR, TRANSCRIBER, describe_device, pick_devices
+        plan = pick_devices("auto")
+        sep = plan[SEPARATOR]
+        tra = plan[TRANSCRIBER]
+        return (None if sep == "cpu" else describe_device(sep),
+                None if tra == "cpu" else describe_device(tra))
     except Exception:
-        return None
+        return (None, None)
+
+
+def _device_line() -> tuple[str, bool]:
+    """The sentence shown under the separator choices, and whether it is good news."""
+    sep, tra = _device_plan()
+    if sep is None:
+        return ("No supported GPU found — everything runs on the CPU", False)
+    if tra is None:
+        return (f"Separation runs on {sep}; transcription stays on the CPU, "
+                f"where recurrent layers are faster", True)
+    if tra == sep:
+        return (f"Separation and transcription both run on {sep}", True)
+    return (f"Separation runs on {sep}; transcription on {tra}", True)
 
 
 SEPARATORS = [
@@ -370,13 +391,8 @@ class App(ttk.Frame):
         for i, (val, label) in enumerate(SEPARATORS):
             ttk.Radiobutton(sep, text=label, value=val, variable=self.v_sep,
                             command=self._sync).grid(row=i, column=0, sticky="w")
-        gpu = _accelerator()
-        ttk.Label(sep,
-                  text=(f"Separation runs on {gpu}; transcription stays on the CPU, "
-                        f"where recurrent layers are faster"
-                        if gpu else
-                        "No supported GPU found — everything runs on the CPU"),
-                  style="Ok.TLabel" if gpu else "Dim.TLabel"
+        text, ok = _device_line()
+        ttk.Label(sep, text=text, style="Ok.TLabel" if ok else "Dim.TLabel"
                   ).grid(row=len(SEPARATORS), column=0, sticky="w", pady=(6, 0))
 
         # Options and the channel map are both "settings you set before converting", so
@@ -730,8 +746,10 @@ class App(ttk.Frame):
             self.v_estimate.set("")
             return
         # measured on this machine: seconds of processing per second of audio.
-        # MDX23C is the only stage that moves to the GPU, so only its rate changes.
-        gpu = _accelerator() is not None
+        # The rates below were measured with the separator on a GPU and the transcriber
+        # on the CPU. On CUDA the transcriber moves to the GPU too, which makes these
+        # an over-estimate there rather than a wrong shape.
+        gpu = _device_plan()[0] is not None
         rate = {"uvr": 1.9 if gpu else 15.0, "larsnet": 0.6, "none": 0.35,
                 "drumsep": 1.2, "hybrid": 2.9 if gpu else 16.0}.get(self.v_sep.get(), 1.0)
         secs = dur * rate
