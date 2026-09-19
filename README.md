@@ -845,6 +845,74 @@ turns out to be worth more than the isolation.
 Cost: 3.9 hours to build the dataset (would have been 23 without the GPU) and 20 minutes
 to train. Worth it to close a question that had been open since the beginning.
 
+### ❌ A fallback for the passages where ADTOF goes silent
+
+A real song produced a passage the pipeline left completely empty — 24 seconds, 70
+audible onsets, nothing written. Not a threshold problem: ADTOF's activations there peak
+at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which is noise rather than a near
+miss. The material is percussive (harmonic fraction 0.101, stable pitch in 4.6% of
+frames) with a dull spectrum, centroid 2129 Hz against 4037 Hz in the loud sections.
+ReStem does not recognise it either: 73 of the 106 notes it emits there are pitch 60,
+its unclassified bucket.
+
+That suggested a narrow fallback — emit onsets only where the model is silent. Narrow is
+the operative word, because a stem-based onset detector had already been rejected above
+for firing everywhere.
+
+`blind_spots.py` measures how much of a recording falls in that hole: peak-pick the
+audio's own onset envelope, then ask whether any class reacted within 60 ms. A peak
+counts as **blind** when every class stays under *half* its threshold.
+
+Across all 23 MDB tracks (`blind_spots_mdb.py`):
+
+| | |
+|---|---|
+| blind onsets | 101 of 5081 detected, **1.99%** |
+| tracks at exactly zero | **15 of 23** |
+| concentration | 95 of the 101 sit in three tracks |
+| worst track | SwingJazz 19.3%, above the 18.2% of the real song |
+| correlation with per-track F1 | −0.288, 95% CI **[−0.605, +0.143]** |
+
+**The correlation decided nothing, and should not have been asked to.** With 15 tracks
+pinned at zero there is no gradient for it to read — three tracks against twenty, with
+single-event noise between. The criteria for this experiment were written as though a
+correlation would come out decisive; that was a mistake in the experimental design, and
+reporting −0.288 as "near zero, idea dropped" would have been choosing the reading after
+seeing the number.
+
+**What decides it is where the failures actually are.** The worst-scoring tracks are not
+blind:
+
+| track | F1 | blind share |
+|---|---|---|
+| Reggae | 0.631 | **0.0%** (0 of 54) |
+| LatinJazz | 0.668 | **0.0%** (0 of 359) |
+| FreeJazz | 0.731 | 0.5% |
+| SwingJazz | 0.744 | 19.3% |
+| BebopJazz | 0.758 | **0.0%** (0 of 413) |
+
+Three of the five worst tracks contain not one blind onset. The model sees those hits,
+reacts to them, and still gets them wrong — wrong class, wrong time, or spurious. A
+fallback that fires only into silence is **inert on exactly the recordings that need
+help**. The ceiling agrees: granting that every blind peak is a real missed onset and
+that a fallback recovers all of them without a single false positive, 101 of 7924
+annotated onsets is a **1.27%** bound on recall.
+
+The inversion is worth naming, because it was the argument that kept the idea alive.
+"It would not fire at all on four of the six tracks measured" was offered as evidence of
+safety. Measured across 23 tracks, that is inertness on 20 of them, and specifically on
+the ones that score worst. The property that made it seem harmless is the property that
+makes it useless.
+
+Two smaller findings from the same measurement. The blind column was computed with the
+fixed tom threshold while `transcribe()` substitutes an adaptive one, which biases the
+share upward — recomputing both ways moves the mean from 1.823% to 1.703% and changes
+three tracks, so the column is a slight overestimate but not an artefact. And the figures
+reproduced to the digit on a second machine running **librosa 0.11.0 against 1.0.0 here**
+— a major version apart in the library that computes the onset envelope, which is
+stronger evidence that the measurement is a property of the audio than matched versions
+would have been.
+
 ### ❌ A learned ride/crash classifier, and a tuned margin
 
 The largest remaining gap against ReStem that is our own doing rather than a data

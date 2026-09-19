@@ -193,6 +193,21 @@ def check() -> int:
     print("\n  Models")
     if have("adtof_pytorch"):
         print(f"{OK}ADTOF-pytorch")
+        # The two-machine protocol in docs/second-machine.md rests on comparing these
+        # two strings, so they have to be printed rather than merely assumed equal.
+        # An earlier version claimed to print them and did not, which made the
+        # safeguard decorative.
+        try:
+            import hashlib
+
+            from adtof_pytorch import get_default_weights_path
+            weights = Path(get_default_weights_path())
+            raw = weights.read_bytes()
+            print(f"    checkpoint   {weights.name}")
+            print(f"    size         {len(raw)} B")
+            print(f"    sha256       {hashlib.sha256(raw).hexdigest()}")
+        except Exception as exc:
+            print(f"{WARN}could not resolve the ADTOF checkpoint: {exc}")
     else:
         print(f"{BAD}ADTOF-pytorch  (pip install -e ./ADTOF-pytorch)")
         problems += 1
