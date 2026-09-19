@@ -6,8 +6,10 @@ descriptions turned out to be wrong, and one dataset that nobody in this corner 
 literature cites turned out to be the best source of the exact thing this project is
 worst at.
 
-Figures marked **(measured)** were computed from the annotation files. Everything else is
-cited.
+Figures marked **(measured)** were computed from the annotation files. Where they say
+**(measured here)**, they were recomputed in this repository by a script you can run —
+E-GMD's numbers were checked that way and matched the published ones to the digit.
+Everything else is cited.
 
 ---
 
@@ -58,15 +60,39 @@ Tom coverage across the datasets that are actually obtainable:
 | Dataset | Tom onsets | % of set | Tom classes | Acoustic? | Access |
 |---|---|---|---|---|---|
 | TMIDT `midi_drums_bal_l` | 1,101,434 | 16.4% | 3 | no, synthesised | open, **no licence stated** |
-| **E-GMD** | **1,074,753 (measured)** | 7.49% | 3 + rims | no, electronic kit | **open, CC BY 4.0** |
+| **E-GMD** | **1,074,753 (measured here)** | 7.49% | 3 + rims | no, electronic kit | **open, CC BY 4.0** |
 | ADTOF-YT | ~601,092 | ~7.2% | 1 merged | **yes, commercial music** | on request |
 | StemGMD | ~ as E-GMD | ~7% | **3, as isolated stems** | no, sampled kits | open, CC BY 4.0 |
-| **ENST-Drums** | **2,758 (measured)** | 6.03% | **4** | **yes, real kits and rooms** | open, CC BY-NC-SA |
-| RWC 2.0 | 10,199 (measured) | 2.61% | 6 | yes, studio recordings | **open since Feb 2026**, CC BY-NC |
+| **ENST-Drums** | **2,758** | 6.03% | **4** | **yes, real kits and rooms** | open, CC BY-NC-**ND** |
+| RWC 2.0 | 10,199 | 2.61% | 6 | yes, studio recordings | **open since Feb 2026**, CC BY-NC |
 | Slakh2100 | full GM range | — | 6 | no, synthesised | open, CC BY 4.0 |
-| **MDB Drums** (ours) | **90 (measured)** | **1.14%** | 4 subclasses | yes | open, CC BY-NC-SA |
+| **MDB Drums** (ours) | **90 (measured here)** | **1.14%** | 4 subclasses | yes | open, CC BY-NC-SA |
 | IDMT-SMT-Drums (ours) | **0** | 0% | none | partly | open, CC BY-NC-ND |
-| RBMA-13 | **0 (measured)** | 0% | none | yes | open — see correction |
+| RBMA-13 | **0** | 0% | none | yes | open — see correction |
+
+### E-GMD, verified rather than quoted
+
+The MIDI-only archive is 102 MB against 90 GB for the audio and carries the entire
+annotation, so the claims could be checked before committing to the big download
+(`fetch_egmd.py --survey`). All 45,537 files parsed, none unreadable, **14,341,145
+note-ons**, and every published figure matched to the digit:
+
+| Family | Onsets | % |
+|---|---|---|
+| snare | 4,469,307 | 31.16% |
+| hi-hat | 3,913,861 | 27.29% |
+| kick | 2,842,803 | 19.82% |
+| cymbal | 1,824,834 | 12.72% |
+| **tom** | **1,074,753** | **7.49%** |
+| auxiliary (tambourine, clap, cowbell) | 215,587 | 1.50% |
+
+Toms break down as 424,582 on tom 3 head, 386,871 on tom 1, 130,591 on tom 2, plus
+132,709 across the three rims. Velocity spans **4–127**, mean 66.5, 124 distinct values,
+with **48.54% of onsets below 60 and 25.04% below 40** — which is the ghost-note material
+MDB labels but cannot quantify, since its annotations carry no velocity.
+
+Roland TD kits deviate from General MIDI, so those figures depend on the mapping in
+`fetch_egmd.py`; it is the one published with GMD.
 
 ### ENST ships isolated tom stems, which nothing else does
 
@@ -85,7 +111,7 @@ that failure mode instead of repeating it.
 
 | Dataset | Velocity | Ghost-note material |
 |---|---|---|
-| E-GMD | 4–127, 124 distinct values **(measured)** | **48.5% of onsets below 60, 25.0% below 40** |
+| E-GMD | 4–127, mean 66.5, 124 distinct values **(measured here)** | **48.54% of onsets below 60, 25.04% below 40** |
 | StemGMD | inherited from GMD | `StemGMD_single_hits.zip`: every piece at 10 velocities, 30→127 |
 | MDB Drums | subclass labels, not velocity | ghost/buzz annotated as subclasses — the reference standard |
 | RWC 2.0 | 1–127, but **score** velocities | beat-aligned score MIDI, not a transcription of the performance |

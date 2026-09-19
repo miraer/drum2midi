@@ -54,6 +54,11 @@ ROLAND = {
     57: ("crash 2 bow", "cymbal"), 52: ("crash 2 edge", "cymbal"),
     51: ("ride bow", "cymbal"), 59: ("ride edge", "cymbal"),
     53: ("ride bell", "cymbal"),
+    # Auxiliary pads that appear on some kits. Not part of the five classes this
+    # project transcribes, but naming them stops them being reported as "unmapped",
+    # which invites the suspicion that the mapping is wrong.
+    54: ("tambourine", "auxiliary"), 39: ("hand clap", "auxiliary"),
+    56: ("cowbell", "auxiliary"),
 }
 
 
