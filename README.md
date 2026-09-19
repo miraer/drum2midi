@@ -1313,6 +1313,41 @@ nearly all of the available signal, and the extra spectral features describe the
 thing again. With 130 crashes across 17 tracks, a model learns individual cymbals rather
 than the difference between cymbal types. `train_ride.py` reproduces all of this.
 
+### ❌ Lowering the thresholds to rescue soft beaters
+
+[Mallets fail as a class](#enst-drums--the-corpus-that-can-actually-measure-toms), and at
+every annotated mallet onset the model's activation for that onset's own class sits at a
+median of **0.50×** its threshold, against 2.75× for sticks. 13% of mallet onsets land in
+the band between half a threshold and the threshold, which a lower threshold would reach,
+so the obvious remedy has a measurable case for it — unlike the deaf passages, where the
+activations were noise and no threshold could have helped.
+
+Halving all five thresholds does exactly what that predicts, and then some:
+
+| | default | halved | |
+|---|---|---|---|
+| ENST mallets, MICRO | 0.409 | **0.505** | 8 recordings |
+| ENST sticks, MICRO | 0.699 | 0.700 | 24 recordings, unchanged |
+| **MDB MICRO** | **0.882** | **0.827** | **−0.054, CI [−0.089, −0.028]** |
+| **MDB toms** | **0.589** | **0.175** | **−0.414, CI [−0.558, −0.126]** |
+
+So it works, and it is not worth it. The tom row is the reason: on MDB the halved
+threshold emits **722 tom notes where 90 were played**. Toms sit under everything else on
+a real kit, and a threshold low enough to hear a mallet is low enough to hear a snare
+leaking into the tom channel on every backbeat.
+
+The ENST stick number looked at first like the change was free. It is not free, it is
+**unmeasurable there**: ENST is scored without separation, where precision is already low
+and there is less to lose. MDB is scored on separated stems, which is the path the tool
+actually takes. A cost that only appears on the real configuration is still the cost.
+
+Kept as a negative result rather than an option, because a flag that improves 8 mallet
+recordings and quietly quadruples false toms on ordinary material is worse than no flag.
+What it does establish is that soft beaters are **not** entirely a signal limit: about a
+tenth of those onsets are reachable, and something narrower than a global threshold —
+detecting the material, or a beater-aware threshold on the tom channel alone — could
+reach them without paying on the backbeat. Nothing of that is built or measured.
+
 ### ❌ Tuning all five thresholds globally (my earlier result was biased)
 
 I originally tuned thresholds on all 23 tracks and reported on those same 23 tracks.
@@ -1517,7 +1552,10 @@ python setup_env.py --check
    95% CI [−0.660, −0.351], and emit only 41% as many notes as the annotation contains.
    The same afro material played with sticks scores 0.775 against 0.347, so it is the
    beater rather than the repertoire. One mallet recording of 210 transcribes to nothing
-   at all. `enst_mallets.py` measures it; nothing yet fixes it.
+   at all. Half of those onsets are noise the model cannot see; about a tenth sit just
+   under the threshold, and [lowering it to reach them costs far more than it
+   buys](#-lowering-the-thresholds-to-rescue-soft-beaters). `enst_mallets.py` and
+   `enst_beater_activations.py` measure it; nothing yet fixes it.
 8. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
    audible onsets transcribed to nothing. This is not a threshold that could be lowered —
    the activations there peak at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which
@@ -1612,6 +1650,7 @@ transcriber from scratch.
 | `compare_idm.py` | Inverse Drum Machine vs MDX23C for the velocity stage |
 | **Analysis** | |
 | `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
+| `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
 | `analyze_ghosts.py` | recall by hit strength; is it fixable by threshold |
 | `analyze_ghost_fusion.py` | do stems recover quiet hits |
 | `analyze_pedal.py` | feature separability for pedal hi-hat |

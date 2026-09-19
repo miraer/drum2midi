@@ -105,6 +105,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--mix", default="wet_mix", choices=["wet_mix", "dry_mix"])
     ap.add_argument("--kinds", default="phrase,solo,minus-one,MIDI-minus-one")
+    ap.add_argument("--only", default=None,
+                    help="substring the recording name must contain, e.g. mallets")
     ap.add_argument("--include-hits", action="store_true")
     ap.add_argument("--rescore", action="store_true")
     ap.add_argument("--tag", default="enst")
@@ -141,6 +143,8 @@ def main() -> int:
             if len(parts) < 2 or parts[1] not in kinds:
                 continue
             wav = data / f"drummer_{d}" / "audio" / args.mix / f"{ann.stem}.wav"
+            if args.only and args.only not in ann.stem:
+                continue
             if wav.exists():
                 items.append((f"d{d}/{ann.stem}", wav, ann, parts[1]))
     items = items[: args.limit]
