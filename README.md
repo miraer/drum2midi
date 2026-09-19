@@ -7,22 +7,30 @@ Convert a mixed drum recording into MIDI, using only open-source models.
 **Measured against [ReStem 2 Pro](https://restemapp.com/restem2)** — a $199 commercial
 product — on 23 hand-annotated recordings:
 
-| | drum2midi | ReStem 2 Pro |
-|---|---|---|
-| **Overall onset F1** | **0.882** | 0.820 |
-| Kick | **0.960** | 0.951 |
-| Snare | 0.844 | 0.845 |
-| Hi-hat | **0.892** | 0.754 |
-| Cymbals | **0.869** | 0.755 |
-| Toms | 0.605 | **0.699** |
-| Ghost notes (recall) | 0.718 | **0.747** |
-| Ride vs crash | 0.917 | **0.953** |
-| Hi-hat articulation | 0.690 | 0.691 |
+| | drum2midi | ReStem 2 Pro | 95% CI on the difference |
+|---|---|---|---|
+| **Overall onset F1** | **0.882** | 0.820 | **[+0.033, +0.097]** |
+| Kick | 0.960 | 0.951 | [−0.013, +0.040] |
+| Snare | 0.844 | 0.845 | [−0.025, +0.020] |
+| Hi-hat | **0.892** | 0.754 | **[+0.062, +0.249]** |
+| Cymbals | 0.869 | 0.755 | [−0.004, +0.373] |
+| Toms | 0.605 | 0.699 | [−0.304, +0.139] |
+| Ghost notes (recall) | 0.718 | 0.747 | — |
+| Ride vs crash | 0.917 | 0.953 | — |
+| Hi-hat articulation | 0.690 | 0.691 | — |
+
+**Only two of those rows mean anything.** The intervals come from resampling the 23
+recordings 4000 times (`significance.py`), and every row whose interval contains zero is
+a difference this test set cannot resolve. The overall win is real, and it is carried
+almost entirely by the hi-hat. The per-class rows for kick, snare, cymbals and **toms**
+are not evidence of anything: MDB holds just **90 tom onsets, 1.14% of the set**, so the
+tom interval is ±0.22 and spans both directions.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
 (`restem_ui.ps1`) and its normal MIDI export was converted with `restem_to_midi.py`;
-nothing was extracted from its model files. Reproduce with `compare_with_restem.py` —
+nothing was extracted from its model files. Reproduce with `compare_with_restem.py` and
+`significance.py` —
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
 On a second, independent corpus — all 95 files of IDMT-SMT-Drums, 7927 onsets — the same
@@ -312,16 +320,22 @@ but only **6 are performance cores** — the other 8 (plus 2 low-power) are effi
 cores running the same work several times slower. A parallel op splits the work evenly
 and then joins, so the share that lands on an E-core holds up the whole layer.
 
-Measured with the real ADTOF model:
+Measured with the real ADTOF model, first on a machine that was also running benchmarks,
+then again on an idle one:
 
-| threads | 1 | 2 | **6** | 8 | 12 | 16 | 22 |
-|---|---|---|---|---|---|---|---|
-| ms | 5673 | 2099 | **2089** | 4097 | 4945 | 5565 | 7941 |
+| threads | 1 | 2 | 4 | **6** | 8 | 12 | 16 | 22 |
+|---|---|---|---|---|---|---|---|---|
+| busy machine, ms | 5673 | 2099 | — | **2089** | 4097 | 4945 | 5565 | 7941 |
+| idle machine, ms | 2607 | 2140 | 1748 | **1553** | 4359 | 4750 | 1967 | 2222 |
 
-PyTorch's default of 16 was **2.66x slower** than 6, and using every logical CPU was
-worse than using a single thread. During a real conversion the machine sat at 35% total
-load with eight logical cores busy and the rest idle — not a shortage of parallelism but
-a surplus of it.
+6 threads wins both times, but **the size of the win depends on what else the machine is
+doing**: 2.66x over torch's default of 16 under load, and 1.27x when idle. The honest
+figure to quote is the idle one, 1.27x, because that is the condition a user converting a
+single file is in. The earlier 2.66x was measured while a benchmark was running and is
+kept here only to show how much contention distorts this kind of measurement.
+
+The shape of the curve is stable across both runs and is the real finding: performance
+collapses between 6 and 12 threads, exactly where work starts landing on E-cores.
 
 So `cpu_threads.py` asks Windows for the per-core `EfficiencyClass`
 (`GetLogicalProcessorInformationEx`) and uses the count of top-class cores. On a uniform
@@ -477,10 +491,11 @@ annotations, so the cost of that extra stage can be measured directly:
 **Toms are the exception**: they nearly halve, 0.573 → 0.328. They are the quietest and
 rarest part of the kit, so whatever htdemucs leaves behind hurts them most.
 
-**The extractor itself was never compared.** htdemucs is what `audio-separator` offers
-first, and unlike every other component here it was adopted without measurement — which
-is uncomfortable, because it sits on the weakest path in the whole pipeline. The catalogue
-holds four models that emit a drums stem, and their published SDR spans 1.5 dB:
+**The extractor was finally compared, and the choice turned out not to matter.** htdemucs
+is what `audio-separator` offers first, and unlike every other component here it was
+adopted without measurement — which was uncomfortable, because it sits on the weakest
+path in the whole pipeline. The catalogue holds four models that emit a drums stem, and
+their published SDR spans 1.5 dB:
 
 | model | drums SDR |
 |---|---|
@@ -489,9 +504,28 @@ holds four models that emit a drums stem, and their published SDR spans 1.5 dB:
 | `htdemucs` (default) | 9.4 |
 | `htdemucs_6s` | 8.5 |
 
-SDR is not this project's metric, so `compare_extractors.py` runs each of them over MDB's
-full mixes, transcribes the result and scores the MIDI against the same annotations.
-`--extractor htdemucs_ft.yaml` selects one.
+SDR is not this project's metric, so `compare_extractors.py` ran each of them over all 23
+MDB full mixes, transcribed the result and scored the MIDI against the same annotations.
+`score_extractors.py` reports it, and will score a run that was interrupted:
+
+| extractor | MICRO F1 | 95% CI (bootstrap over tracks) |
+|---|---|---|
+| `hdemucs_mmi` | **0.8363** | [0.7764, 0.8927] |
+| `htdemucs_ft` | 0.8339 | [0.7705, 0.8922] |
+| `htdemucs` (default) | 0.8308 | [0.7654, 0.8920] |
+
+**None of the gaps survive contact with statistics.** Resampling the 23 tracks 4000 times,
+every pairwise difference straddles zero: htdemucs vs `hdemucs_mmi` is −0.0055 with a 95%
+interval of [−0.0125, +0.0019]. The nominal ranking also disagrees with SDR, which put
+`htdemucs_ft` first and `hdemucs_mmi` second — another reminder that separation quality
+and transcription accuracy are not the same axis.
+
+So the default stays `htdemucs`, now for a stated reason rather than by accident: nothing
+measurably beats it. `--extractor hdemucs_mmi.yaml` selects another if you want to try.
+
+The wider lesson is about this test set rather than about Demucs. A single extractor's
+interval spans **±0.06**, so 23 recordings cannot resolve differences smaller than about
+one point of F1 — and the individual claim being tested here is a tenth of that.
 
 It also costs time: the 23 tracks took 12 minutes as stems and 111 minutes as songs,
 because every file goes through the extractor first.
@@ -554,14 +588,24 @@ and it classifies toms **by fundamental pitch** — the same approach as our `sp
 
 ### Where each side wins
 
-**ReStem is better at:** ghost notes (0.747 vs 0.718), ride/crash (0.953 vs 0.917),
-toms (0.699 vs 0.605).
+Stated the way the evidence supports, rather than by reading off the bigger number:
 
-**drum2midi is better at:** hi-hat (0.892 vs 0.754), cymbal onsets (0.869 vs 0.755),
-kick (0.960 vs 0.951), and overall F1 (0.882 vs 0.820).
+**drum2midi is measurably better** at the hi-hat (0.892 vs 0.754, interval
+[+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.033, +0.097]). The overall
+win is essentially the hi-hat win.
 
-The strategies differ: ReStem leans towards recall (P 0.764 / R 0.884), we sit closer to
-balanced (P 0.853 / R 0.914).
+**Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
+intervals that cross zero. The tom row is the starkest: the nominal 0.605 vs 0.699 looks
+like a clear loss for us, but with only 90 tom onsets in the whole corpus the interval is
+[−0.304, +0.139]. We do not know who is better at toms, and neither does anyone else
+using MDB alone.
+
+This correction was made after the fact. An earlier version of this README claimed
+ReStem was better at toms, ghost notes and ride/crash, and us at kick — all read straight
+off the point estimates. Three of those four claims do not survive a bootstrap.
+
+The strategies do differ, and that part is visible in the aggregate: ReStem leans towards
+recall (P 0.764 / R 0.884), we sit closer to balanced (P 0.853 / R 0.914).
 
 ### Where ReStem breaks
 
