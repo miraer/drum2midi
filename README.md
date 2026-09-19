@@ -608,7 +608,9 @@ event (`restem_one.ps1`, `compare_restem_runs.py`).
 Better and Best produce **identical MIDI**, on a track with no toms and on the track with
 the most. Only Bleed Reduction changes anything, and it loses on both: on Rock it emits 7
 toms where the reference has none; on Beatles it gains 0.009 on toms and loses 0.011 on
-snare. So the comparison is against ReStem at its best, and a re-run would change nothing.
+snare. That is two tracks, chosen for contrast rather than at random, so it is evidence
+that the comparison ran at or near ReStem's best — not a proof that the two modes are
+identical in general.
 
 Two caveats on the machine rather than the software. Their offline renderer wants around
 5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
@@ -635,6 +637,31 @@ Stated the way the evidence supports, rather than by reading off the bigger numb
 **drum2midi is measurably better** at the hi-hat (0.892 vs 0.754, interval
 [+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.033, +0.097]). The overall
 win is essentially the hi-hat win.
+
+> **⚠ The hi-hat result is provisional, and this is the thing most likely to overturn it.**
+> Every ReStem figure here comes from its **offline MIDI export**. ReStem also emits MIDI
+> live through a virtual loopback port — its installer registers "ReStem 2 Feed" and
+> "ReStem 2" via `restem2_midicfg.ps1` — and that path has not been tested here.
+>
+> It matters because the hi-hat gap is almost entirely an articulation gap. The exports
+> contain no open hi-hat at all: 42 (closed) appears 188 times on one song, 46 (open) and
+> 44 (pedal) never, and all 188 CC4 values sit below 59, under the "open" threshold of the
+> mapping recovered from the exports themselves.
+>
+> Yet the information is demonstrably present in the audio. Measured on ReStem's own
+> separated hi-hat stem, the hits we call open ring **1.51× longer** than the ones we call
+> closed, and that ordering holds for 68% of pairs against 50% for random pairs. So either
+> TrigNet does not use it, or the offline export flattens it. If it is the latter, this
+> section measures ReStem's exporter rather than its model, and both the hi-hat row and
+> the overall row are measuring the wrong thing.
+>
+> The test is cheap and has not been run: record the live port on one track and compare
+> its notes and CC4 against the exported file. The catch is that the live port runs in
+> real time, which also switches ReStem's separation to its realtime path, so the two runs
+> would differ in more than one way. If they disagree, both numbers get published.
+>
+> The ReStem team have been told this is public and asked directly which path carries the
+> articulation. If the answer changes the figures, the figures change here.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
 intervals that cross zero. The tom row is the starkest: the nominal 0.605 vs 0.699 looks
