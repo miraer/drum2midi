@@ -112,6 +112,15 @@ def main() -> int:
         (5, "blind spots across MDB, against per-track F1", ["blind_spots_mdb.py"]),
     ]
 
+    # ReStem's Best + Bleed Reduction, on the six remaining tom-bearing tracks. Kept
+    # out of `steps` because it drives a GUI rather than running a script: it needs
+    # ReStem open, in that mode, and it takes about 4.5 hours. Two tracks already show
+    # the mode losing, but Bleed Reduction can only move a tom score where toms exist,
+    # and these six carry 60 of MDB's 90 tom onsets.
+    restem_batch = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                    str(ROOT / "restem_batch_mode.ps1"),
+                    "-Expect", "Best (Offline) +", "-Label", "best-plus"]
+
     with keep_awake() as granted:
         say(f"=== overnight run started, sleep {'blocked' if granted else 'NOT blocked'}")
 
@@ -141,6 +150,22 @@ def main() -> int:
                 say(f"extractor comparison finished (waited {waited/3600:.1f} h)")
                 # scores the MIDI already on disk instead of transcribing again
                 run("score the extractor comparison", ["score_extractors.py"])
+
+        if 6 not in args.skip:
+            # The ReStem batch is a GUI job, so it can only run if a human left the
+            # plugin open in the right mode. The script itself refuses to proceed
+            # otherwise, which is what makes it safe to attempt unattended.
+            if not (ROOT / "restem_in").exists():
+                say("SKIP   ReStem Best+ batch: no restem_in")
+            else:
+                say("START  ReStem Best + Bleed Reduction over the tom-bearing tracks")
+                res = subprocess.run(restem_batch, capture_output=True, text=True,
+                                     encoding="utf-8", errors="replace", cwd=str(ROOT))
+                tail = (res.stdout or "").strip().splitlines()
+                for line in tail[-6:]:
+                    say(f"    | {line}")
+                if any("refusing to run" in ln for ln in tail):
+                    say("ReStem was not in Best (Offline) + ; nothing was collected")
 
         run("full test suite", ["test_smoke.py"])
         say("=== overnight run complete")
