@@ -9,12 +9,12 @@ product — on 23 hand-annotated recordings:
 
 | | drum2midi | ReStem 2 Pro | 95% CI on the difference |
 |---|---|---|---|
-| **Overall onset F1** | **0.882** | 0.820 | **[+0.033, +0.097]** |
+| **Overall onset F1** | **0.882** | 0.820 | **[+0.032, +0.097]** |
 | Kick | 0.960 | 0.951 | [−0.013, +0.040] |
 | Snare | 0.844 | 0.845 | [−0.025, +0.020] |
 | Hi-hat | **0.892** | 0.754 | **[+0.062, +0.249]** |
 | Cymbals | 0.869 | 0.755 | [−0.004, +0.373] |
-| Toms | 0.605 | 0.699 | [−0.304, +0.139] |
+| Toms | 0.589 | 0.699 | [−0.313, +0.129] |
 | Ghost notes (recall) | 0.718 | 0.747 | — |
 | Ride vs crash | 0.917 | 0.953 | — |
 | Hi-hat articulation | 0.690 | 0.691 | — |
@@ -427,7 +427,7 @@ Scored with `mir_eval` at the 50 ms MIREX tolerance.
 |---|---|---|---|---|
 | Kick | 1539 | **0.960** | 0.951 | 0.970 |
 | Snare | 2654 | 0.844 | 0.821 | 0.868 |
-| Toms | 90 | 0.605 | 0.520 | 0.722 |
+| Toms | 90 | 0.589 | 0.493 | 0.733 |
 | Hi-hat | 2639 | **0.892** | 0.860 | 0.928 |
 | Cymbals | 1002 | **0.869** | 0.815 | 0.930 |
 | **MICRO** | 7924 | **0.882** | 0.853 | 0.914 |
@@ -480,6 +480,51 @@ almost tied: `uvr` 0.942 vs `larsnet` 0.939. The large advantage measured on MDB
 (0.882 vs 0.860) comes mostly from toms, cymbals and ghost notes — none of which IDMT
 annotates. So `uvr` is the right default for full kits, but if your material is just
 kick/snare/hats, `larsnet` costs almost nothing and is 50x faster.
+
+### ENST-Drums — the corpus that can actually measure toms
+
+MDB holds 90 tom onsets, 1.14% of its annotations, and 16 of its 23 tracks contain none.
+That is not enough to resolve anything about toms: a **+0.282** effect — nearly a doubling
+of tom F1 — produced an interval containing zero. The corpus was not disagreeing with us,
+it was unable to answer.
+
+ENST-Drums is 210 musical recordings across three drummers. Those recordings carry 2617
+tom onsets out of 44 425 annotated onsets — the dataset as a whole holds 2758 toms, the
+rest falling outside the musical subset scored here. On the same `mir_eval` code and
+50 ms window:
+
+| | MDB (23 tracks) | ENST (210 recordings) |
+|---|---|---|
+| tom F1 | 0.589 | 0.539 |
+| **95% CI half-width** | **±0.272** | **±0.087** |
+
+**3.1× narrower.** A +0.10 change in tom F1 is now resolvable; on MDB it was not. The two
+corpora do not disagree — ENST's figure sits inside MDB's interval, which is the cleanest
+demonstration available that the old number was uninformative rather than wrong.
+
+One methodological difference to declare: the ENST runs use `wet_mix` **without
+separation**, on the grounds that the separator provably does not move tom scores on MDB.
+That makes the tom comparison across the two corpora sound, but it is not a like-for-like
+MICRO comparison with the separated MDB figures.
+
+Full five-class picture on ENST, current policy:
+
+| | F1 |
+|---|---|
+| kick | 0.902 |
+| hi-hat | 0.839 |
+| snare | 0.833 |
+| cymbals | 0.824 |
+| toms | 0.539 |
+| **MICRO** | **0.834** |
+
+Toms remain the outlier here as on MDB, and the gap is larger — ENST's drum solos are
+far more tom-dense than anything in MDB. Buying the instrument immediately paid for
+itself: [it found that our tom threshold was capping its own
+output](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months).
+
+ENST is **CC BY-NC-ND**: evaluation only. Nothing here is trained on it and no derived
+annotations are redistributed.
 
 ### Groove MIDI Dataset — velocity and articulation
 
@@ -674,7 +719,7 @@ and it classifies toms **by fundamental pitch** — the same approach as our `sp
 Stated the way the evidence supports, rather than by reading off the bigger number:
 
 **drum2midi is measurably better** at the hi-hat (0.892 vs 0.754, interval
-[+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.033, +0.097]). The overall
+[+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.032, +0.097]). The overall
 win is essentially the hi-hat win.
 
 > **⚠ The hi-hat gap is over-firing, not articulation — and an earlier version of this
@@ -700,10 +745,12 @@ win is essentially the hi-hat win.
 > is scored separately from onset F1, so none of it explains the hi-hat row.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
-intervals that cross zero. The tom row is the starkest: the nominal 0.605 vs 0.699 looks
+intervals that cross zero. The tom row is the starkest: the nominal 0.589 vs 0.699 looks
 like a clear loss for us, but with only 90 tom onsets in the whole corpus the interval is
-[−0.304, +0.139]. We do not know who is better at toms, and neither does anyone else
-using MDB alone.
+[−0.313, +0.129]. We do not know who is better at toms, and neither does anyone else
+using MDB alone — which is the reason a corpus that *can* measure toms was added, and
+[what it found there](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months)
+is the largest change this pipeline has had.
 
 This correction was made after the fact. An earlier version of this README claimed
 ReStem was better at toms, ghost notes and ride/crash, and us at kick — all read straight
@@ -798,12 +845,67 @@ The default used to be LarsNet because it is fast. Measured on MDB:
 Ghost-note recall improved by half. I had previously concluded that ghost notes were a
 hard limit of the ADTOF model — that was wrong; it was a dirty stem.
 
-### ✅ Adaptive tom threshold
+### ✅ Adaptive tom threshold, and the ceiling it was missing for months
 
 A fixed peak-picking threshold cannot serve toms, whose density varies wildly between
 tracks. Using the **98.5th percentile of each track's own tom activations** raises
 held-out tom F1 from 0.322 to 0.472 and MICRO from 0.850 to 0.858. The same trick hurts
 dense classes (hi-hat 0.863 → 0.802), so it is applied to toms only.
+
+That measurement was correct and the conclusion from it was wrong, in a way MDB could not
+reveal. **A percentile over frames is a proportional cap.** The top 1.5% of frames is
+about 90 frames a minute at 100 fps, and a tom occupies two or three of them — so the
+policy silently limits how many toms a recording is *allowed* to contain, and the limit
+tightens exactly when toms are being played a lot. The floor protected sparse material
+from a threshold drifting too low. Nothing protected dense material from one drifting too
+high.
+
+MDB cannot see this: 1.1% of its onsets are toms and 16 of 23 tracks contain none.
+**ENST-Drums can**, and the effect is monotonic in how tom-dense the material is:
+
+| ENST material | recordings | tom density | tom F1, before |
+|---|---|---|---|
+| MIDI-minus-one | 36 | 2.3% | 0.594 |
+| minus-one | 28 | 2.9% | 0.514 |
+| phrase | 135 | 6.8% | 0.357 |
+| **drum solo** | 11 | **26.6%** | **0.058** |
+
+Over all 210 recordings, toms scored precision 0.689 against recall **0.227** — the
+pipeline emitted 863 tom notes where 2617 were played. The model was hearing them; the
+peak picker was not allowed to emit them.
+
+The fix is one constant, `TOM_CEILING = 0.45`, bounding the adaptive value from above:
+
+| | before | after | 95% CI on the difference |
+|---|---|---|---|
+| ENST tom F1 | 0.342 | **0.539** | **[+0.098, +0.286]** significant |
+| ENST tom recall | 0.227 | **0.634** | |
+| MDB tom F1 | 0.605 | 0.589 | [−0.036, +0.000] not significant |
+| MDB MICRO | 0.882 | 0.882 | unchanged to three decimals |
+
+The MDB figures are this pipeline's own re-run with the separator on, which is the
+configuration every other number in this README uses. The ENST figures come from the
+second machine with separation off, on the grounds that the separator provably does not
+move tom scores on MDB; that keeps the tom comparison sound but means the two MICRO
+columns are not like for like.
+
+Sixteen candidate policies scored on the recordings that selected them is how a benchmark
+gets overfitted — [this README carries that scar already](#-tuning-all-five-thresholds-globally-my-earlier-result-was-biased).
+So the value was re-chosen on ENST drummers 1–2 alone and applied to drummer 3 unseen:
+**+0.194, [+0.061, +0.307]**, against +0.197 in sample. The margin is a property of the
+policy, not of the sweep.
+
+**0.45 is the conservative end of the trade, and that is a judgement rather than a
+measurement.** Ceilings of 0.32–0.40 buy more on dense material (+0.248 to +0.217) and
+cost MDB significantly. Ordinary drum tracks are tom-sparse and are what people actually
+convert, so the sparse corpus keeps the benefit of the doubt.
+
+Two things worth stating plainly. The original percentile was not a careless choice: it
+was measured as an improvement on the only corpus then available, and that corpus could
+not resolve the failure mode. And this is a large fix to a small class — toms are 5.9% of
+ENST's onsets and 1.14% of MDB's, so MICRO moves 0.830 → 0.834 on ENST and **does not
+move at all on MDB**, where it stays at 0.882 to three decimals. What changes is that the
+tom number now measures a model rather than a cap.
 
 ### ✅ Tom splitting was correct but too timid
 
@@ -876,7 +978,7 @@ Three code-level obstacles had to be cleared first, all worth knowing if you try
 serious candidate to appear in years: a 69M-parameter seq2seq transformer with 26 output
 classes, published weights, and **CC BY-SA 4.0** — which would remove the non-commercial
 restriction that ADTOF imposes on this pipeline. Its paper reports tom F1 0.77 on MDB
-against our 0.605.
+against our 0.589.
 
 Run on the same 23 tracks and scored with the same code (`run_adt_str.py`,
 `score_adt_str.py`):
@@ -886,7 +988,7 @@ Run on the same 23 tracks and scored with the same code (`run_adt_str.py`,
 | kick | 1539 | 0.899 | **0.960** |
 | snare | 2654 | 0.785 | **0.844** |
 | hi-hat | 2639 | 0.620 | **0.892** |
-| toms | 90 | 0.140 | **0.605** |
+| toms | 90 | 0.140 | **0.589** |
 | cymbals | 1002 | 0.041 | **0.869** |
 | **MICRO** | 7924 | **0.673** | **0.882** |
 
@@ -1095,6 +1197,11 @@ It takes timing from the tom stem and steals hits from kick and snare. With MDX2
 clean tom stem (252x contrast) it only adds false positives: toms 0.605 → 0.398, MICRO
 0.882 → 0.876. It is now enabled automatically only for LarsNet.
 
+Those figures were measured before `TOM_CEILING` existed, against the then-current tom
+baseline of 0.605. The conclusion does not depend on the baseline — the experiment added
+false positives to a clean stem — but the exact numbers have not been re-measured and are
+therefore quoted as what they are: the comparison as it stood.
+
 ---
 
 ## Reproducing the measurements
@@ -1226,7 +1333,8 @@ python setup_env.py --check
 ## Limitations
 
 1. **Speed.** MDX23C runs ~15x slower than real time on a CPU; ~1.9x on an Intel GPU.
-2. **Toms** — F1 0.605, and measured on only 90 annotated onsets.
+2. **Toms** — F1 0.589 on MDB's 90 annotated onsets, and 0.539 on ENST's 2617, which
+   is the figure to trust. Still the weakest class by a wide margin.
 3. **Pedal hi-hat** — 19 of 230. Not solved by anyone, including ReStem (3 of 513).
 4. **Ghost notes** — 0.718 vs ReStem's 0.747.
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
