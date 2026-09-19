@@ -96,19 +96,22 @@ def main() -> int:
             print(f"  {k:<10} {pa.get(k, 0)} vs {pb.get(k, 0)}")
 
     print("\nverdict")
+    a_name, b_name = ma["label"], mb["label"]
     if diff == 0 and same:
-        print("  Every stem is byte-identical. The selector changed nothing, so both")
-        print("  captures are the same mode and the published mode table describes one")
-        print("  setting rather than two. The comparison needs re-running.")
+        print(f"  Every stem is byte-identical between {a_name} and {b_name}. Whatever")
+        print("  distinguishes those two settings did not reach the renderer, so both")
+        print("  captures describe one configuration rather than two.")
     elif diff and json_same:
-        print(f"  {diff} of {diff + same} stems differ, and the trigger events are still")
-        print("  byte-identical. The modes are real, the separation genuinely changes,")
-        print("  and TrigNet lands on exactly the same events regardless. That is the")
-        print("  published claim, now with the evidence it was missing.")
+        print(f"  {diff} of {diff + same} stems differ between {a_name} and {b_name}, and")
+        print("  the trigger events are still byte-identical. The settings are real and")
+        print("  the separation genuinely changes; the trigger engine lands on exactly")
+        print("  the same events regardless.")
     elif diff:
-        print(f"  {diff} of {diff + same} stems differ and so do the trigger events.")
-        print("  The modes are real and they do not agree. The published claim that")
-        print("  Better and Best produce identical MIDI is wrong for this track.")
+        print(f"  {diff} of {diff + same} stems differ between {a_name} and {b_name}, and")
+        print(f"  so do the trigger events: {ea} against {eb}. That setting reaches the")
+        print("  transcription, not only the audio.")
+        print("  Used as a positive control for a pair that agreed, this is the result")
+        print("  that matters: the method detects event-level change where it exists.")
     return 0
 
 

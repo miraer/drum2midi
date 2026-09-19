@@ -721,17 +721,23 @@ seconds and 367 events, far richer than the 24-event track the claim first reste
 with the mode read from the window before each render and the run refusing if it was
 wrong:
 
-| | Better (Offline) | Best (Offline) |
-|---|---|---|
-| input sha256 | identical | identical |
-| render time | 231.4 s | 163.9 s |
-| separated stems | **all 7 differ** | |
-| `trigger_events.json` | **byte-identical**, 367 events | |
+| | Better (Offline) | Best (Offline) | Best + Bleed Reduction |
+|---|---|---|---|
+| input sha256 | identical | identical | identical |
+| render time | 231.4 s | 163.9 s | 399.6 s |
+| separated stems | — | **all 7 differ** | **all 7 differ** |
+| `trigger_events.json` | 367 events | **byte-identical**, 367 | **differs**, 359 |
 
 The modes are real and the separation genuinely changes. **TrigNet lands on exactly the
-same events regardless.** That also answers whether the capture was simply blind to
-change: it detected it in the stems, so the agreement in the events is not an artefact of
-the method.
+same events regardless** — its transcription is insensitive to the separation quality it
+is given, at least on this material.
+
+The third column is the control, and it is the reason the second column can be trusted.
+Bleed Reduction reaches the transcription where the quality selector does not: eight
+fewer events, the difference falling on the snare, 130 against 123. So the capture is not
+blind to event-level change — it detects it where it exists, which is what makes the
+agreement between Better and Best a property of their trigger engine rather than an
+artefact of our method.
 
 Two caveats on the machine rather than the software. Their offline renderer wants around
 5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
