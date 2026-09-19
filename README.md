@@ -876,6 +876,27 @@ Both fail on pedal. Our own measurement independently agrees: across 1102 annota
 hi-hat hits the pedal chick is not separable from a closed hat in the stem (peak 0.0457
 vs 0.0466, centroid 11993 vs 12454, d' between 0.01 and 0.48).
 
+**And decay does not separate open from closed either — a withdrawn claim.** An earlier
+version of this project reported that on ReStem's hi-hat stem, hits we label open ring
+**1.51×** longer than ones we label closed. That figure came from a single recording
+outside the public test set, so nobody could check it. Re-measured across seven acoustic
+recordings from MDB (`hihat_decay_corpus.py`, second machine), pooling 924 closed and 296
+open hits:
+
+| | |
+|---|---|
+| open / closed median decay | **0.83×** |
+| 95% CI, resampling tracks | **[0.66, 1.38]** |
+| a random open hit outlasts a random closed one | 47% against a 50% null |
+| per-track spread | 0.60× to 4.15× |
+
+The interval contains 1.0 and the pairwise figure is indistinguishable from chance. The
+honest statement is not "open hi-hats do not ring longer" — physically they must — but
+**measuring decay on a separated stem at our onset times cannot tell**. A quantity that
+swings from 0.60 to 4.15 across seven recordings is not measuring articulation. High-pass
+filtering ReStem's trial watermark out moves the figure by a few hundredths, so that is
+not the cause either.
+
 ### Caveats
 
 1. No NVIDIA GPU on the test machine — ReStem's engine crashed on Vulkan (Intel Arc,
