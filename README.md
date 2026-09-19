@@ -44,8 +44,10 @@ tom interval is ±0.22 and spans both directions.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
-(`restem_ui.ps1`) and its normal MIDI export was converted with `restem_to_midi.py`;
-nothing was extracted from its model files. Reproduce with `compare_with_restem.py` and
+(`restem_ui.ps1`) and the `trigger_events.json` it writes was converted to MIDI by
+`restem_to_midi.py`, with the note and CC4 mapping validated against one of ReStem's own
+exports — 374 JSON events against 374 exported notes; nothing was extracted from its model
+files. Reproduce with `compare_with_restem.py` and
 `significance.py` —
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
