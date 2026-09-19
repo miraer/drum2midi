@@ -88,7 +88,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--limit", type=int)
-    ap.add_argument("--midi-dir", type=Path, default=ROOT / "bench" / "note36",
+    ap.add_argument("--midi-dir", type=Path, default=ROOT / "bench" / "ceiling",
                     help="folder of transcriptions to score against")
     ap.add_argument("--csv", type=Path, default=ROOT / "bench" / "blind_mdb.csv")
     args = ap.parse_args()
@@ -99,7 +99,9 @@ def main() -> int:
 
     thr = np.array(drum2midi.DEFAULT_THRESHOLDS, dtype=float)
     wavs = sorted(AUDIO.glob("*.wav"))[:args.limit]
-    print(f"{len(wavs)} tracks, thresholds {list(thr)}\n")
+    print(f"{len(wavs)} tracks, thresholds {list(thr)}")
+    # Which export the F1 column came from is part of the result, not a detail.
+    print(f"scoring against {args.midi_dir}\n")
     print(f"{'track':<34}{'onsets':>8}{'blind':>8}{'F1':>8}")
     print("-" * 58)
 

@@ -9,6 +9,11 @@ annotation -- every onset, every velocity. So the claims worth checking can be c
 before committing to the big download: how many tom onsets there really are, and how the
 velocities are distributed. That is the point of --survey.
 
+Disk: the audio archive downloads 90 GB and unpacks to 131 GB. The zip is deleted after
+unpacking unless --keep-archive, so the requirement is about 135 GB; keeping it needs
+**220 GB**. Measured on the second machine, which reported 45537 wavs matching the
+metadata row for row.
+
 Caveat that survives any survey: the audio is a Roland TD-17 electronic kit. No room, no
 mic bleed, no cymbal wash. Expect a domain gap to acoustic drums and measure it rather
 than assuming it away -- a previous attempt to fix toms with synthetic audio, ADT_STR,
@@ -169,6 +174,8 @@ def main() -> int:
     ap.add_argument("--survey", action="store_true",
                     help="count onsets and velocities after unpacking")
     ap.add_argument("--out", type=Path, default=ROOT / "egmd")
+    ap.add_argument("--keep-archive", action="store_true",
+                    help="do not delete the .zip after unpacking")
     args = ap.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -182,6 +189,12 @@ def main() -> int:
         with zipfile.ZipFile(archive) as z:
             z.extractall(target)
         print("unpacked")
+        # The audio zip unpacks 90 GB into 131 GB and keeping both needs 220 GB, which
+        # runs a machine out of disk near the end of a four-hour download. fetch_enst.py
+        # has deleted its archive by default since it was written; this one did not.
+        if not args.keep_archive:
+            archive.unlink(missing_ok=True)
+            print(f"removed {archive.name}")
 
     if args.survey:
         survey(target)
