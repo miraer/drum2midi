@@ -1,4 +1,4 @@
-# Reports whether ReStem can be driven by UI Automation on this machine.
+﻿# Reports whether ReStem can be driven by UI Automation on this machine.
 #
 # The automation in restem_ui.ps1 finds controls by name and AutomationId, which is
 # resolution-independent and should move between machines. What does not move is the
@@ -153,11 +153,30 @@ foreach ($c in $combos) {
     # see the difference will report "nothing changed" when the thing that changed is
     # precisely this.
     $state = if ($c.Current.IsEnabled) { "enabled " } else { "DISABLED" }
+    # HelpText is where ReStem keeps the thing that matters. A tom note selector is
+    # named '' and valued 'D2', which says nothing, while its help reads "MIDI note for
+    # auto-detected high toms (fundamental above 210 Hz)" -- the classification boundary
+    # itself, in a property this probe used not to read. Omitting it produced a
+    # confident "the thresholds are nowhere in the tree", which was false.
+    $help = $c.Current.HelpText
     Say ("  [{0}] {1}  name '{2}' autoid '{3}' at {4},{5} {6}x{7}  value: {8}" -f `
         $i, $state, $c.Current.Name, $c.Current.AutomationId, [int]$cr.X, [int]$cr.Y,
         [int]$cr.Width, [int]$cr.Height, $val)
+    if ($help) { Say ("        help: {0}" -f $help) }
     $i++
 }
+
+Say ""
+Say "=== every element carrying help text, which is where the semantics live ==="
+$helped = 0
+foreach ($e in $all) {
+    if ($e.Current.HelpText) {
+        $helped++
+        Say ("  {0,-12} '{1}'  -> {2}" -f `
+            $e.Current.LocalizedControlType, $e.Current.Name, $e.Current.HelpText)
+    }
+}
+Say ("  {0} of {1} elements have help text" -f $helped, $all.Count)
 
 $offCount = @($combos | Where-Object { -not $_.Current.IsEnabled }).Count
 if ($offCount) {

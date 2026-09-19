@@ -766,11 +766,16 @@ win is essentially the hi-hat win.
 >
 > **The defaults were verified rather than assumed**, by opening both trigger-range
 > editors: the hi-hat shows 0.47 and 0.8 and the toms show 115, 155 and 210 Hz, which are
-> the values their user's guide documents. Worth knowing for anyone repeating this: those
-> thresholds are *drawn* rather than built from controls. Read through UI Automation, the
-> note assignments and the CC number are exposed and settable, and the threshold lines
-> appear nowhere. An automated comparison structurally cannot tune them — which is a
-> property of the method, not a fault in either product.
+> the values their user's guide documents.
+>
+> The two panels differ in a way worth recording. Each **tom** note selector names its own
+> range in accessibility help text — "auto-detected mid toms (155-210 Hz)" — so those
+> boundaries can be read without opening anything. The **hi-hat** selectors name only the
+> class: "auto-detected pedal hi-hats", no numbers. So the openness thresholds this
+> section turns on are visible only by opening the editor and looking.
+>
+> An earlier version of this paragraph said the thresholds were nowhere in the tree at
+> all. That was wrong and was our own tooling: the probe was not reading help text.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
 intervals that cross zero. The tom row is the starkest: the nominal 0.589 vs 0.699 looks
