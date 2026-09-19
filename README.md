@@ -45,12 +45,13 @@ tom interval is ±0.22 and spans both directions.
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
 (`restem_ui.ps1`) and the `trigger_events.json` it writes was converted to MIDI by
-`restem_to_midi.py`. That conversion is checked against ReStem's own MIDI exports for all
-23 tracks (`compare_restem_export.py`): **3623 of their 3628 notes match ours in time,
-pitch and velocity**, and their files are shorter only because MIDI OUT is per stem and
-defaults off — scoring them instead would have credited ReStem with no kick on most of the
-corpus. Nothing was extracted from its model files. Reproduce with
-`compare_with_restem.py` and `significance.py` —
+`restem_to_midi.py`. That conversion is checked against ReStem's own MIDI exports
+(`compare_restem_export.py`): on a render with every stem's MIDI OUT enabled it
+reproduces their export **note for note including velocity** — kick 63, snare 123, closed
+hat 158, pedal hat 7, mid tom 2, crash 6, all identical — differing only by the three
+notes of the unscored `other` stem, which our converter does not emit. Nothing was
+extracted from its model files. Reproduce with `compare_with_restem.py` and
+`significance.py` —
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
 On a second, independent corpus — all 95 files of IDMT-SMT-Drums, 7927 onsets — the same

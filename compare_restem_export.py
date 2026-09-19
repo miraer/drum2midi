@@ -118,6 +118,10 @@ def main() -> int:
           f"{totals['matched']:>9}{totals['vel_same']:>7}")
 
     print()
+    if not totals["ours"] and not totals["theirs"]:
+        print("Nothing was compared. Every export was skipped, so this says nothing at")
+        print("all -- check the day filter and that the names line up with --ours.")
+        return 1
     if totals["ours"] == totals["theirs"] == totals["matched"]:
         if totals["vel_same"] == totals["matched"]:
             print("Every note matches in time, pitch and velocity. Our conversion is the")
