@@ -97,7 +97,10 @@ TOM_FLOOR = 0.25
 # Measured on ENST-Drums, 210 recordings, paired bootstrap over recordings:
 #   ENST tom F1  0.342 -> 0.539   [+0.098, +0.286]   significant
 #   MDB  tom F1  0.605 -> 0.589   [-0.036, +0.000]   not significant
-#   tom recall on ENST            0.227 -> 0.634
+#   tom recall on ENST            0.227 -> 0.466
+# This line read 0.227 -> 0.634 until it was checked: 0.634 is the recall of dropping
+# the adaptive threshold entirely, a different policy measured in a different run, and
+# quoting it here credited the ceiling with recall it does not deliver.
 # and, because sixteen candidates scored on the recordings that chose them is how a
 # benchmark gets overfitted, the value was re-chosen on ENST drummers 1-2 alone and
 # applied to drummer 3 unseen: +0.194 [+0.061, +0.307] against +0.197 in sample.

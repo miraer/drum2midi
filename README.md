@@ -977,12 +977,17 @@ high.
 MDB cannot see this: 1.1% of its onsets are toms and 16 of 23 tracks contain none.
 **ENST-Drums can**, and the effect is monotonic in how tom-dense the material is:
 
-| ENST material | recordings | tom density | tom F1, before |
-|---|---|---|---|
-| MIDI-minus-one | 36 | 2.3% | 0.594 |
-| minus-one | 28 | 2.9% | 0.514 |
-| phrase | 135 | 6.8% | 0.357 |
-| **drum solo** | 11 | **26.6%** | **0.058** |
+| ENST material | recordings | tom density | tom F1, before | tom F1, after |
+|---|---|---|---|---|
+| MIDI-minus-one | 36 | 2.3% | 0.594 | 0.604 |
+| minus-one | 28 | 2.9% | 0.514 | **0.414** |
+| phrase | 135 | 6.8% | 0.357 | 0.629 |
+| **drum solo** | 11 | **26.6%** | **0.058** | **0.485** |
+
+The "after" column is this machine's re-run, and it is not uniformly good news: the
+ceiling transforms dense material and costs `minus-one` a tenth of its tom F1. That
+category is the most tom-sparse of the four, which is the same trade the ceiling value
+was chosen for, showing up per-category instead of in the total.
 
 Over all 210 recordings, toms scored precision 0.689 against recall **0.227** — the
 pipeline emitted 863 tom notes where 2617 were played. The model was hearing them; the
@@ -993,9 +998,16 @@ The fix is one constant, `TOM_CEILING = 0.45`, bounding the adaptive value from 
 | | before | after | 95% CI on the difference |
 |---|---|---|---|
 | ENST tom F1 | 0.342 | **0.539** | **[+0.098, +0.286]** significant |
-| ENST tom recall | 0.227 | **0.634** | |
+| ENST tom recall | 0.227 | **0.466** | |
 | MDB tom F1 | 0.605 | 0.589 | [−0.036, +0.000] not significant |
 | MDB MICRO | 0.882 | 0.882 | unchanged to three decimals |
+
+> This table read **0.634** in the recall row until it was checked against a re-run.
+> That figure is real but belongs to a different policy — removing the adaptive
+> threshold altogether, which emits 3007 tom notes and reaches tom F1 0.590. Quoting it
+> beside the ceiling's F1 credited the ceiling with a recall it does not deliver, and it
+> made the fix look like it nearly tripled recall rather than roughly doubling it. The
+> error was in our own favour, which is the direction these go.
 
 The MDB figures are this pipeline's own re-run with the separator on, which is the
 configuration every other number in this README uses. The ENST figures come from the
