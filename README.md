@@ -592,6 +592,30 @@ the same code (`compare_with_restem.py`).
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
 
+**Which quality mode, and why it does not matter.** ReStem offers Better (Offline) and
+Best (Offline), the latter with an optional Bleed Reduction. The runs above used Better,
+and that was not recorded at the time — the export does not carry the mode, so it had to
+be established afterwards by re-transcribing tracks and matching the exports event for
+event (`restem_one.ps1`, `compare_restem_runs.py`).
+
+| | MusicDelta_Rock_Drum | MusicDelta_Beatles_Drum |
+|---|---|---|
+| reference toms | 0 | **30**, the most in MDB |
+| Better (Offline) | 0.500 | 0.931 |
+| Best (Offline) | 0.500, byte-identical | 0.931, byte-identical |
+| Best + Bleed Reduction | 0.466 | 0.915 |
+
+Better and Best produce **identical MIDI**, on a track with no toms and on the track with
+the most. Only Bleed Reduction changes anything, and it loses on both: on Rock it emits 7
+toms where the reference has none; on Beatles it gains 0.009 on toms and loses 0.011 on
+snare. So the comparison is against ReStem at its best, and a re-run would change nothing.
+
+Two caveats on the machine rather than the software. Their offline renderer wants around
+5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
+computes through Vulkan; forcing it off — which was tried here on the strength of an older
+note about a Vulkan crash — quadruples its memory to 20 GB and destroys its speed. Neither
+affects accuracy, but both make timing figures from this machine untrustworthy.
+
 Its engine writes `trigger_events.json`, which is the raw **TrigNet** output:
 
 ```json
