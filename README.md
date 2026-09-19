@@ -517,14 +517,24 @@ rest falling outside the musical subset scored here. On the same `mir_eval` code
 | | MDB (23 tracks) | ENST (210 recordings) |
 |---|---|---|
 | tom F1 | 0.589 | 0.539 |
-| **95% CI half-width** | **±0.272** | **±0.087** |
+| **95% CI half-width** | **±0.199** | **±0.067** |
 
-**3.1× narrower.** A +0.10 change in tom F1 is now resolvable; on MDB it was not. The two
+**3.0× narrower.** A +0.10 change in tom F1 is now resolvable; on MDB it was not. The two
 corpora do not disagree — ENST's figure sits inside MDB's interval, which is the cleanest
 demonstration available that the old number was uninformative rather than wrong.
 
+Both half-widths are bootstrapped the same way, same seed and same 4000 resamples, by
+`significance.py --own-ci` and `benchmark_enst.py`. An earlier version of this table
+printed **±0.272** and **±0.087** and called the ratio 3.1×. Neither figure was
+recomputed after `TOM_CEILING` landed: the first was a constant nothing produced any
+more, the second came from the pre-ceiling run. The ratio survived almost unchanged
+because both were stale in the same direction, which is luck, not method.
+
 One methodological difference to declare: the ENST runs use `wet_mix` **without
 separation**, on the grounds that the separator provably does not move tom scores on MDB.
+That claim was re-verified under `TOM_CEILING` rather than inherited from the run that
+first established it: separated and `--no-separate` give bit-identical toms on MDB —
+90 ref, 134 est, 66 matched, F1 0.589 — while every other class moves, MICRO by 0.022.
 That makes the tom comparison across the two corpora sound, but it is not a like-for-like
 MICRO comparison with the separated MDB figures.
 
@@ -543,6 +553,25 @@ Toms remain the outlier here as on MDB, and the gap is larger — ENST's drum so
 far more tom-dense than anything in MDB. Buying the instrument immediately paid for
 itself: [it found that our tom threshold was capping its own
 output](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months).
+
+The four kinds of recording are not the same material, and toms do not score the same
+across them:
+
+| kind | recordings | toms | tom F1 |
+|---|---|---|---|
+| phrase | 135 | 1057 | 0.629 |
+| MIDI-minus-one | 36 | 247 | 0.604 |
+| solo | 11 | 866 | 0.485 |
+| minus-one | 28 | 447 | 0.414 |
+
+Solos hold a third of the tom onsets in a twentieth of the recordings, and score below
+the phrases — density is not the difficulty, the playing is.
+
+**One recording of the 210 transcribed to nothing at all**: `048_phrase_afro_simple_slow_mallets`,
+played with mallets. It is scored as zero estimates rather than dropped, so it is paying
+its full penalty in every figure above. This is [the same deafness as Limitation 7](#limitations),
+but where that one describes passages inside a track, this is a whole recording — 1 of
+210, counted, not estimated.
 
 ENST is **CC BY-NC-ND**: evaluation only. Nothing here is trained on it and no derived
 annotations are redistributed.

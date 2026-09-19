@@ -13,6 +13,12 @@ and only adds the interval around them.
 
     python significance.py
     python significance.py --rounds 10000 --ours bench/note36
+    python significance.py --own-ci          # interval around our own per-class F1
+
+The default --ours is bench/ceiling, the export the README's tables are built from.
+bench/note36 predates TOM_CEILING and still scores toms at 0.605; pointing this script
+at it reproduces every row of the README except toms, which is the one row the ceiling
+moves. The directory measured is printed in the header so no log is ambiguous about it.
 """
 
 from __future__ import annotations
@@ -82,9 +88,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--rounds", type=int, default=4000)
-    ap.add_argument("--ours", type=Path, default=ROOT / "bench" / "note36")
+    ap.add_argument("--ours", type=Path, default=ROOT / "bench" / "ceiling")
     ap.add_argument("--theirs", type=Path, default=ROOT / "restem_midi")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--own-ci", action="store_true",
+                    help="also bootstrap our own per-class F1, not just the difference")
     args = ap.parse_args()
 
     tracks = collect_tracks()
@@ -95,6 +103,9 @@ def main() -> int:
     ours = per_track(args.ours, tracks)
     theirs = per_track(args.theirs, tracks)
     shared = sorted(set(ours) & set(theirs))
+    # Which export produced these numbers is part of the result, not a detail.
+    print(f"ours:   {args.ours}")
+    print(f"theirs: {args.theirs}")
     print(f"{len(shared)} tracks scored by both systems")
     if len(shared) < 3:
         print("not enough overlap to resample")
@@ -128,6 +139,18 @@ def main() -> int:
     print("\nA difference whose interval contains zero is one this test set cannot\n"
           "resolve. That is a statement about the 23 recordings, not about either\n"
           "system being equal.")
+
+    if args.own_ci:
+        # The README compares MDB's tom half-width against ENST's. That comparison
+        # needs the interval around our own F1, which the table above does not carry.
+        print(f"\ninterval around our own F1, same {len(shared)} tracks resampled")
+        print(f"{'class':<10}{'F1':>8}{'95% CI':>22}{'half-width':>13}")
+        print("-" * 53)
+        for family in [None] + list(FAMILIES):
+            label = "MICRO" if family is None else PRETTY.get(family, family)
+            point = f1(ours, shared, family)
+            lo, hi = interval([f1(ours, d, family) for d in draws])
+            print(f"{label:<10}{point:>8.3f}      [{lo:.3f}, {hi:.3f}]{(hi - lo) / 2:>13.3f}")
     return 0
 
 

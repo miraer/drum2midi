@@ -1,11 +1,13 @@
 """Benchmark drum2midi on ENST-Drums, the acoustic set that actually has toms.
 
-MDB Drums holds 90 tom onsets and five of its 23 tracks carry 86 of them. Bootstrapping
-over tracks there gives tom F1 0.605 with a 95% CI of [0.341, 0.747], and a known-large
-effect -- adaptive against fixed tom thresholding, which nearly doubles tom F1 -- comes
-back as +0.282 [-0.074, +0.469], an interval containing zero around an effect we know is
-real. A benchmark that cannot see a doubling cannot see anything a training run would
-produce. This script asks whether ENST can.
+MDB Drums holds 90 tom onsets and five of its 23 tracks carry 86 of them. This is the
+state that justified buying ENST, quoted as it stood then: bootstrapping over tracks
+gave tom F1 0.605 with a 95% CI of [0.341, 0.747], and a known-large effect -- adaptive
+against fixed tom thresholding, which nearly doubles tom F1 -- came back as
++0.282 [-0.074, +0.469], an interval containing zero around an effect we know is real.
+A benchmark that cannot see a doubling cannot see anything a training run would produce.
+This script asks whether ENST can. (MDB's tom figure is now 0.589 [0.337, 0.735] under
+TOM_CEILING; the half-width barely moved, which is the point.)
 
 ENST's musical recordings carry 2617 tom onsets across 210 recordings: 29x the onsets
 over 9x the recordings, and the recording is the unit the interval is computed over.
@@ -26,10 +28,14 @@ Two traps this script is built to avoid, both of which have caught this project 
                 them on and prints what they do to the number, which is the cheapest
                 available demonstration of why balanced material must not be scored.
 
-Separation is deliberately off. On MDB, note36 and --no-separate produce bit-identical
-tom numbers -- 90 ref, 125 est, 65 matched, precision 0.520, recall 0.722, F1 0.605 in
-both -- so the separator provably does not touch this class, and the tom figure here is
-comparable with MDB's despite being computed without a GPU.
+Separation is deliberately off. Re-verified under TOM_CEILING, not inherited: on MDB,
+bench/ceiling and --no-separate produce bit-identical tom numbers -- 90 ref, 134 est,
+66 matched, precision 0.493, recall 0.733, F1 0.589 in both -- while every other class
+moves (snare 0.844 against 0.805, hi-hat 0.892 against 0.863, MICRO 0.882 against 0.860).
+The separator provably does not touch this one class, so the tom figure here is
+comparable with MDB's despite being computed without a GPU. The pre-ceiling check that
+first established this read 125 est, 65 matched, F1 0.605; the counts moved, the
+identity did not.
 
     python benchmark_enst.py                      # musical recordings, wet mix
     python benchmark_enst.py --limit 20           # quick pass
@@ -279,8 +285,8 @@ def main() -> int:
     lo, hi = ci("TT")
     half = (hi - lo) / 2
     print(f"\n{'=' * 62}")
-    print(f"TOM HALF-WIDTH: {half:.3f}      (MDB: 0.272)")
-    print(f"tom F1 on ENST {tf:.3f}   against 0.605 on MDB")
+    print(f"TOM HALF-WIDTH: {half:.3f}      (MDB: 0.199)")
+    print(f"tom F1 on ENST {tf:.3f}   against 0.589 on MDB")
     verdict = ("resolves +0.10, the instrument works" if half < 0.10 else
                "resolves +0.10 only marginally" if half < 0.15 else
                "CANNOT resolve +0.10 -- another unusable benchmark")
