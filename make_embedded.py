@@ -97,25 +97,42 @@ def write_path_file(site_packages: Path) -> None:
 
 
 def write_sitecustomize(venv: Path) -> None:
-    """Registers the virtual environment's native library directories.
+    """Registers the virtual environment's native libraries, and runs its .pth files.
 
-    Packages like torch+xpu ship their DLLs outside site-packages -- here in
-    .venv/Library/bin -- and locate them relative to sys.prefix. The embedded
+    Two separate problems, both invisible until something fails at import time.
+
+    DLLs: packages like torch+xpu ship their native libraries outside site-packages --
+    here in .venv/Library/bin -- and locate them relative to sys.prefix. The embedded
     interpreter has a different prefix, so they have to be declared explicitly, before
     anything imports torch.
+
+    .pth files: a directory listed in ._pth is put straight onto sys.path, and the .pth
+    files inside it are never executed. Editable installs are nothing but a .pth file,
+    so `pip install -e` packages silently vanish -- adtof_pytorch is installed that way
+    and its ModuleNotFoundError is what sent us looking. site.addsitedir processes them
+    properly.
     """
-    body = f'''"""Added by make_embedded.py: share the virtual environment's DLLs."""
+    body = f'''"""Added by make_embedded.py: share the virtual environment with the runtime."""
 import os
+import site
 from pathlib import Path
 
+_VENV = Path(r"{venv}")
+
 for _name in ("Library/bin", "Scripts", "Library/lib"):
-    _path = Path(r"{venv}") / _name
+    _path = _VENV / _name
     if _path.is_dir():
         try:
             os.add_dll_directory(str(_path))
         except OSError:
             pass
         os.environ["PATH"] = str(_path) + os.pathsep + os.environ.get("PATH", "")
+
+# Runs the .pth files in site-packages, which a bare ._pth entry does not. Without
+# this, every `pip install -e` package is missing at runtime.
+_site = _VENV / "Lib" / "site-packages"
+if _site.is_dir():
+    site.addsitedir(str(_site))
 '''
     (RUNTIME / "sitecustomize.py").write_text(body, encoding="utf-8")
 

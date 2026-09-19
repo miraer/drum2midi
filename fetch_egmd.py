@@ -1,0 +1,187 @@
+"""Fetches the Expanded Groove MIDI Dataset, and checks what is actually in it.
+
+E-GMD is the one dataset that could fix both weaknesses this project has measured in
+itself: toms and ghost notes. It is CC BY 4.0, so unlike ENST-Drums (CC BY-NC-ND) it may
+be trained on and the resulting weights published.
+
+The MIDI-only archive is 102 MB against 90 GB for the audio, and it carries the whole
+annotation -- every onset, every velocity. So the claims worth checking can be checked
+before committing to the big download: how many tom onsets there really are, and how the
+velocities are distributed. That is the point of --survey.
+
+Caveat that survives any survey: the audio is a Roland TD-17 electronic kit. No room, no
+mic bleed, no cymbal wash. Expect a domain gap to acoustic drums and measure it rather
+than assuming it away -- a previous attempt to fix toms with synthetic audio, ADT_STR,
+scored 0.140 on toms.
+
+    python fetch_egmd.py --survey        # 102 MB, then count what is inside
+    python fetch_egmd.py --audio         # the full 90 GB
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import sys
+import time
+import urllib.error
+import urllib.request
+import zipfile
+from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+ROOT = Path(__file__).resolve().parent
+BASE = "https://storage.googleapis.com/magentadata/datasets/e-gmd/v1.0.0"
+MIDI_ZIP = f"{BASE}/e-gmd-v1.0.0-midi.zip"
+FULL_ZIP = f"{BASE}/e-gmd-v1.0.0.zip"
+HEADERS = {"User-Agent": "drum2midi/1.0 (research use)"}
+CHUNK = 1 << 20
+
+# Roland TD kits deviate from General MIDI, so the pads have to be mapped by hand.
+# Taken from the Groove MIDI Dataset's own "Drum Mapping" table.
+ROLAND = {
+    36: ("kick", "kick"),
+    38: ("snare head", "snare"), 40: ("snare rim", "snare"),
+    37: ("snare x-stick", "snare"),
+    48: ("tom 1", "tom"), 50: ("tom 1 rim", "tom"),
+    45: ("tom 2", "tom"), 47: ("tom 2 rim", "tom"),
+    43: ("tom 3 head", "tom"), 58: ("tom 3 rim", "tom"),
+    46: ("hh open bow", "hi-hat"), 26: ("hh open edge", "hi-hat"),
+    42: ("hh closed bow", "hi-hat"), 22: ("hh closed edge", "hi-hat"),
+    44: ("hh pedal", "hi-hat"),
+    49: ("crash 1 bow", "cymbal"), 55: ("crash 1 edge", "cymbal"),
+    57: ("crash 2 bow", "cymbal"), 52: ("crash 2 edge", "cymbal"),
+    51: ("ride bow", "cymbal"), 59: ("ride edge", "cymbal"),
+    53: ("ride bell", "cymbal"),
+}
+
+
+def human(n: float) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def download(url: str, dest: Path) -> None:
+    """Resumable, because the audio archive is 90 GB."""
+    req = urllib.request.Request(url, headers=HEADERS, method="HEAD")
+    with urllib.request.urlopen(req, timeout=60) as r:
+        expect = int(r.headers.get("Content-Length", 0))
+    done = dest.stat().st_size if dest.exists() else 0
+    if done >= expect > 0:
+        print(f"already have {dest.name} ({human(done)})")
+        return
+
+    print(f"{dest.name}: {human(expect)}")
+    attempt = 0
+    while done < expect:
+        attempt += 1
+        headers = dict(HEADERS)
+        if done:
+            headers["Range"] = f"bytes={done}-"
+            print(f"  resuming at {human(done)} ({done * 100 / expect:.1f}%)")
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=120) as resp, \
+                    dest.open("ab" if done else "wb") as fh:
+                last = time.time()
+                while block := resp.read(CHUNK):
+                    fh.write(block)
+                    done += len(block)
+                    if time.time() - last > 30:
+                        last = time.time()
+                        print(f"  {human(done)} / {human(expect)} "
+                              f"({done * 100 / expect:.1f}%)", flush=True)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if attempt >= 12:
+                raise SystemExit(f"giving up after {attempt} attempts: {exc}")
+            print(f"  interrupted ({exc}); retrying in 30 s")
+            time.sleep(30)
+            done = dest.stat().st_size if dest.exists() else 0
+    print(f"  done, {human(done)}")
+
+
+def survey(folder: Path) -> None:
+    """Counts every note-on, so the published claims can be checked rather than quoted."""
+    import pretty_midi
+
+    files = sorted(folder.rglob("*.mid*"))
+    if not files:
+        print(f"no MIDI under {folder}")
+        return
+    print(f"\nparsing {len(files)} MIDI files (this takes a few minutes) ...")
+
+    pitches = collections.Counter()
+    vels = collections.Counter()
+    bad = 0
+    for i, path in enumerate(files, 1):
+        try:
+            pm = pretty_midi.PrettyMIDI(str(path))
+        except Exception:
+            bad += 1
+            continue
+        for inst in pm.instruments:
+            for n in inst.notes:
+                pitches[n.pitch] += 1
+                vels[n.velocity] += 1
+        if i % 5000 == 0:
+            print(f"  {i}/{len(files)}", flush=True)
+
+    total = sum(pitches.values())
+    print(f"\n{len(files) - bad} files parsed, {bad} unreadable, {total} note-ons")
+
+    fams = collections.Counter()
+    for pitch, n in pitches.items():
+        fams[ROLAND.get(pitch, ("?", "unmapped"))[1]] += n
+    print("\nby family")
+    for fam, n in fams.most_common():
+        print(f"  {fam:<10}{n:>10}  {100 * n / total:5.2f}%")
+
+    print("\ntoms in detail — the class MDB has only 90 of")
+    for pitch, n in sorted(pitches.items(), key=lambda kv: -kv[1]):
+        if ROLAND.get(pitch, ("", ""))[1] == "tom":
+            print(f"  {pitch:>3} {ROLAND[pitch][0]:<14}{n:>9}")
+
+    if vels:
+        lo = sum(n for v, n in vels.items() if v < 60)
+        lower = sum(n for v, n in vels.items() if v < 40)
+        vtot = sum(vels.values())
+        mean = sum(v * n for v, n in vels.items()) / vtot
+        print(f"\nvelocity: {min(vels)}..{max(vels)}, mean {mean:.1f}, "
+              f"{len(vels)} distinct values")
+        print(f"  below 60: {lo} ({100 * lo / vtot:.2f}%)   "
+              f"below 40: {lower} ({100 * lower / vtot:.2f}%)")
+        print("  (ghost-note material; MDB annotates ghosts but carries no velocity)")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--audio", action="store_true",
+                    help="fetch the full 90 GB archive instead of MIDI only")
+    ap.add_argument("--survey", action="store_true",
+                    help="count onsets and velocities after unpacking")
+    ap.add_argument("--out", type=Path, default=ROOT / "egmd")
+    args = ap.parse_args()
+
+    args.out.mkdir(parents=True, exist_ok=True)
+    url = FULL_ZIP if args.audio else MIDI_ZIP
+    archive = args.out / url.rsplit("/", 1)[1]
+    download(url, archive)
+
+    target = args.out / archive.stem
+    if not target.exists():
+        print(f"unpacking into {target} ...")
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(target)
+        print("unpacked")
+
+    if args.survey:
+        survey(target)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

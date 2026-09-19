@@ -550,6 +550,55 @@ def test_gui_table_shows_every_drum_the_pipeline_prints():
     assert not missing, f"results table cannot colour these rows: {missing}"
 
 
+@test
+def test_pipeline_finds_its_own_modules_without_the_script_directory():
+    """drum2midi.py must import its siblings even when sys.path lacks its folder.
+
+    Python usually puts a script's own directory on sys.path. The embedded runtime
+    built by make_embedded.py does not: its ._pth file defines sys.path outright.
+    Launching through runtime\\drum2midi.exe therefore died with
+    "No module named 'devices'" at the point of conversion -- far enough in that
+    --help still worked and nothing caught it.
+
+    `python -P` reproduces exactly that condition.
+    """
+    code = (
+        "import importlib.util, sys;"
+        f"spec = importlib.util.spec_from_file_location('d2m', r'{ROOT / 'drum2midi.py'}');"
+        "m = importlib.util.module_from_spec(spec);"
+        "spec.loader.exec_module(m);"
+        # the imports that were failing, deliberately done after the module has run
+        "import devices, cpu_threads;"
+        "print('ok')"
+    )
+    res = subprocess.run([sys.executable, "-P", "-c", code],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=tempfile.gettempdir())
+    assert "ok" in (res.stdout or ""), (
+        "drum2midi.py does not put its own directory on sys.path:\n"
+        + (res.stderr or "")[-400:])
+
+
+@test
+def test_embedded_runtime_runs_pth_files():
+    """The embedded runtime must call site.addsitedir, or editable installs vanish.
+
+    A directory named in ._pth goes straight onto sys.path and the .pth files inside
+    it are never executed. An editable install is nothing but a .pth file, so
+    adtof_pytorch -- installed with `pip install -e` -- disappeared at runtime while
+    being perfectly importable in the virtual environment.
+    """
+    src = (ROOT / "make_embedded.py").read_text(encoding="utf-8")
+    assert "addsitedir" in src, \
+        "make_embedded.py must generate a sitecustomize that calls site.addsitedir"
+
+    runtime = ROOT / "runtime" / "sitecustomize.py"
+    if runtime.exists():
+        body = runtime.read_text(encoding="utf-8")
+        assert "addsitedir" in body, \
+            "runtime/sitecustomize.py is stale; re-run make_embedded.py"
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

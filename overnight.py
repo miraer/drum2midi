@@ -127,8 +127,17 @@ def main() -> int:
             while extractor_comparison_running() and waited < 5 * 3600:
                 time.sleep(120)
                 waited += 120
-            say(f"extractor comparison finished (waited {waited/3600:.1f} h)")
-            run("score the extractor comparison", ["compare_extractors.py"])
+            if extractor_comparison_running():
+                # The loop also exits on timeout, and the previous version treated
+                # that as success: it announced "finished", started a second
+                # compare_extractors over the first, and the two deadlocked on the
+                # GPU for nine hours. Never launch anything while one is alive.
+                say(f"extractor comparison STILL RUNNING after {waited/3600:.1f} h; "
+                    "leaving it alone")
+            else:
+                say(f"extractor comparison finished (waited {waited/3600:.1f} h)")
+                # scores the MIDI already on disk instead of transcribing again
+                run("score the extractor comparison", ["score_extractors.py"])
 
         run("full test suite", ["test_smoke.py"])
         say("=== overnight run complete")

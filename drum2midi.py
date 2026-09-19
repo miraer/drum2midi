@@ -31,6 +31,13 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parent
+# Python normally puts the script's own directory on sys.path, but not always: the
+# embedded runtime built by make_embedded.py defines sys.path entirely through its
+# ._pth file, and `python -P` suppresses it too. Either way the sibling modules
+# imported further down -- devices, cpu_threads, note_names -- would not be found.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 LARSNET_DIR = ROOT / "larsnet"
 DRUMSEP_DIR = ROOT / "drumsep"
 DRUMSEP_SIG = "49469ca8"
