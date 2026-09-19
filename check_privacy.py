@@ -62,7 +62,7 @@ IDENTITY = [n for n in {USER, ROOT.parent.name} if len(n) > 2]
 
 
 def own_repo_url() -> re.Pattern | None:
-    """The one place this repository's own account name is not a leak: its clone URL.
+    r"""The one place this repository's own account name is not a leak: its clone URL.
 
     A public repository's URL necessarily contains its owner. Telling people to clone
     `github.com/<you>/drum2midi` gives them a URL that does not work, so the README
