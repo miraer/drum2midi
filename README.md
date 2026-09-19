@@ -673,6 +673,15 @@ This correction was made after the fact. An earlier version of this README claim
 ReStem was better at toms, ghost notes and ride/crash, and us at kick — all read straight
 off the point estimates. Three of those four claims do not survive a bootstrap.
 
+**Where those claims came from is worth stating.** This project was built largely by an AI
+coding agent (GitHub Copilot) working under direction, and every retracted claim in this
+README was the agent reading a point estimate as though it were a result — confidently,
+fluently, and wrongly. The pattern is consistent enough to be worth naming: it never
+invented a number, and it never hedged one either. What caught them was a standing rule
+that no difference is real until `significance.py` has resampled the tracks around it.
+The retractions are left in the text rather than quietly edited out, because a write-up
+that shows only the surviving claims tells you nothing about how hard they were tested.
+
 The strategies do differ, and that part is visible in the aggregate: ReStem leans towards
 recall (P 0.764 / R 0.884), we sit closer to balanced (P 0.853 / R 0.914).
 
