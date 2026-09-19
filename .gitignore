@@ -19,6 +19,8 @@ models/*
 # Datasets. All of them are downloaded by the user; several are non-commercial
 # and none of them belong in this repository.
 gmd/
+egmd/
+enst/
 mdbdrums/
 idmt/
 
