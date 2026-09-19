@@ -14,12 +14,31 @@
 
 param(
     [string] $Track = "MusicDelta_Rock_Drum",
-    [Parameter(Mandatory = $true)][string] $Label
+    [Parameter(Mandatory = $true)][string] $Label,
+    [int] $StallMinutes = 5,
+    [int] $MaxMinutes = 120
 )
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 Invoke-Expression (Get-Content "$root\restem_ui.ps1" -Raw)
+
+# How far through a render ReStem says it is, 0..1, or $null if it is not rendering.
+# Kept here rather than in restem_ui.ps1 so a running batch that has already sourced
+# that file is unaffected.
+function Get-RenderProgress($win) {
+    if (-not $win) { return $null }
+    $cond = New-Object System.Windows.Automation.PropertyCondition(
+        [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+        [System.Windows.Automation.ControlType]::ProgressBar)
+    $el = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+    if (-not $el) { return $null }
+    foreach ($pat in @([System.Windows.Automation.RangeValuePattern]::Pattern,
+                       [System.Windows.Automation.ValuePattern]::Pattern)) {
+        try { return [double] $el.GetCurrentPattern($pat).Current.Value } catch { }
+    }
+    $null
+}
 
 $src = Join-Path $root "restem_in\$Track.wav"
 if (-not (Test-Path $src)) { "no such input: $src"; exit 1 }
@@ -55,7 +74,15 @@ if (-not (Submit-FileDialog $src)) { "could not submit the path"; exit 1 }
 Wait-DialogGone 20 | Out-Null
 
 "waiting for the render ..."
-$deadline = (Get-Date).AddSeconds(400)
+# ReStem publishes a real progress value (0..1) on a ProgressBar element, so the wait
+# does not have to guess how long a render takes. A fixed deadline is wrong in both
+# directions: 400 s was generous for a 13 s track and expired 13 minutes early on a
+# 125 s one, and when it expired the caller copied the *previous* track's stems, which
+# still sit in the cache under the same names. Waiting on a stall instead fails only
+# when nothing is happening, and reports where it stopped rather than how long it waited.
+$stallAt = Get-Date
+$last = -1.0
+$deadline = (Get-Date).AddMinutes($MaxMinutes)
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 5
     if ((Test-Path $cacheJson) -and (Get-Item $cacheJson).LastWriteTime -gt $before) {
@@ -64,9 +91,25 @@ while ((Get-Date) -lt $deadline) {
         "wrote $dest"
         break
     }
+
+    $w = Get-RestemWindow
+    $p = Get-RenderProgress $w
+    if ($null -ne $p -and $p -gt $last + 1e-6) {
+        $last = $p
+        $stallAt = Get-Date
+    }
+    $idle = ((Get-Date) - $stallAt).TotalMinutes
+    if ($idle -ge $StallMinutes) {
+        if ($last -ge 0) {
+            "render stalled at {0:P0} after {1:N1} min with no progress" -f $last, $idle
+        } else {
+            "no progress reported for {0:N1} min; the render may never have started" -f $idle
+        }
+        break
+    }
+
     # a render error puts up a dialog; dismiss it and stop rather than waiting out
     # the full timeout
-    $w = Get-RestemWindow
     $err = Find-ByName $w "OK"
     if ($err) {
         try { Invoke-Btn $err } catch {}
