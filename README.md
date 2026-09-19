@@ -1437,7 +1437,18 @@ python setup_env.py --check
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.
 6. **Jazz** — brushes and swing remain the hardest material.
-7. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
+7. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
+   audible onsets transcribed to nothing. This is not a threshold that could be lowered —
+   the activations there peak at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which
+   is noise rather than a near miss. The material is percussive but dull, harmonic
+   fraction 0.101 and spectral centroid 2129 Hz against 4037 Hz in the loud sections.
+   **ReStem fails on the same passage**, emitting 73 of its 106 notes there as pitch 60,
+   its unclassified bucket — so this is a property of the material rather than of either
+   transcriber. The obvious remedy, firing a fallback only where the model is silent,
+   [was measured and does not
+   work](#-a-fallback-for-the-passages-where-adtof-goes-silent). Unsolved, and no approach
+   currently proposed.
+8. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
 
 ---
