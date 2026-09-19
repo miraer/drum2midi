@@ -31,15 +31,16 @@ tom interval is ±0.22 and spans both directions.
 > not neutral parties — we measured a competitor to our own work, using software we had
 > to learn from the outside.
 >
-> The known caveat is a setting: ReStem's hi-hat articulation boundaries are
-> user-adjustable, and we left them at their defaults. At the documented default split,
-> every hi-hat hit in this corpus was labelled closed, which is most of the hi-hat gap.
-> [The detail, and what it does and does not mean](#where-each-side-wins).
+> The hi-hat row, which carries the overall win, is a **precision** difference: they find
+> nearly as many real hi-hats as we do and emit far more false ones. It is not an
+> articulation difference — on MDB's open/closed/pedal labels the two systems tie at
+> 0.691 and 0.690. [The detail, including a claim withdrawn from this
+> section](#where-each-side-wins).
 >
 > The ReStem team have been written to and told this is public. If they say the product
 > was used incorrectly, these numbers get rerun and corrected here, and the correction
-> gets stated plainly rather than quietly edited in. That has already happened five times
-> with our own claims — most recently to a caveat in this very section.
+> gets stated plainly rather than quietly edited in. That has already happened repeatedly
+> with our own claims, twice in this very section.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
@@ -676,24 +677,27 @@ Stated the way the evidence supports, rather than by reading off the bigger numb
 [+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.033, +0.097]). The overall
 win is essentially the hi-hat win.
 
-> **⚠ The hi-hat result depends on a setting we left at its default.**
-> ReStem classifies hi-hats by how long each hit rings, converting decay to an
-> "openness" value and splitting it at documented boundaries: below 0.465 closed,
-> 0.465–0.798 pedal, above 0.798 open. Every one of the 188 CC4 values in our exports
-> sat below the first boundary, so everything was labelled closed and no note 46 or 44
-> was ever written.
+> **⚠ The hi-hat gap is over-firing, not articulation — and an earlier version of this
+> box said otherwise.**
+> ReStem finds nearly as many real hi-hats as we do (recall 0.893 against 0.928). The
+> difference is precision: **0.652 against 0.860**. It emits hi-hat onsets that are not
+> there, most visibly on jazz — 212 events against 7 in the reference on FreeJazz.
 >
-> **Those boundaries are user-adjustable**, through a trigger-range editor the vendor
-> documents and recommends when articulations land on the wrong note. We did not touch
-> them — both systems ran at their defaults, which is the comparison we intended, but it
-> means this row measures ReStem's default thresholds against our material rather than
-> the limit of what its model can do. A user tuning the split per song would likely
-> recover open hi-hats that we recorded as closed.
+> On articulation the two systems are level. Scored against MDB's own open/closed/pedal
+> labels, accuracy is **0.691 for ReStem and 0.690 for us** — a tie to within a
+> thousandth. Their MDB exports contain 3113 closed, 370 pedal and 133 open hi-hats,
+> across 12 of the 23 files.
 >
-> Two things that are *not* wrong with it, both checked against the vendor's own
-> documentation after an earlier version of this section guessed otherwise: the offline
-> export is the path they recommend for accuracy over their live MIDI port, and note 60
-> is documented as the "Other" stem's neutral fallback, which is how we read it.
+> This box previously claimed their exports contained no open hi-hat at all and blamed a
+> default threshold. That came from one song — a single recording where their export
+> carried 188 note-42 and nothing else — generalised to the corpus without checking.
+> Counting the files takes seconds (`count_restem_articulations.py`) and refutes it.
+>
+> What survives is narrower and still worth saying: ReStem's articulation boundaries are
+> user-adjustable and we left them at their defaults, as we left ours. On this corpus
+> that costs them the open class specifically — 37 correct of 251, against our 174 of
+> 246 — while they take the pedal class no more successfully than we do. But articulation
+> is scored separately from onset F1, so none of it explains the hi-hat row.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
 intervals that cross zero. The tom row is the starkest: the nominal 0.605 vs 0.699 looks
