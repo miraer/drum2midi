@@ -763,6 +763,14 @@ win is essentially the hi-hat win.
 > that costs them the open class specifically — 37 correct of 251, against our 174 of
 > 246 — while they take the pedal class no more successfully than we do. But articulation
 > is scored separately from onset F1, so none of it explains the hi-hat row.
+>
+> **The defaults were verified rather than assumed**, by opening both trigger-range
+> editors: the hi-hat shows 0.47 and 0.8 and the toms show 115, 155 and 210 Hz, which are
+> the values their user's guide documents. Worth knowing for anyone repeating this: those
+> thresholds are *drawn* rather than built from controls. Read through UI Automation, the
+> note assignments and the CC number are exposed and settable, and the threshold lines
+> appear nowhere. An automated comparison structurally cannot tune them — which is a
+> property of the method, not a fault in either product.
 
 **Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
 intervals that cross zero. The tom row is the starkest: the nominal 0.589 vs 0.699 looks
@@ -933,6 +941,23 @@ tom number now measures a model rather than a cap.
 **when it splits, the pitch order is right 100% of the time** (36/36). The problem was
 coverage — the original gate refused to split 75% of tom pairs. Loosening it from 1.18 to
 1.10 raised coverage from 25% to 34% with no loss of accuracy.
+
+**ReStem solves the same problem the opposite way**, and the contrast is instructive. It
+uses fixed frequency boundaries — 115, 155 and 210 Hz by default, splitting floor / low /
+mid / high — and lets the user drag them against a picture of the detected hits. We
+cluster each recording's own tom fundamentals with k-means and require neighbouring
+centres to differ by at least 1.10 before trusting the split.
+
+Neither is obviously better and the trade is real. Absolute thresholds name the classes
+correctly whenever a kit is tuned conventionally, and their own documentation concedes the
+failure case: "a rack tom tuned low or a set of two toms rather than four will not fall
+neatly into the defaults — which is why they are adjustable." Relative clustering adapts
+to any tuning without being told, and pays for it by not knowing whether the low cluster
+is a floor tom or merely the lower of two rack toms.
+
+Our approach needs no configuration, which matters for a command-line tool nobody will
+tune per song. Theirs is adjustable in thirty seconds by someone looking at their own
+drums, which matters for a product.
 
 ### ✅ Learned velocity — but only for two drums
 
