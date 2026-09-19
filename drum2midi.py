@@ -84,6 +84,23 @@ DEFAULT_THRESHOLDS = [0.22, 0.14, 0.32, 0.22, 0.30]
 TOM_PERCENTILE = 98.5
 TOM_FLOOR = 0.25
 
+# That percentile is taken over frames, which quietly makes it a cap on how many toms a
+# recording is allowed to contain: at 100 fps the top 1.5% of frames is about 90 frames
+# a minute, and a tom occupies two or three of them. On tom-sparse material that is
+# exactly the phantom suppression it was built for. On tom-dense material it forbids
+# detections the model is making perfectly well.
+#
+# Measured on ENST-Drums, 210 recordings, paired bootstrap (second machine, 19 Sept):
+# tom recall 0.227 against 2617 referenced onsets, and replacing the policy with a flat
+# 0.32 recovers +0.248 tom F1, CI [+0.103, +0.380]. On drum solos, where toms are 26.6%
+# of onsets, it is +0.617. But on MDB, at 1.1% tom density, the flat threshold is worse
+# by 0.282. Both are real; the policy is wrong in opposite directions at the two ends.
+#
+# So the threshold is blended by how tom-dense the recording actually is, estimated from
+# a permissive first pass. Sparse material keeps today's behaviour, dense material
+# approaches the flat floor. Off by default until ENST and MDB have both judged it.
+TOM_DENSE_SHARE = 0.06
+
 # How many dB below a drum's loudest hit maps to the lowest velocity. Swept against
 # GMD's real module velocities (sweep_velocity.py, 2371 annotated hits): a kick keeps
 # a narrow dynamic range inside a groove, while cymbals span soft ride taps to loud
@@ -132,8 +149,40 @@ def _adtof_model(device: str):
     return model
 
 
+def tom_threshold(activations: np.ndarray, base: Sequence[float], fps: int,
+                  density_aware: bool) -> float:
+    """Pick the tom threshold for one recording.
+
+    With `density_aware` off this is the shipped policy: a high percentile of the
+    recording's own tom activations, floored. With it on, that value is blended towards
+    the floor in proportion to how many toms a permissive pass finds, because the
+    percentile's phantom suppression is only wanted where toms are genuinely rare.
+
+    The probe costs one extra peak-pick over activations that are already computed. The
+    model forward pass, which is the expensive part, is not repeated.
+    """
+    from adtof_pytorch import LABELS_5, PeakPicker
+
+    tom_col = activations[0][:, 2]
+    adaptive = max(float(np.percentile(tom_col, TOM_PERCENTILE)), TOM_FLOOR)
+    if not density_aware:
+        return adaptive
+
+    probe = list(base)
+    probe[2] = TOM_FLOOR
+    hits = PeakPicker(thresholds=probe, fps=fps).pick(
+        activations, labels=LABELS_5, label_offset=0)[0]
+    total = sum(len(v) for v in hits.values())
+    if not total:
+        return adaptive
+    share = len(hits.get(2, [])) / total
+    w = min(share / TOM_DENSE_SHARE, 1.0)
+    return (1.0 - w) * adaptive + w * TOM_FLOOR
+
+
 def transcribe(audio_path: Path, device: str, thresholds: Optional[Sequence[float]],
-               fps: int = 100, adaptive_toms: bool = True) -> Dict[int, List[float]]:
+               fps: int = 100, adaptive_toms: bool = True,
+               density_aware_toms: bool = False) -> Dict[int, List[float]]:
     from adtof_pytorch import LABELS_5, PeakPicker, load_audio_for_model
     import torch
 
@@ -144,8 +193,7 @@ def transcribe(audio_path: Path, device: str, thresholds: Optional[Sequence[floa
 
     thr = list(thresholds) if thresholds else list(DEFAULT_THRESHOLDS)
     if thresholds is None and adaptive_toms:
-        tom_col = activations[0][:, 2]
-        thr[2] = max(float(np.percentile(tom_col, TOM_PERCENTILE)), TOM_FLOOR)
+        thr[2] = tom_threshold(activations, thr, fps, density_aware_toms)
 
     picker = PeakPicker(thresholds=thr, fps=fps)
     return picker.pick(activations, labels=LABELS_5, label_offset=0)[0]
@@ -1016,6 +1064,11 @@ def main() -> int:
                    help="Per-class peak-pick thresholds kick,snare,tom,hat,cymbal")
     p.add_argument("--fixed-tom-threshold", action="store_true",
                    help="Use a fixed tom threshold instead of adapting it per track")
+    p.add_argument("--density-aware-toms", action="store_true",
+                   help="Experimental: scale the adaptive tom threshold towards the "
+                        "floor on tom-dense material, where the percentile caps how "
+                        "many toms may be emitted. Unmeasured on MDB; measured on "
+                        "ENST only as a flat threshold. Off by default")
     p.add_argument("--fuse-stem-onsets", default="auto", choices=["auto", "on", "off"],
                    help="Add onsets found in the separated stems. auto: on for "
                         "--separator uvr, where it measured MICRO 0.692 -> 0.801; off "
@@ -1155,7 +1208,8 @@ def convert_one(args, src: Path, out_path: Path) -> int:
 
     log(f"[1/4] Transcribing {src.name} with ADTOF ...")
     onsets = transcribe(src, dev_trans, thresholds,
-                        adaptive_toms=not args.fixed_tom_threshold)
+                        adaptive_toms=not args.fixed_tom_threshold,
+                        density_aware_toms=args.density_aware_toms)
     total_hits = sum(len(v) for v in onsets.values())
     if total_hits == 0:
         log("ERROR: no drum hits detected. Try lowering --thresholds.")
