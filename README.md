@@ -700,21 +700,27 @@ event (`restem_one.ps1`, `compare_restem_runs.py`).
 | Best (Offline) | 0.500, byte-identical | 0.931, byte-identical |
 | Best + Bleed Reduction | 0.466 | 0.915 |
 
-Better and Best produce **identical MIDI**, on a track with no toms and on the track with
-the most. Only Bleed Reduction changes anything, and it loses on both: on Rock it emits 7
-toms where the reference has none; on Beatles it gains 0.009 on toms and loses 0.011 on
-snare. That is two tracks, chosen for contrast rather than at random, so it is evidence
-that the comparison ran at or near ReStem's best — not a proof that the two modes are
-identical in general.
+Better and Best produced **identical MIDI** on both tracks checked — one with no toms and
+one with the most. Only Bleed Reduction changed anything, and it lost on both: on Rock it
+emits 7 toms where the reference has none; on Beatles it gains 0.009 on toms and loses
+0.011 on snare.
 
-**Why "identical" here is not a collection artefact.** Copying a render out of ReStem's
-cache can pick up the previous one if a wait gives up early, and two files being identical
-is exactly what that looks like — so the claim was re-checked rather than trusted
-(`verify_restem_events.py`). The Better renders come from the 23-track batch of
-**17 September** and the Best renders from **19 September**, two days apart, through
-different scripts, with a different cache state in between. A stale copy cannot cross
-that. Every collected file also has its last onset inside its own audio, 95–96% of the
-way through, which is what rules out a file belonging to a different recording.
+> **⏳ That identity is not yet verified at the point that matters, and it is suspicious.**
+> The vendor documents Better and Best as *different models*, so byte-identical trigger
+> events from both is a strong claim. What is established: the engine is deterministic
+> (two runs of one mode are byte-identical), the Better and Best files were collected two
+> days apart through different scripts so neither is a stale copy of the other, and the
+> Bleed Reduction switch demonstrably does change output.
+>
+> What is **not** established is that the Better/Best selector was applied to those
+> renders. The log that records the mode shown in the window was overwritten, and
+> ReStem's guide describes a separate `Reprocess` action, which leaves open that loading
+> a file re-emits a cached result rather than recomputing it.
+>
+> The decisive test is the separated audio rather than the MIDI: two different separation
+> models must produce different stems even where the trigger events coincide. That test
+> is queued on the machine that still has a trial. Until it lands, read this row as "we
+> could not make the two modes differ", not as "the two modes are the same".
 
 Two caveats on the machine rather than the software. Their offline renderer wants around
 5 GB for a 36-second track and swaps badly below that. And on this Intel Arc system it
