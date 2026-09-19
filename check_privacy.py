@@ -60,6 +60,39 @@ RULES = [
 # say why, and so an empty username does not match everything.
 IDENTITY = [n for n in {USER, ROOT.parent.name} if len(n) > 2]
 
+
+def own_repo_url() -> re.Pattern | None:
+    """The one place this repository's own account name is not a leak: its clone URL.
+
+    A public repository's URL necessarily contains its owner. Telling people to clone
+    `github.com/<you>/drum2midi` gives them a URL that does not work, so the README
+    carries the real one.
+
+    This is deliberately derived from the configured remote rather than hard-coded, and
+    it matches the full `owner/repo` slug rather than the bare name. A stray mention of
+    the account anywhere else still fails, which is the point -- the exemption is for
+    one specific string that is already public by definition, not for the name.
+
+    The trailing `(?![\w.-])` is load-bearing and was not there first. With a plain `\b`
+    the pattern also matched `github.com/<owner>/<repo>-coord`, because a word boundary
+    sits happily before a hyphen -- so the private repository this project uses to
+    coordinate with a second machine would have been exempted by the rule meant to
+    protect it. A test asserts that specific URL is still rejected.
+    """
+    try:
+        out = subprocess.run(["git", "remote", "get-url", "origin"],
+                             capture_output=True, text=True, cwd=ROOT, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", out.stdout.strip())
+    if not m:
+        return None
+    return re.compile(rf"github\.com[/:]{re.escape(m.group(1))}/"
+                      rf"{re.escape(m.group(2))}(?:\.git)?(?![\w.-])", re.I)
+
+
+OWN_REPO = own_repo_url()
+
 # Files that must never be committed, whatever is in them.
 FORBIDDEN = [
     (re.compile(r"(^|/)docs/letter-", re.I), "correspondence draft"),
@@ -95,7 +128,17 @@ def scan(paths: list[Path]) -> tuple[list, list]:
     fatal, warn = [], []
 
     for path in paths:
-        rel = path.relative_to(ROOT).as_posix() if path.is_absolute() else str(path)
+        # A file outside the repository is a normal thing to check -- a draft held
+        # elsewhere on purpose, inspected before anyone is tempted to move it in. This
+        # used to raise ValueError from relative_to and print a traceback instead of a
+        # verdict, which is the least useful moment for a tool like this to fail.
+        if path.is_absolute():
+            try:
+                rel = path.relative_to(ROOT).as_posix()
+            except ValueError:
+                rel = path.as_posix()
+        else:
+            rel = str(path)
 
         for pattern, why in FORBIDDEN:
             if pattern.search(rel):
@@ -126,9 +169,15 @@ def scan(paths: list[Path]) -> tuple[list, list]:
                     (fatal if is_fatal else warn).append(
                         (rel, n, label, m.group(0)[:70]))
             for name in IDENTITY:
-                if re.search(rf"\b{re.escape(name)}\b", line, re.I):
+                for m in re.finditer(rf"\b{re.escape(name)}\b", line, re.I):
+                    # inside this repository's own clone URL the owner is public by
+                    # definition; anywhere else on the line it is still a leak
+                    if OWN_REPO and any(u.start() <= m.start() and m.end() <= u.end()
+                                        for u in OWN_REPO.finditer(line)):
+                        continue
                     fatal.append((rel, n, f"machine or account name '{name}'",
                                   line.strip()[:70]))
+                    break
     return fatal, warn
 
 

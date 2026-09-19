@@ -13,6 +13,7 @@ mangled argument, a broken MIDI writer, a channel override that never lands.
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -661,6 +662,42 @@ def test_nothing_private_is_committed():
                          capture_output=True, text=True, encoding="utf-8",
                          errors="replace", cwd=str(ROOT))
     assert res.returncode == 0, (res.stdout or "")[-900:]
+
+
+@test
+def test_own_clone_url_is_the_only_account_exemption():
+    """The account name is allowed in this repo's clone URL, and nowhere else.
+
+    A public repository's URL contains its owner, so `git clone` instructions cannot use
+    a placeholder without handing people a URL that fails. The exemption is therefore
+    keyed to the full owner/repo slug taken from the origin remote.
+
+    The case that matters is the third one. Coordination with a second machine runs
+    through a separate private repository under the same account, which must never be
+    named here -- so an exemption keyed to the account rather than the slug would have
+    quietly permitted exactly the leak this whole check exists to prevent.
+    """
+    def verdict(text: str) -> int:
+        probe = _tmp / "privacy_probe.md"
+        probe.write_text(text, encoding="utf-8")
+        return subprocess.run(
+            [sys.executable, str(ROOT / "check_privacy.py"), str(probe)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            cwd=str(ROOT)).returncode
+
+    url = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True,
+                         text=True, cwd=str(ROOT)).stdout.strip()
+    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?$", url)
+    if not m:
+        return  # no GitHub remote configured; nothing to exempt
+    owner, repo = m.group(1), m.group(2)
+
+    assert verdict(f"git clone https://github.com/{owner}/{repo}.git") == 0, \
+        "the repository's own clone URL should be allowed"
+    assert verdict(f"the file landed in {owner}'s folder") != 0, \
+        "a bare account name must still be rejected"
+    assert verdict(f"git clone https://github.com/{owner}/{repo}-coord.git") != 0, \
+        "a different repository under the same account must still be rejected"
 
 
 def main() -> int:

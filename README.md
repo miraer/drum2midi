@@ -183,7 +183,7 @@ a drum to its own channel with `--channels 36=3`.
 ## Install
 
 ```powershell
-git clone https://github.com/<you>/drum2midi.git
+git clone https://github.com/miraer/drum2midi.git
 cd drum2midi
 python -m venv .venv
 .\.venv\Scripts\python.exe setup_env.py
