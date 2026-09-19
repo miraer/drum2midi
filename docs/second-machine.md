@@ -27,17 +27,30 @@ CPU than on the GPU here, because ADTOF is recurrent — 1408 ms against 5731 ms
 Separation is the opposite, 12.2x faster on the GPU. So a GPU-less machine is not a
 weak machine for this project; it is a machine that should not be separating.
 
+**The standing rule is that heavy CPU work goes there by default.** Not because this
+machine cannot do it, but because this one is somebody's desktop and gets used during
+the day, so anything long has to wait for the night here and does not there. A job that
+takes forty minutes is a job to hand over, not to queue for 23:00. Ask before piling on
+parallel work when something is already on the critical path — the answer is usually
+that the critical path comes first.
+
 **Good fit — nothing but ADTOF and arithmetic:**
 
+- `benchmark_enst.py`, `benchmark_mdb.py`, `benchmark_idmt.py` — the long ones
+- threshold sweeps, and anything that re-scores a corpus to compare two policies
 - `blind_spots_mdb.py` — 23 tracks, about 20 minutes, needs MDB and `bench/note36`
 - `blind_spots.py` on any audio
 - `significance.py`, `score_extractors.py` — pure arithmetic over existing MIDI
 - training on E-GMD, where 64 GB of memory is the useful part
+- synthesising training data, which is CPU and disk and nothing else
 
-**Keep here:**
+**Keep here, and these are the only reasons:**
 
 - anything with `--from-song` or `--separator uvr`, which is separation and wants the GPU
-- everything involving ReStem: the trial is tied to this machine
+- **everything involving ReStem** — the trial is tied to this machine, it is driven
+  through its own interface by UI automation, and neither the licence nor the window can
+  travel. This is the one category that genuinely cannot be handed over, so the night
+  slot here belongs to it rather than to arithmetic that could have run elsewhere.
 - the GUI
 
 ## Setting it up
