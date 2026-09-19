@@ -148,10 +148,20 @@ foreach ($c in $combos) {
             if ($sel.Count) { $val = $sel[0].Current.Name }
         } catch { $val = "(no value or selection pattern)" }
     }
-    Say ("  [{0}] name '{1}' autoid '{2}' at {3},{4} {5}x{6}  value: {7}" -f `
-        $i, $c.Current.Name, $c.Current.AutomationId, [int]$cr.X, [int]$cr.Y,
+    # IsEnabled is not decoration. A control that is present but greyed out reads
+    # exactly like an active one if only the value is printed, and a probe that cannot
+    # see the difference will report "nothing changed" when the thing that changed is
+    # precisely this.
+    $state = if ($c.Current.IsEnabled) { "enabled " } else { "DISABLED" }
+    Say ("  [{0}] {1}  name '{2}' autoid '{3}' at {4},{5} {6}x{7}  value: {8}" -f `
+        $i, $state, $c.Current.Name, $c.Current.AutomationId, [int]$cr.X, [int]$cr.Y,
         [int]$cr.Width, [int]$cr.Height, $val)
     $i++
+}
+
+$offCount = @($combos | Where-Object { -not $_.Current.IsEnabled }).Count
+if ($offCount) {
+    Say ("  {0} of {1} combo boxes are present but disabled" -f $offCount, $combos.Count)
 }
 
 if ($Tree) {
