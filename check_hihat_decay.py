@@ -1,23 +1,27 @@
 """Do the hi-hats we call "open" actually ring longer than the ones we call "closed"?
 
-Two transcribers disagreed about this song: ours reports 18 open hi-hats and 6 pedal
-ones, ReStem reports none at all (every one of its 188 CC4 values says "closed").
-Only one of those can be right, and it is decidable without listening: an open hi-hat
-is two cymbals free to vibrate, so it decays slowly, while a closed one is clamped and
-stops almost immediately.
+An open hi-hat is two cymbals free to vibrate, so it decays slowly; a closed one is
+clamped and stops almost immediately. That should be measurable on a hi-hat stem without
+anyone listening.
 
-This measures decay time on the hi-hat stem at the moments each transcription marks,
-and compares the groups.
+It was measured once, on a single recording outside the public test set, and gave 1.51 --
+open ringing half again as long as closed. That figure is **withdrawn**. Re-measured on
+MusicDelta_Disco, MDB's most hi-hat-dense track at 756 hits, the same code gives **0.70**,
+with open hits ringing *shorter*. One private song against one public one is not a
+disagreement worth resolving by argument, so more tracks are being measured; until then
+neither number should be quoted.
+
+The mistake is worth naming because this project made it four times in one day: a figure
+taken from one recording and never counted across the corpus.
 
     python check_hihat_decay.py ours.mid path/to/hh.wav
     python check_hihat_decay.py ours.mid path/to/hh.wav --highpass 1000
 
 `--highpass` exists because of a specific hazard. ReStem's free trial mixes a 603 Hz
 watermark tone into every stem it writes, including offline renders, and the envelope
-here is broadband -- so a tone sitting inside a hit's decay window holds the envelope up
-and inflates the measured decay. A hi-hat's energy is around 12 kHz, so discarding
-everything below 1 kHz costs nothing and removes the watermark entirely. If the ratio
-moves when you add it, the unfiltered number was measuring the watermark.
+here is broadband. A hi-hat's energy is around 12 kHz, so discarding everything below
+1 kHz costs nothing and removes the watermark entirely. On Disco it moves the ratio from
+0.70 to 0.66, so the watermark is not what produced the disagreement.
 
 Note also that the default 22.05 kHz sample rate puts Nyquist at 11 kHz, just below where
 hi-hat energy actually sits. That is fine for a decay envelope, which only needs relative

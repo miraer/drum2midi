@@ -2,13 +2,22 @@
 
 check_hihat_decay.py measures a broadband envelope, and the trial mixes a 603 Hz tone
 into every stem it writes. A tone sitting inside a hit's decay window holds the envelope
-up and makes the hit look like it rang longer than it did. That measurement is the only
-number in our ReStem comparison taken from their audio rather than their MIDI, so it is
-the only place the watermark could have touched our published figures.
+up and makes the hit look like it rang longer than it did.
 
 This measures decay at moments where the watermark is sounding and at moments where it is
-not, with the filter off and on, and reports the difference. If filtering barely moves the
-numbers, the watermark never mattered and the 1.51x ratio stands as measured.
+not, with the filter off and on, and reports the difference.
+
+The question it was written to answer -- whether the watermark manufactured the 1.51x
+open-versus-closed ratio -- is now moot, and the answer is worth keeping anyway. It did
+not: filtering moves the ratio away from 1.51 rather than towards it. The ratio was
+withdrawn for an unrelated reason, namely that it came from a single recording outside
+the public test set and does not reproduce on MusicDelta_Disco, where the same
+measurement gives 0.70 in the opposite direction.
+
+What survives is the measurement about the watermark itself, which applies to any decay
+figure taken from trial stems: it perturbs decay by roughly 28% in the windows it
+occupies, and it does so by raising the peak rather than by extending the tail, which
+makes hits look shorter rather than longer.
 
     python beep_decay_sensitivity.py
 """
