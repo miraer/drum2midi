@@ -31,12 +31,22 @@ try {
 } catch { $ws = $null }
 Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
 Say ("  interactive          : {0}" -f [Environment]::UserInteractive)
+$virt = $null
 try {
     Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-    $scr = [System.Windows.Forms.Screen]::PrimaryScreen
-    Say ("  primary screen       : {0}x{1}" -f $scr.Bounds.Width, $scr.Bounds.Height)
+    foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
+        Say ("  screen {0,-12} primary={1,-6} {2},{3}  {4}x{5}" -f `
+            $s.DeviceName.Replace("\\.\", ""), $s.Primary,
+            $s.Bounds.X, $s.Bounds.Y, $s.Bounds.Width, $s.Bounds.Height)
+    }
+    # A window legitimately on a second monitor sits outside the primary screen, so
+    # "outside the primary" is not a fault. The virtual screen is the union of all of
+    # them, and that is the boundary a coordinate click actually has to respect.
+    $virt = [System.Windows.Forms.SystemInformation]::VirtualScreen
+    Say ("  virtual screen       : {0},{1}  {2}x{3}" -f `
+        $virt.X, $virt.Y, $virt.Width, $virt.Height)
 } catch {
-    Say "  primary screen       : UNAVAILABLE - no desktop. UI Automation will not work."
+    Say "  screens              : UNAVAILABLE - no desktop. UI Automation will not work."
 }
 
 Say ""
@@ -91,6 +101,11 @@ if ($r.X -lt -10000 -or $r.Y -lt -10000) {
     Say "  STATE                : MINIMIZED. Reading the tree still works, but anything"
     Say "                         that clicks a screen coordinate will miss. Restore the"
     Say "                         window before running the batch."
+} elseif ($virt -and ($r.X + $r.Width -le $virt.X -or $r.X -ge $virt.X + $virt.Width -or
+                      $r.Y + $r.Height -le $virt.Y -or $r.Y -ge $virt.Y + $virt.Height)) {
+    Say "  STATE                : OUTSIDE the virtual screen. Coordinate clicks will miss."
+} elseif ($virt) {
+    Say "  STATE                : on-screen, within the virtual desktop"
 }
 
 $all = $win.FindAll([System.Windows.Automation.TreeScope]::Descendants,
