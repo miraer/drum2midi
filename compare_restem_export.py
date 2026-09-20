@@ -1,9 +1,9 @@
 """Does our conversion of ReStem's trigger JSON match the MIDI ReStem itself exports?
 
 The published comparison scores `restem_midi/`, which `restem_to_midi.py` builds from
-ReStem's `trigger_events.json`. The note and CC4 mapping was validated once, on a single
-song, against one real export -- 374 events against 374 notes. Everything since has
-assumed that mapping generalises.
+ReStem's `trigger_events.json`. The note and CC4 mapping has been validated against two
+real exports on two songs -- 374 events against 374 notes, and 123 against 123 -- both
+identical in time, pitch and velocity. Everything else assumes that mapping generalises.
 
 It need not. ReStem's exporter could round times differently, shape velocity, drop events
 below a threshold, or decide articulation from something the JSON does not carry. If it
@@ -18,6 +18,11 @@ which has no business being under a repository.
 
     python compare_restem_export.py
     python compare_restem_export.py --theirs "C:/path/to/midi-drag" --ours restem_midi
+    python compare_restem_export.py --theirs ... --ours ... --on ""   # any day
+
+`--on` defaults to the day of the original batch, so a newer render needs its own day or
+an empty `--on`. If nothing survives the filter the script says so and exits non-zero
+rather than printing a clean-looking table of nothing.
 """
 
 from __future__ import annotations

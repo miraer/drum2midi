@@ -84,11 +84,14 @@ given the isolated drum recording. ReStem was driven through its own interface
 `restem_to_midi.py`. That conversion is checked against ReStem's own MIDI exports
 (`compare_restem_export.py`): on a render with every stem's MIDI OUT enabled it
 reproduces their export **note for note including velocity** — kick 63, snare 123, closed
-hat 158, pedal hat 7, mid tom 2, crash 6, all identical. Three further notes on the
-unscored `other` stem did not line up, and that detail can no longer be checked: ReStem
-overwrites its export directory on every render, so the originals are gone. **None of the
-23 benchmark recordings produce any `other` events at all**, so nothing in the table
-above depends on it. Nothing was extracted from its model files. Reproduce with
+hat 158, pedal hat 7, mid tom 2, crash 6, all identical. This line used to add that three
+further notes on the unscored `other` stem did not line up and could no longer be checked.
+That was our error, not theirs: the two files came from renders 74 minutes apart and
+ReStem overwrites its export directory each time. A second render with the JSON and the
+MIDI captured from the same run matches exactly — **123 events, 123 notes, identical in
+time, pitch and velocity**, and no pitch 60 in it at all. **None of the 23 benchmark
+recordings produce any `other` events**, so nothing in the table above ever depended on
+it. Nothing was extracted from its model files. Reproduce with
 `compare_with_restem.py` and `significance.py` —
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
