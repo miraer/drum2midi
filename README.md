@@ -614,12 +614,49 @@ previous one, so launch overhead dominates and an integrated GPU loses to the CP
 Convolution over a spectrogram is the opposite. So the default splits the work:
 **separation on the GPU, transcription on the CPU.**
 
-**On NVIDIA it does not split.** cuDNN provides fused recurrent kernels that XPU and MPS
-do not, so `auto` sends both stages to CUDA there. That is the documented behaviour of
-those libraries rather than something measured here — this machine has no NVIDIA GPU, and
-the table above is Intel Arc. If you have one, `bench_devices.py` will tell you in a
-minute whether the split is worth forcing with `--device`, and a contradicting result is
-worth an issue.
+**On NVIDIA it does not split**, and that is now measured rather than assumed. cuDNN
+provides fused recurrent kernels that XPU and MPS do not, so `auto` sends both stages to
+CUDA. This used to say the claim followed those libraries' documentation and had never
+been run, because the machine above has no NVIDIA GPU. One has since reported in — an
+RTX 4070 SUPER against a 16-thread Ryzen:
+
+| workload | CPU | RTX 4070 SUPER | |
+|---|---|---|---|
+| separator-like Conv2d stack | 64.4 ms | 3.0 ms | GPU **21.8x faster** |
+| MDX23C over a whole track | 562 s | 26.9 s | GPU **20.9x faster** |
+| GRU over a long sequence | 124.5 ms | 2.1 ms | GPU **59.1x faster** |
+| ADTOF, the real model | 4766.0 ms | 74.9 ms | GPU **63.6x faster** |
+
+**The recurrent rows reverse sign.** On Intel Arc the GRU is 6.1x slower on the GPU and
+the real transcriber 4.1x slower, which is why the default splits there. On CUDA the same
+two workloads are 59x and 64x *faster*. Nothing about the model changed; the fused
+kernels are the whole difference, and sending transcription to CUDA is correct.
+
+End to end on a 269.9-second drum recording, both stages on CUDA, best of three runs
+(38.2 s, 39.2 s, 39.8 s):
+
+| stage | | share |
+|---|---|---|
+| 1 transcribe (ADTOF) | 1.6 s | 4% |
+| 2 separate (MDX23C) | 26.9 s | **68%** |
+| 3 velocity and articulation | 8.5 s | 22% |
+| 4 write MIDI | 0.6 s | 2% |
+| **total** | **38.2 s** | **7.1x faster than real time** |
+
+The same four stages on the CPU come to about **10 minutes** — 6.5 s, 562 s, 31.3 s,
+0.5 s. That is a sum of separately measured stages rather than one timed run, so it is
+quoted to the minute. Separation is the whole story in both columns: it is 68% of the
+GPU run and 94% of the CPU one.
+
+Two things about how these were taken. The separation figure was measured twice, once
+on a busy machine and once on an idle one, and came back at **562 s both times** —
+unlike the thread-count measurements above, this one does not care what else is
+running. And the CPU column only exists because `--device cpu` now reaches the
+separator at all: it used to stop before it, so the same measurement came back as
+26.6 s of separation that was quietly still running on CUDA.
+
+This is one machine and one GPU. `bench_devices.py` will tell you in a minute what your
+own does, and a contradicting result is worth an issue.
 
 The GUI reports whichever mapping applies rather than assuming the split; an earlier
 version printed "transcription stays on the CPU" unconditionally, which was wrong on
@@ -660,8 +697,10 @@ you by default:
 ```
 
 CUDA is used for both stages when present, because cuDNN has fused recurrent kernels
-that XPU and MPS lack. That follows those libraries' documented behaviour rather than a
-measurement here — this machine has no NVIDIA GPU, so treat it as untested.
+that XPU and MPS lack. That followed those libraries' documented behaviour rather than a
+measurement until an RTX 4070 SUPER reported in: the transcriber is 63.6x faster on CUDA
+there, against 4.1x slower on this Intel GPU. [The
+numbers](#which-device-runs-what).
 
 Transcription is a once-per-song operation, and the quality gap is large
 (ride/crash 0.139 → 0.917). If you need speed without a GPU, `--separator larsnet` is
