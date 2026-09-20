@@ -963,6 +963,40 @@ def test_failed_install_does_not_end_with_a_clean_bill_of_health():
         shutil.which = real_which
 
 
+@test
+def test_install_advice_names_an_interpreter():
+    """Every instruction to install torch must name which Python it installs into.
+
+    pytorch.org gives the CUDA command as `pip3 install torch --index-url ...`, and
+    this project repeated that shape. Followed literally on Windows it installs into
+    whatever pip3 PATH resolves to, which is usually the system Python and not .venv.
+    The install then succeeds, says nothing is wrong, and leaves a working CUDA build
+    in an interpreter the pipeline never opens -- while torch here still reports +cpu
+    and the GPU sits idle. It happened: 2.14.0+cu132 in one interpreter and
+    2.14.0+cpu in .venv on the same machine, with a 4070 SUPER doing nothing.
+
+    `<interpreter> -m pip` cannot go wrong that way, so the advice has to use it.
+    """
+    import devices
+
+    # The command the program prints must point at the interpreter printing it.
+    assert devices.pip_here().endswith(" -m pip"), (
+        f"install advice does not go through `-m pip`: {devices.pip_here()}")
+    named = Path(devices.interpreter_here())
+    if not named.is_absolute():
+        named = ROOT / named
+    assert named.resolve() == Path(sys.executable).resolve(), (
+        f"advice names {named}, but this is running in {sys.executable}")
+
+    # The same for the install lines in requirements.txt, where a reader starts.
+    offers = [ln.strip() for ln in
+              (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+              if ln.lstrip("# ").startswith(("NVIDIA:", "CPU:", "Intel:"))]
+    assert offers, "the torch install lines have moved or been renamed"
+    bare = [ln for ln in offers if "python.exe" not in ln]
+    assert not bare, f"these tell the reader to use whatever pip is on PATH: {bare}"
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
