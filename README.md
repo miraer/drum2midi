@@ -14,31 +14,41 @@ in the repository at [`docs/pitch.mp4`](docs/pitch.mp4) for anyone reading this 
 GitHub. The drum track is from the Groove MIDI Dataset, Magenta / Google, CC BY 4.0.</sub>
 
 **Measured against [ReStem 2 Pro](https://restemapp.com/restem2)** — a $199 commercial
-product — on 23 hand-annotated recordings:
+product — on 23 hand-annotated recordings, **in its best mode**:
 
 | | drum2midi | ReStem 2 Pro | 95% CI on the difference |
 |---|---|---|---|
-| **Overall onset F1** | **0.882** | 0.820 | **[+0.032, +0.097]** |
-| Kick | 0.960 | 0.951 | [−0.013, +0.040] |
-| Snare | 0.844 | 0.845 | [−0.025, +0.020] |
-| Hi-hat | **0.892** | 0.754 | **[+0.062, +0.249]** |
-| Cymbals | 0.869 | 0.755 | [−0.004, +0.373] |
-| Toms | 0.589 | 0.699 | [−0.313, +0.129] |
+| **Overall onset F1** | **0.882** | 0.834 | **[+0.023, +0.083]** |
+| Kick | 0.960 | 0.953 | [−0.014, +0.037] |
+| Snare | 0.844 | 0.857 | [−0.036, +0.010] |
+| Hi-hat | **0.892** | 0.779 | **[+0.049, +0.216]** |
+| Cymbals | **0.869** | 0.759 | **[+0.013, +0.382]** |
+| Toms | 0.589 | 0.651 | [−0.268, +0.193] |
 | Ghost notes (recall) | 0.718 | 0.747 | — |
 | Ride vs crash | 0.917 | 0.953 | — |
 | Hi-hat articulation | 0.690 | 0.691 | — |
 
-![The same table as a plot: Overall and Hi-hat exclude zero, the other four straddle it](docs/comparison.png)
+> **This table was restated on 20 September and the earlier one flattered us.** Every
+> figure above had been measured with ReStem in **Better (Offline)**, which is not its
+> best setting. All three of its offline modes have now been rendered across all 23
+> recordings on the same machine: Better and Best (Offline) are **byte-identical on every
+> track**, but **Best + Bleed Reduction is genuinely better for ReStem** — 0.834 against
+> 0.820. Our margin drops from +0.062 to **+0.048** and the hi-hat margin from +0.139 to
+> +0.113. One row moved the other way: cymbals now clears zero. The comparison is against
+> their strongest configuration from here on, and the weaker number is not quoted anywhere
+> without this note.
+
+![The same table as a plot: Overall, Hi-hat and Cymbals exclude zero, the other three straddle it](docs/comparison.png)
 
 *Drawn by `plot_comparison.py` from `significance.py`'s own output, so the picture cannot
 drift from the table. The last three rows have no interval and are not plotted.*
 
-**Only two of those rows mean anything.** The intervals come from resampling the 23
+**Only three of those rows mean anything.** The intervals come from resampling the 23
 recordings 4000 times (`significance.py`), and every row whose interval contains zero is
 a difference this test set cannot resolve. The overall win is real, and it is carried
-almost entirely by the hi-hat. The per-class rows for kick, snare, cymbals and **toms**
-are not evidence of anything: MDB holds just **90 tom onsets, 1.14% of the set**, so the
-tom interval is ±0.22 and spans both directions.
+almost entirely by the hi-hat. The per-class rows for kick, snare and **toms** are not
+evidence of anything: MDB holds just **90 tom onsets, 1.14% of the set**, so the tom
+interval is ±0.23 and spans both directions.
 
 > **⚠ These are our measurements of someone else's product, and they may be wrong.**
 > ReStem's developers were not involved in any of this and have not reviewed it. We are
@@ -73,13 +83,12 @@ tom interval is ±0.22 and spans both directions.
 > raises it. We have asked, and undertaken to re-run all 23 recordings at whatever they
 > say.
 >
-> **Nor is it established that ReStem ran in its best mode.** These runs used Better
-> (Offline), which is byte-identical to Best (Offline) on the three tracks checked. Best
-> (Offline) + Bleed Reduction is a different matter — it changes the output, and has been
-> scored on two tracks, where it was worse for ReStem. Two tracks settles nothing in
-> either direction, so the fair description of this table is *against Better*, not
-> *against ReStem at its best*. All 23 are queued for a Best + Bleed Reduction run and
-> the result is published whichever way it falls.
+> **Its best mode is now the one measured, and it was not before.** These figures use
+> Best (Offline) + Bleed Reduction. All three offline modes were rendered across all 23
+> recordings on one machine: Better and Best (Offline) came out byte-identical on every
+> track, so that pair is settled, and Bleed Reduction is worth +0.014 MICRO to ReStem.
+> The earlier published figure of 0.820 was its weaker configuration and has been
+> restated rather than quietly replaced.
 >
 > The ReStem team have not been written to yet. The letter is written and not sent, and
 > publication was deliberately not made to wait on it — which means that as things stand
@@ -895,18 +904,15 @@ people with an obvious stake in the answer. Seven specific reasons to hold it lo
   regrouping the tracks by genre and dropping a whole genre moves the delta by at most
   0.015, against a published interval of ±0.032 — so *that* form of unrepresentativeness
   does not reach the answer. Which is a narrower reassurance than it sounds.
-- **It has not been established that ReStem ran in its best mode, and that matters more
-  than the rest of this list.** The 23 renders used Better (Offline). Better and Best
-  (Offline) are byte-identical on the three tracks rendered both ways, so that choice
-  appears to cost ReStem nothing. But Best (Offline) **+ Bleed Reduction** genuinely
-  differs — it moved the events on all three — and it has only ever been *scored* on two,
-  where it came out lower for ReStem (0.466 against 0.500; 0.915 against 0.931). Two
-  tracks is not a basis for concluding that their most expensive setting is their weaker
-  one, and it is not a basis on which to claim a win either. Until all 23 have been
-  rendered in Best + Bleed Reduction and scored, **the honest statement is that this
-  comparison is against Better, not against ReStem at its best, and we do not yet know
-  whether those differ.** That run is queued; whichever way it comes out is published, and
-  if Best + Bleed Reduction scores higher the headline is restated against it.
+- **~~It has not been established that ReStem ran in its best mode.~~ Settled, and we
+  were using the weaker one.** All three offline modes have now been rendered across all
+  23 recordings on a single machine. Better and Best (Offline) are byte-identical on
+  every track, so that choice never cost ReStem anything. Best + Bleed Reduction is a
+  different matter: it is worth **+0.014 MICRO to ReStem**, 0.834 against 0.820, and the
+  published comparison had been measured against the weaker setting. The table has been
+  restated. Two of the differences this changes are worth naming: Bleed Reduction gains
+  ReStem the snare (0.845 → 0.857) and the hi-hat (0.754 → 0.779) and costs it the toms
+  (0.699 → 0.651).
 - **ReStem was never run on a second corpus.** Our own 0.935 on IDMT-SMT-Drums is a
   second-corpus check on us alone; the comparison has none. Nor is MDB the largest real
   corpus here — ENST-Drums holds 210 recordings, 106 minutes and 45,097 onsets of real
@@ -1024,9 +1030,11 @@ and it classifies toms **by fundamental pitch** — the same approach as our `sp
 
 Stated the way the evidence supports, rather than by reading off the bigger number:
 
-**drum2midi is measurably better** at the hi-hat (0.892 vs 0.754, interval
-[+0.062, +0.249]) and therefore overall (0.882 vs 0.820, [+0.032, +0.097]). The overall
-win is essentially the hi-hat win.
+**drum2midi is measurably better** at the hi-hat (0.892 vs 0.779, interval
+[+0.049, +0.216]), at the cymbals (0.869 vs 0.759, [+0.013, +0.382]) and therefore
+overall (0.882 vs 0.834, [+0.023, +0.083]). The overall win is still carried mostly by
+the hi-hat. Those figures are against ReStem in Best + Bleed Reduction, its best mode;
+an earlier version of this section used Better and reported a larger margin.
 
 > **⚠ The hi-hat gap is over-firing, not articulation — and an earlier version of this
 > box said otherwise.**
