@@ -1,4 +1,4 @@
-"""If one model wins the snare and another wins the cymbals, what would routing buy?
+﻿"""If one model wins the snare and another wins the cymbals, what would routing buy?
 
 The survey found a split rather than a winner: Vogl's CRNN beats us on snare (+0.111 and
 +0.081, both intervals clear of zero) while we beat it on cymbals (+0.143 and +0.231,
@@ -59,7 +59,7 @@ DRUMS = ["kick", "snare", "hi-hat", "toms", "cymbals"]
 #                     python benchmark_mdb.py --rescore --tag ceiling
 #   vogl-*        Vogl's DAFx'18 CRNNs, run by the second machine on 20 September 2026
 #                 (score_vogl_CRNN_8.log, score_vogl_CRNN_18.log) and transcribed here.
-#                 NOT produced on this machine. @0.10 is the threshold that scored best
+#                 NOT produced on this machine. the 0.10 variant is the threshold that scored best
 #                 on this corpus -- hindsight, in its favour, excluded by default. @0.15
 #                 is parameter-free and is the defensible one.
 COUNTS: dict[str, dict[str, tuple[int, int, int]]] = {
@@ -71,15 +71,15 @@ COUNTS: dict[str, dict[str, tuple[int, int, int]]] = {
         "kick": (1539, 1570, 1493), "snare": (2654, 2808, 2304),
         "hi-hat": (2639, 2848, 2448), "toms": (90, 134, 66),
         "cymbals": (1002, 1144, 932)},
-    "vogl-8@0.10": {
+    "vogl-8/0.10": {
         "kick": (1539, 1586, 1522), "snare": (2654, 2783, 2491),
         "hi-hat": (2639, 3154, 2477), "toms": (90, 254, 73),
         "cymbals": (1002, 1420, 881)},
-    "vogl-8@0.15": {
+    "vogl-8/0.15": {
         "kick": (1539, 1552, 1504), "snare": (2654, 2359, 2197),
         "hi-hat": (2639, 2758, 2337), "toms": (90, 140, 64),
         "cymbals": (1002, 685, 558)},
-    "vogl-18@0.15": {
+    "vogl-18/0.15": {
         "kick": (1539, 1588, 1515), "snare": (2654, 2466, 2269),
         "hi-hat": (2639, 2937, 2310), "toms": (90, 95, 52),
         "cymbals": (1002, 676, 536)},
@@ -122,9 +122,9 @@ def main() -> int:
                     help="CSV of system,drum,ref,est,match; overrides the built-in table")
     ap.add_argument("--baseline", default="ours")
     ap.add_argument("--exclude", action="append",
-                    default=["vogl-8@0.10"],
+                    default=["vogl-8/0.10"],
                     help="system to leave out, repeatable; the hindsight-tuned "
-                         "vogl-8@0.10 is excluded unless you clear this")
+                         "vogl-8/0.10 is excluded unless you clear this")
     ap.add_argument("--top", type=int, default=8)
     args = ap.parse_args()
 
