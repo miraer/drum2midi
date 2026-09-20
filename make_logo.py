@@ -16,7 +16,12 @@ import math
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+# Pillow is imported inside the drawing functions rather than here, the way
+# drum_icons.py does it. Pillow is optional in this project: the GUI degrades without
+# it and requirements.txt says so. Importing it at module scope meant that reading the
+# palette constants below -- which theme.py restates for the GUI, and which a smoke
+# test compares -- required a library that drawing needs and reading does not, so the
+# test errored out on any install without Pillow instead of checking anything.
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -65,6 +70,7 @@ def drum_envelope(x: float) -> float:
 
 
 def draw_logo(size: int, transparent: bool = False) -> Image.Image:
+    from PIL import Image, ImageDraw
     # supersample, then downscale: gives clean edges without any antialiasing code
     scale = 4
     s = size * scale
@@ -127,6 +133,7 @@ def draw_logo(size: int, transparent: bool = False) -> Image.Image:
 
 
 def draw_banner(width: int = 1280, height: int = 360) -> Image.Image:
+    from PIL import Image, ImageDraw, ImageFont
     scale = 2
     img = Image.new("RGB", (width * scale, height * scale), PAPER)
     d = ImageDraw.Draw(img)
@@ -160,6 +167,7 @@ def draw_social(width: int = 1280, height: int = 640) -> Image.Image:
     that distinguishes the project: a measured comparison against a commercial product,
     with the number that is statistically defensible rather than the flattering one.
     """
+    from PIL import Image, ImageDraw, ImageFont
     scale = 2
     w, h = width * scale, height * scale
     img = Image.new("RGB", (w, h), PAPER)
@@ -221,6 +229,7 @@ def draw_small(size: int) -> Image.Image:
     pixels those collapse into noise, so the small sizes keep only the part that still
     reads at a glance: four coloured note blocks, in the kit's own colours.
     """
+    from PIL import Image, ImageDraw
     scale = 8
     s = size * scale
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
