@@ -1041,7 +1041,10 @@ def main() -> int:
                    help="Alpha-Wiener exponent; reduces bleed between stems. 0 disables")
     p.add_argument("--chunk-seconds", type=float, default=48.0, help="Separation chunk size")
     p.add_argument("--thresholds", default="",
-                   help="Per-class peak-pick thresholds kick,snare,tom,hat,cymbal")
+                   help="Per-class peak-pick thresholds kick,snare,tom,hat,cymbal. "
+                        "Giving these replaces the adaptive tom policy, TOM_CEILING "
+                        "included, so runs using them are not comparable with the "
+                        "default ones on toms")
     p.add_argument("--fixed-tom-threshold", action="store_true",
                    help="Use a fixed tom threshold instead of adapting it per track")
     p.add_argument("--fuse-stem-onsets", default="auto", choices=["auto", "on", "off"],
@@ -1182,6 +1185,18 @@ def convert_one(args, src: Path, out_path: Path) -> int:
             return 1
 
     log(f"[1/4] Transcribing {src.name} with ADTOF ...")
+    # Which tom policy ran is part of the result. An explicit --thresholds vector
+    # silently replaces the adaptive policy including TOM_CEILING, and a benchmark run
+    # that does not say so produces figures from one policy family that read as though
+    # they belonged to another.
+    if thresholds is not None:
+        log(f"      thresholds {list(thresholds)} given explicitly, so the adaptive "
+            f"tom policy (TOM_CEILING={TOM_CEILING}) is NOT in effect")
+    elif args.fixed_tom_threshold:
+        log(f"      fixed tom threshold {DEFAULT_THRESHOLDS[2]}, adaptive policy off")
+    else:
+        log(f"      adaptive tom threshold, {TOM_PERCENTILE}th percentile bounded to "
+            f"[{TOM_FLOOR}, {TOM_CEILING}]")
     onsets = transcribe(src, dev_trans, thresholds,
                         adaptive_toms=not args.fixed_tom_threshold)
     total_hits = sum(len(v) for v in onsets.values())

@@ -1375,31 +1375,75 @@ the band between half a threshold and the threshold, which a lower threshold wou
 so the obvious remedy has a measurable case for it — unlike the deaf passages, where the
 activations were noise and no threshold could have helped.
 
-Halving all five thresholds does exactly what that predicts, and then some:
+It works on the class it was meant for, and it is still not worth shipping.
 
-| | default | halved | |
+> **A trap that cost this section a correction.** Passing `--thresholds` **silently
+> disables the adaptive tom policy**, `TOM_CEILING` included: `transcribe()` only adapts
+> when no explicit vector is given. So a halved-threshold run is not one change away from
+> the shipped default, it is two, and the first version of this table charged the whole
+> difference to the thresholds. The pipeline now prints which tom policy ran, and the
+> three rows below are the decomposition.
+
+All on MDB, all with separation, 4000 resamples over tracks:
+
+| | MICRO | toms | tom notes emitted |
 |---|---|---|---|
-| ENST mallets, MICRO | 0.409 | **0.505** | 8 recordings |
-| ENST sticks, MICRO | 0.699 | 0.700 | 24 recordings, unchanged |
-| **MDB MICRO** | **0.882** | **0.827** | **−0.054, CI [−0.089, −0.028]** |
-| **MDB toms** | **0.589** | **0.175** | **−0.414, CI [−0.558, −0.126]** |
+| shipped: adaptive threshold, bounded by `TOM_CEILING` | **0.882** | **0.589** | 134 |
+| explicit stock thresholds — the ceiling is now off | 0.873 | 0.322 | 276 |
+| explicit halved thresholds | 0.827 | 0.175 | **722** |
 
-So it works, and it is not worth it. The tom row is the reason: on MDB the halved
-threshold emits **722 tom notes where 90 were played**. Toms sit under everything else on
-a real kit, and a threshold low enough to hear a mallet is low enough to hear a snare
-leaking into the tom channel on every backbeat.
+| step | MICRO | toms |
+|---|---|---|
+| losing the ceiling | −0.008 [−0.023, +0.001] | −0.267 [−0.449, **+0.074**] |
+| halving, on top of that | **−0.046 [−0.066, −0.028]** | **−0.148 [−0.249, −0.043]** |
 
-The ENST stick number looked at first like the change was free. It is not free, it is
-**unmeasurable there**: ENST is scored without separation, where precision is already low
-and there is less to lose. MDB is scored on separated stems, which is the path the tool
-actually takes. A cost that only appears on the real configuration is still the cost.
+The tom cost of halving is **−0.148, not the −0.414** this section first reported: the
+rest was the ceiling being switched off behind the flag. Note also that the ceiling row's
+own interval contains zero — MDB's 90 tom onsets cannot resolve it, which is exactly
+[why ENST was bought](#enst-drums--the-corpus-that-can-actually-measure-toms). The second
+machine measured the same halving without separation and got tom −0.147, so the
+like-for-like number reproduces across machines and across the separation path.
 
-Kept as a negative result rather than an option, because a flag that improves 8 mallet
-recordings and quietly quadruples false toms on ordinary material is worse than no flag.
-What it does establish is that soft beaters are **not** entirely a signal limit: about a
-tenth of those onsets are reachable, and something narrower than a global threshold —
-detecting the material, or a beater-aware threshold on the tom channel alone — could
-reach them without paying on the backbeat. Nothing of that is built or measured.
+It is still fatal. **722 tom notes where 90 were played**, and MICRO down 0.046 with the
+interval clear of zero. Toms sit under everything else on a real kit, and a threshold low
+enough to hear a mallet is low enough to hear a snare leaking into the tom channel on
+every backbeat.
+
+**Why ENST disagreed, and it is not the separator.** On ENST's stick material the same
+halving costs 0.009 and *improves* toms, 0.400 → 0.667. The first version of this section
+blamed the separation path. That was wrong: the second machine's MDB sweep is also
+`--no-separate` and collapses the same way. The difference is **tom density** — MDB holds
+90 tom onsets, ENST's stick material holds 2001. On sparse material any over-firing
+destroys precision; on dense material the extra notes mostly land on real toms. Which is
+`TOM_CEILING`'s own lesson from the other side: a percentile is a proportional cap that
+fails on dense material, a fixed threshold is an absolute cap that fails on sparse
+material, and **neither policy knows the density it is working in**.
+
+Nor is a narrower version available. The second machine swept the channels separately:
+lowering the **tom** channel alone reproduces the full damage exactly — 722 notes, tom
+0.175 — so the other four contribute nothing, and even a gentle cut from 0.32 to 0.24
+still emits **524**. The **hi-hat** channel alone is nearly free on MDB at −0.005 MICRO,
+but MDB is all sticks, and the hi-hat channel is precisely where the two soft beaters
+disagree: mallets emit 0.28 notes per onset there and brushes 1.71. A global hi-hat cut
+would help one and worsen the other.
+
+Measured per beater on ENST, which settles it:
+
+| | F1 before | F1 after halving |
+|---|---|---|
+| mallets | 0.285 | **0.505** |
+| brushes | 0.625 | 0.630 |
+| sticks | 0.867 | 0.858 |
+
+**Mallets gain 0.220. Brushes gain 0.005** — their recall rises 0.546 → 0.698 and their
+precision falls 0.732 → 0.575, because the onsets a lower threshold recovers and the
+channel that is already over-firing are the same channel. Brush hi-hat over-firing goes
+from 1.71 notes per onset to 2.58, and brush *toms* reach 5.17.
+
+So the recoverable band is real and reaching it is not worth it — a framing the second
+machine proposed, then retracted with the measurement that disproved it, having recorded
+the prediction in advance. What survives is that a **beater-aware** threshold is the only
+version of this idea still standing, and nothing of it is built or measured.
 
 ### ❌ Tuning all five thresholds globally (my earlier result was biased)
 

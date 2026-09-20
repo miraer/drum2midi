@@ -150,9 +150,11 @@ The third rule was paid for three times in the same week, once in the published 
 a figure read out of one run and written beside a figure from another, with nothing in
 either log saying which run produced it. A stale default sent `significance.py` at an
 export that predated a constant; a half-width was a hardcoded number no script computed;
-a tom recall belonged to a rival policy measured elsewhere. **A number is not usable
-until something states what produced it**, so the scripts print the export they scored
-rather than leaving it to the person reading the log.
+a tom recall belonged to a rival policy measured elsewhere. It then happened a fourth
+time, and worse: `--thresholds` silently disables `TOM_CEILING`, so a published table
+charged a two-change difference entirely to the one change it named. **A number is not
+usable until something states what produced it**, so the scripts print the export they
+scored and the pipeline prints which tom policy ran.
 
 The fourth comes from the second machine, about E-GMD: its 45 537 files are 1059
 performances rendered through 43 kits, so resampling files instead of performances gives
