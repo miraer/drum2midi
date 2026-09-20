@@ -73,6 +73,14 @@ tom interval is ±0.22 and spans both directions.
 > raises it. We have asked, and undertaken to re-run all 23 recordings at whatever they
 > say.
 >
+> **Nor is it established that ReStem ran in its best mode.** These runs used Better
+> (Offline), which is byte-identical to Best (Offline) on the three tracks checked. Best
+> (Offline) + Bleed Reduction is a different matter — it changes the output, and has been
+> scored on two tracks, where it was worse for ReStem. Two tracks settles nothing in
+> either direction, so the fair description of this table is *against Better*, not
+> *against ReStem at its best*. All 23 are queued for a Best + Bleed Reduction run and
+> the result is published whichever way it falls.
+>
 > The ReStem team have not been written to yet. The letter is written and not sent, and
 > publication was deliberately not made to wait on it — which means that as things stand
 > they are learning about this here or not at all. That is a choice with a cost and it is
@@ -844,7 +852,7 @@ the same code (`compare_with_restem.py`).
 ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
 object before publication. Everything below was learned from the outside — from its
 exports, its `trigger_events.json`, its interface and its published user's guide — by
-people with an obvious stake in the answer. Six specific reasons to hold it loosely:
+people with an obvious stake in the answer. Seven specific reasons to hold it loosely:
 
 - **Some rows rest on far fewer recordings than the table implies.** The onset counts are
   not the sample size. Toms appear in 7 of the 23 recordings and one of them carries a
@@ -866,6 +874,18 @@ people with an obvious stake in the answer. Six specific reasons to hold it loos
   regrouping the tracks by genre and dropping a whole genre moves the delta by at most
   0.015, against a published interval of ±0.032 — so *that* form of unrepresentativeness
   does not reach the answer. Which is a narrower reassurance than it sounds.
+- **It has not been established that ReStem ran in its best mode, and that matters more
+  than the rest of this list.** The 23 renders used Better (Offline). Better and Best
+  (Offline) are byte-identical on the three tracks rendered both ways, so that choice
+  appears to cost ReStem nothing. But Best (Offline) **+ Bleed Reduction** genuinely
+  differs — it moved the events on all three — and it has only ever been *scored* on two,
+  where it came out lower for ReStem (0.466 against 0.500; 0.915 against 0.931). Two
+  tracks is not a basis for concluding that their most expensive setting is their weaker
+  one, and it is not a basis on which to claim a win either. Until all 23 have been
+  rendered in Best + Bleed Reduction and scored, **the honest statement is that this
+  comparison is against Better, not against ReStem at its best, and we do not yet know
+  whether those differ.** That run is queued; whichever way it comes out is published, and
+  if Best + Bleed Reduction scores higher the headline is restated against it.
 - **ReStem was never run on a second corpus.** Our own 0.935 on IDMT-SMT-Drums is a
   second-corpus check on us alone; the comparison has none. Nor is MDB the largest real
   corpus here — ENST-Drums holds 210 recordings, 106 minutes and 45,097 onsets of real
