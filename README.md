@@ -1332,6 +1332,36 @@ since it has no tuned operating point here; at its parameter-free 0.5 it scores 
 It is trained on synthetic drum-only stems and its authors publish no MDB numbers, so
 unlike ADT_STR there is no author figure to check the setup against.
 
+**And Vogl's DAFx'18 models, which overturn something this README said.** Two variants,
+an 8-class and an 18-class, CC BY-NC-SA like ADTOF so no licence gain. On MICRO both are
+tied with us — +0.009 [−0.041, +0.075] and −0.008 [−0.047, +0.037] — but the tie hides two
+real and opposite differences: **both beat us on snare** (+0.111 and +0.081, intervals
+clear of zero) and **we beat both on cymbals** (+0.143 and +0.231). A single headline
+number would have reported "no difference" and been useless.
+
+The result that matters is not the F-measure:
+
+| false tom onsets landing near an annotated snare | count | observed | chance | lift |
+|---|---|---|---|---|
+| Vogl CRNN-18 | 43 | 14.0% | 14.5% | **0.96×** |
+| ADTOF (ours) | 68 | 77.9% | 20.2% | **3.86×** |
+
+**Vogl's 18-class model reaches a tom F1 statistically indistinguishable from ours —
+0.562 against 0.589, −0.027 [−0.277, +0.208] — without making the error at all.** Same
+audio, same scorer, same circular-shift null.
+
+That is an existence proof, and it kills a framing this README carried. The snare-tom
+confusion was described as something that might be inherent to the task — toms and snares
+overlapping in the mid-band, with no re-partitioning escaping it. **A different model on
+identical audio simply does not make it.** The confusion is ADTOF's, not drum
+transcription's. It does not follow that training would fix ours; it does follow that a
+model without the pathology is a thing that exists rather than a thing one hopes for.
+
+Vogl is not a candidate to switch to: 211 seconds a track against 1.7 for ADTOF, a
+pure-numpy 2018 CRNN, and no licence advantage. It is useful as a control, and the
+question it raises — what its tom channel does differently — is a diagnostic on two models
+already on disk.
+
 **The licence is the point of the exercise.** Apache-2.0 at 0.703 against CC BY-NC-SA at
 0.860 is the trade this survey exists to price, and today it is not worth taking.
 
@@ -1655,8 +1685,17 @@ nothing.
 transcriber — and the answer is ADTOF, decisively. Running the same 23 tracks with and
 without separation changes **all 23 output files** (2808 snare notes against 2506) and
 leaves the tom notes **bit-identical**: 134 estimates, 66 correct, the same bleed figures
-to a decimal. The separator neither causes this nor fixes it. It is ADTOF answering "tom"
-to a snare, in a model we do not train, and no threshold reaches it. Suppressing it — keeping a tom onset only
+to a decimal. The separator neither causes this nor fixes it.
+
+**And it is not inherent to the task.** An earlier version of this section suggested it
+might be — toms and snares overlap in the mid-band, and no re-partitioning of a five-class
+vocabulary escapes that. [Vogl's 18-class
+model](#the-rest-of-the-alternatives-surveyed) falsifies it: on the same 23 tracks, same
+scorer, same null, it reaches a tom F1 indistinguishable from ours — 0.562 against 0.589 —
+with a lift of **0.96×** against our 3.86×. It does not make the error at all. So this is
+a property of the weights we use, in a model we do not train.
+
+Suppressing it — keeping a tom onset only
 where the tom activation beats snare and kick — gains +0.041 [+0.002, +0.106] on MDB and
 loses −0.019 [−0.036, −0.005] on ENST, because it trades recall for precision and the two
 corpora sit on opposite sides of that balance. The margin was swept rather than fitted:
