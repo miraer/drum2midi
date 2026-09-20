@@ -924,6 +924,44 @@ def test_setup_check_looks_for_every_requirement():
         f"them: {missing}")
 
 
+@test
+def test_failed_install_does_not_end_with_a_clean_bill_of_health():
+    """A half-finished install must not sign off as healthy.
+
+    setup_env.py reports that requirements.txt did not install cleanly, then runs the
+    verification. If nothing pip dropped happens to be on the required list -- which
+    is what happens when the casualties are optional, as tqdm and mir_eval are --
+    the last thing printed used to be "everything required is in place". The exit
+    code said otherwise, but nobody reads exit codes off a screen.
+    """
+    import contextlib
+    import io
+
+    import setup_env
+
+    # Both stubs say "nothing is missing", so problems stays 0 and the only thing
+    # that can change the verdict is the install_failed flag under test. ffmpeg is
+    # stubbed too because check() counts its absence as a problem, and whether the
+    # machine running the tests has it is not what this is about.
+    real_have, real_which = setup_env.have, shutil.which
+    setup_env.have = lambda mod: True
+    shutil.which = lambda prog, *a, **kw: f"/usr/bin/{prog}"
+    try:
+        for failed in (False, True):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = setup_env.check(install_failed=failed)
+            out = buf.getvalue()
+            signed_off = "everything required is in place" in out
+            assert signed_off is not failed, (
+                f"install_failed={failed} printed the clean bill of health: "
+                f"{signed_off}")
+            assert (rc == 0) is not failed, (
+                f"install_failed={failed} returned {rc}")
+    finally:
+        setup_env.have = real_have
+        shutil.which = real_which
+
 
 def main() -> int:
     global _tmp

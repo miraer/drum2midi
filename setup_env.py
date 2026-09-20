@@ -234,7 +234,14 @@ def install_xpu() -> None:
     print(f"  installed; verify with:  {interpreter()} devices.py")
 
 
-def check() -> int:
+def check(install_failed: bool = False) -> int:
+    """Reports what is present. `install_failed` is whether pip actually finished.
+
+    Without that, this printed "everything required is in place" a few lines under
+    the one saying requirements.txt had not installed cleanly, because nothing on
+    the required list happened to be what pip dropped. The exit code was right and
+    the last thing on screen still said the opposite.
+    """
     print("\nverifying installation\n")
     problems = 0
 
@@ -363,6 +370,12 @@ def check() -> int:
     if problems:
         print(f"\n{problems} required component(s) missing - run without --check to install")
         return 1
+    if install_failed:
+        print()
+        print("nothing on the required list is missing, but the install above did")
+        print("not finish, so this is not a clean bill of health -- read the error.")
+        warn_if_bare_python_differs()
+        return 1
     print("\neverything required is in place; try:")
     print(f"    {interpreter()} test_smoke.py")
     warn_if_bare_python_differs()
@@ -399,8 +412,7 @@ def main() -> int:
     elif _intel_gpu_present():
         print("\nAn Intel GPU was detected. Separation runs about 12x faster on it:")
         print(f"    {interpreter()} setup_env.py --with-intel-gpu")
-    rc = check()
-    return 1 if rc or not core_ok else 0
+    return check(install_failed=not core_ok)
 
 
 if __name__ == "__main__":
