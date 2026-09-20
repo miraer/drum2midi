@@ -107,6 +107,11 @@ def main() -> int:
     ap.add_argument("--kinds", default="phrase,solo,minus-one,MIDI-minus-one")
     ap.add_argument("--only", default=None,
                     help="substring the recording name must contain, e.g. mallets")
+    ap.add_argument("--separate", action="store_true",
+                    help="run the separator too, which is the path the tool takes in "
+                         "real use; the default is off so tom figures stay comparable "
+                         "with MDB")
+    ap.add_argument("--device", default="cpu")
     ap.add_argument("--include-hits", action="store_true")
     ap.add_argument("--rescore", action="store_true")
     ap.add_argument("--tag", default="enst")
@@ -157,15 +162,20 @@ def main() -> int:
 
     print(f"ENST-Drums (CC BY-NC-ND 4.0, evaluation only)")
     print(f"{len(items)} recordings, mix={args.mix}, kinds={','.join(sorted(kinds))}")
-    print(f"separation off: the separator provably does not move toms on MDB\n")
+    if args.separate:
+        print("separation ON: the path the tool takes in real use, not comparable with "
+              "the MDB tom figures\n")
+    else:
+        print(f"separation off: the separator provably does not move toms on MDB\n")
 
     if not args.rescore:
         t0 = time.time()
+        sep = [] if args.separate else ["--no-separate"]
         for i, (name, wav, _ann, _k) in enumerate(items, 1):
             mid = outdir / f"{wav.stem}_d{wav.parents[2].name[-1]}.mid"
             res = subprocess.run(
                 [sys.executable, str(root / "drum2midi.py"), str(wav), "-o", str(mid),
-                 "--device", "cpu", "--no-separate"] + passthrough,
+                 "--device", args.device] + sep + passthrough,
                 capture_output=True, text=True, encoding="utf-8", errors="replace")
             if res.returncode != 0:
                 tail = (res.stderr or res.stdout).strip().splitlines()

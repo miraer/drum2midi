@@ -614,9 +614,42 @@ all — the negative control the argument needed and did not have.
 that onset's own class sits at a median of **2.18×** its threshold for brushes against
 **0.50×** for mallets, and 76% of brush onsets clear their threshold against 37% of
 mallet ones. Brushes are a class that is heard and scored badly; mallets are a class that
-is largely not heard. About 11% of the brush gap sits in the band a lower threshold would
-reach, which makes [Limitation 6](#limitations) a tuning problem with a bound on it, and
-[Limitation 7](#limitations) a property of the signal.
+is largely not heard.
+
+The class breakdown says what "scored badly" means, and the two beaters fail in opposite
+directions:
+
+| | sticks | brushes | mallets |
+|---|---|---|---|
+| notes emitted per annotated onset | 0.90 | 0.75 | **0.27** |
+| …on the hi-hat channel alone | 0.85 | **1.71** | 0.28 |
+| hi-hat precision | 0.947 | **0.367** | 1.000 |
+
+Mallets under-fire on every class. Brushes under-fire on every class *except* the hi-hat,
+where they emit 1.71 notes for every one played and only 37% are right. A brush **sweep**
+across a snare head is sustained broadband noise, which is what a hi-hat looks like to
+the model — so the brush failure is not deafness, it is a sweep being transcribed as a
+stream of hi-hat notes.
+
+That was measured without the separator, so the obvious objection is that a separator
+would strip the sweep energy before ADTOF ever sees it. **It does not.** The same 32
+recordings through the full pipeline, paired bootstrap over recordings:
+
+| | no separation | with separation | difference |
+|---|---|---|---|
+| MICRO F1 | 0.616 | 0.663 | +0.047 [+0.014, +0.083] |
+| snare F1 | 0.695 | 0.792 | +0.098 [+0.046, +0.150] |
+| hi-hat F1 | 0.463 | 0.481 | +0.018 [−0.026, +0.079] |
+| **hi-hat notes per onset** | **1.71** | **2.04** | **+0.328 [+0.187, +0.565]** |
+
+Separation helps overall, and it helps the snare a lot — but it makes the hi-hat
+over-firing measurably **worse**, because the separator routes the sweep into the hi-hat
+stem rather than removing it. The failure is not an artefact of scoring on the mix.
+
+The consequence is practical: **a lower threshold would help mallets and actively harm
+brushes**, whose problem is already too many hi-hat notes. There is no shared "soft
+beater" remedy, which is why [Limitation 6](#limitations) and [Limitation
+7](#limitations) are listed as separate problems.
 
 This is [the same deafness as Limitation 8](#limitations) with a name attached: where
 that one describes passages inside a track, this is the material property that produces
@@ -1566,20 +1599,25 @@ python setup_env.py --check
 4. **Ghost notes** — 0.718 vs ReStem's 0.747.
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.
-6. **Jazz** — brushes and swing remain the hardest material. ENST puts a number on the
-   brush half: MICRO 0.616 across 32 brush recordings against 0.873 for sticks, and
-   −0.228 [−0.310, −0.128] within a single drummer. Unlike mallets this is a **tuning**
-   problem with a bound: brush onsets sit at a median 2.18× their threshold and 76% clear
-   it, so the model hears them; about 11% of the gap is in reach of a lower threshold.
-7. **Soft beaters.** Mallets score MICRO **0.409** against 0.841 for every other beater,
+6. **Jazz brushes — over-firing, not deafness.** MICRO 0.616 across 32 brush recordings
+   against 0.873 for sticks, and −0.228 [−0.310, −0.128] within a single drummer. The
+   model *hears* brushes: their onsets sit at a median 2.18× threshold and 76% clear it.
+   The damage is on the hi-hat channel, which emits **1.71 notes per annotated onset at
+   0.367 precision** because a brush sweep is sustained broadband noise. Separation makes
+   it worse, not better — 2.04 notes per onset, +0.328 [+0.187, +0.565]. A lower threshold
+   would make this worse still; the lever would be something that stops continuous energy
+   generating discrete onsets, and nothing of that is built.
+7. **Mallets — insensitivity.** MICRO **0.409** against 0.841 for every other beater,
    95% CI [−0.660, −0.351] holding the style, and −0.435 [−0.679, −0.315] holding the
    drummer instead — two controls with orthogonal confounds agreeing to two thousandths.
-   They emit only 41% as many notes as the annotation contains, and one mallet recording
-   of 210 transcribes to nothing at all. Half of those onsets are noise the model cannot
-   see; about a tenth sit just under the threshold, and [lowering it to reach them costs
-   far more than it buys](#-lowering-the-thresholds-to-rescue-soft-beaters).
+   They emit **0.27** notes per annotated onset, under-firing on every class, and one
+   mallet recording of 210 transcribes to nothing at all. Half of those onsets are noise
+   the model cannot see; about a tenth sit just under the threshold, and [lowering it to
+   reach them costs far more than it
+   buys](#-lowering-the-thresholds-to-rescue-soft-beaters). The opposite failure to
+   brushes, and no shared remedy: what would help here would harm them.
    `enst_mallets.py`, `enst_beater_activations.py` and `enst_beater_within_drummer.py`
-   measure it; nothing yet fixes it.
+   measure both.
 8. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
    audible onsets transcribed to nothing. This is not a threshold that could be lowered —
    the activations there peak at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which
