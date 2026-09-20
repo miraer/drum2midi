@@ -515,14 +515,20 @@ def test_every_script_answers_help():
 
 @test
 def test_privacy_gate_does_not_flag_the_repository_itself():
-    """The gate must not treat the project's own name as a leaked account name.
+    """The gate must guard only names that identify somebody.
 
-    It derives identity from the username and the folder above the checkout. On a
-    developer machine that folder is the owner's home, which is right. On GitHub
-    Actions the layout is /home/<user>/work/<repo>/<repo>, so the parent is the
-    repository, and every `from drum2midi import ...` was reported as a leak. The
-    result was a gate that failed on every CI run the project ever had and passed on
-    every machine a person looked at -- so nobody looked.
+    It derives identity from the username, the git remote's owner, and the folder above
+    the checkout. That last one is the one that keeps going wrong, in both directions.
+
+    On GitHub Actions the layout is /home/<user>/work/<repo>/<repo>, so the parent is
+    the repository, and every `from drum2midi import ...` was reported as a leak -- a
+    gate that failed on every CI run the project ever had and passed on every machine a
+    person looked at, so nobody looked.
+
+    Then the opposite: the parent was taken as an identity whatever it was, so a
+    checkout in C:/dev/drum2midi made `dev` a guarded name and bench_training.py's
+    `for dev in devices:` was reported as a leaked account. A container folder is not a
+    person, and guarding one flags ordinary code.
     """
     import check_privacy
 
@@ -540,10 +546,23 @@ def test_privacy_gate_does_not_flag_the_repository_itself():
     assert "runner" not in ci, (
         f"the CI robot account is not an identity and must not be guarded: {ci}")
 
-    dev = check_privacy.identity_names(
-        "someone", Path("/home/<user>/projects/drum2midi"), owner="someone")
-    assert "projects" in dev and "someone" in dev, (
-        f"a developer layout must still yield both names: {dev}")
+    # A home directory does name its owner, and that name is guarded.
+    home = check_privacy.identity_names(
+        "someone", Path("/home/<user>/drum2midi"), owner="someone")
+    assert "<user>" in home and "someone" in home, (
+        f"a checkout in a home directory must yield both names: {home}")
+
+    # Anything else above the checkout is a container, not a person. `dev` is the real
+    # case -- this project lives in C:/dev/drum2midi -- and `projects` is the one an
+    # earlier version of this test wrongly required to be guarded.
+    for layout in (Path("C:/dev/drum2midi"),
+                   Path("/home/<user>/projects/drum2midi")):
+        names = check_privacy.identity_names("someone", layout, owner="someone")
+        container = layout.parent.name.lower()
+        assert container not in [n.lower() for n in names], (
+            f"the container folder {container!r} is guarded as an identity: {names}")
+        assert "someone" in names, (
+            f"the account from the remote must still be guarded: {names}")
 
 
 @test

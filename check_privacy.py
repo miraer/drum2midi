@@ -72,6 +72,38 @@ def remote_owner() -> str | None:
     return m.group(1) if m else None
 
 
+HOME_CONTAINERS = ("users", "home")
+
+
+def checkout_account(root: Path) -> str | None:
+    r"""The account name in the folder a checkout sits in -- when that folder is a home.
+
+    A checkout in `C:\Users\<name>\drum2midi` or `/home/<name>/drum2midi` names its
+    owner in the path itself, and that is worth guarding independently of the username
+    environment variable, which can be missing or wrong.
+
+    Only when the parent really is a home, though. This used to take the parent's name
+    whatever it was, and the machine this project is developed on keeps its checkout in
+    `C:\dev\drum2midi` -- so `dev` became a guarded identity and every
+    `for dev in devices:` in bench_training.py was reported as a leaked account name.
+    A container folder (`dev`, `src`, `code`, `projects`) identifies nobody, and
+    guarding one flags ordinary variable names: the same failure the CI robot account
+    `runner` caused, in the same direction, for the same reason.
+
+    So a home is recognised by shape rather than assumed: the parent is either the
+    running user's own home, or it sits directly inside a home container.
+    """
+    parent = root.parent
+    if parent.parent.name.lower() in HOME_CONTAINERS:
+        return parent.name
+    try:
+        if parent == Path.home():
+            return parent.name
+    except RuntimeError:
+        pass  # no resolvable home; the username and the remote owner still apply
+    return None
+
+
 def identity_names(user: str, root: Path, owner: str | None = None,
                    ci: bool = False) -> list[str]:
     """Names that identify this machine or its owner.
@@ -79,10 +111,11 @@ def identity_names(user: str, root: Path, owner: str | None = None,
     Three sources, and the reason there are three is that the first two were wrong in
     opposite directions on a build server.
 
-    The folder above a checkout is the owner's home on a developer machine. On GitHub
-    Actions the layout is `work/<repo>/<repo>`, so the parent is the repository's own
-    name, and every `from drum2midi import ...` was reported as a leaked account. A
-    repository cannot leak its own name, so it is excluded.
+    The folder above a checkout names the owner when it is a home directory, which is
+    what checkout_account decides and why this is not simply the parent's name. On
+    GitHub Actions the layout is `work/<repo>/<repo>`, so the parent is the
+    repository's own name, and every `from drum2midi import ...` was reported as a
+    leaked account. A repository cannot leak its own name, so it is excluded here too.
 
     The ambient username is the author on a developer machine and a shared robot
     account on CI -- where it is `runner`, an ordinary English word that appears in
@@ -94,12 +127,13 @@ def identity_names(user: str, root: Path, owner: str | None = None,
     the git remote is added: knowable everywhere, identical everywhere, and already
     exempted where it legitimately appears, in the clone URL.
     """
-    names = {root.parent.name}
+    names = {checkout_account(root)}
     if user and not ci:
         names.add(user)
     if owner:
         names.add(owner)
-    return sorted(n for n in names if len(n) > 2 and n.lower() != root.name.lower())
+    return sorted(n for n in names
+                  if n and len(n) > 2 and n.lower() != root.name.lower())
 
 
 # Checked separately from RULES so the message can say why, and so an empty username
