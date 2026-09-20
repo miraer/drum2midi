@@ -4,6 +4,10 @@
 
 Convert a mixed drum recording into MIDI, using only open-source models.
 
+**[Watch the 80-second demo](docs/pitch.mp4)** — a conversion start to finish, the
+comparison below, and the parts that were measured and thrown away. Captions included
+(`docs/pitch.srt`); the drum track is from the Groove MIDI Dataset, CC BY 4.0.
+
 **Measured against [ReStem 2 Pro](https://restemapp.com/restem2)** — a $199 commercial
 product — on 23 hand-annotated recordings:
 

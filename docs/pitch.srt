@@ -1,0 +1,62 @@
+1
+00:00:05,900 --> 00:00:11,730
+I wanted this as MIDI. Every hit, the right drum, the right
+loudness.
+
+2
+00:00:11,730 --> 00:00:14,510
+I thought it would take a weekend.
+
+3
+00:00:14,510 --> 00:00:20,580
+It does work. Open source, runs on your machine, about a
+minute a song.
+
+4
+00:00:20,580 --> 00:00:22,955
+It was not a weekend.
+
+5
+00:00:22,955 --> 00:00:30,160
+I benchmarked it against a $199 product. Twenty-three
+hand-annotated recordings.
+
+6
+00:00:30,160 --> 00:00:35,265
+Four rows point our way. Only two survive being checked.
+
+7
+00:00:35,265 --> 00:00:40,585
+They happen to be the two that matter. Overall, and hi-hat.
+
+8
+00:00:40,585 --> 00:00:48,690
+An AI agent wrote most of this. Brilliant at code,
+pathologically confident about statistics.
+
+9
+00:00:48,691 --> 00:00:53,321
+It told me we were better at toms. We are not.
+
+10
+00:00:53,321 --> 00:00:58,801
+Five retractions in one day. Two were compliments to the
+competitor.
+
+11
+00:00:58,801 --> 00:01:05,766
+Being strict paid off. It found a real bug: our tom threshold
+was rationing its own toms.
+
+12
+00:01:05,766 --> 00:01:10,691
+One constant fixed it, and it held on a drummer we never tuned
+it on.
+
+13
+00:01:10,691 --> 00:01:14,426
+Free, open source, runs on your machine.
+
+14
+00:01:14,426 --> 00:01:19,541
+Measured, not guessed. Eventually.
