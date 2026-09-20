@@ -528,14 +528,20 @@ def test_privacy_gate_does_not_flag_the_repository_itself():
 
     # Placeholder usernames rather than literal home paths: the gate rejects
     # /home/<a real name> on sight, and the shape of the path is all this test needs.
-    ci = check_privacy.identity_names("runner",
-                                      Path("/home/<user>/work/drum2midi/drum2midi"))
+    ci = check_privacy.identity_names(
+        "runner", Path("/home/<user>/work/drum2midi/drum2midi"),
+        owner="someone", ci=True)
     assert "drum2midi" not in [n.lower() for n in ci], (
         f"the repository's own name is treated as an identity on CI: {ci}")
-    assert "runner" in ci, f"the CI username should still be guarded: {ci}"
+    assert "someone" in ci, (
+        f"the account from the remote must be guarded on CI too: {ci}")
+    # `runner` is the shared CI account and an ordinary English word; this repository
+    # contains the phrase "the batch runner waits" and it is not a leak.
+    assert "runner" not in ci, (
+        f"the CI robot account is not an identity and must not be guarded: {ci}")
 
-    dev = check_privacy.identity_names("someone",
-                                       Path("/home/<user>/projects/drum2midi"))
+    dev = check_privacy.identity_names(
+        "someone", Path("/home/<user>/projects/drum2midi"), owner="someone")
     assert "projects" in dev and "someone" in dev, (
         f"a developer layout must still yield both names: {dev}")
 

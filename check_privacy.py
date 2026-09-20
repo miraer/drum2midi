@@ -56,28 +56,56 @@ RULES = [
     ("email address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]{2,}\b"), False),
 ]
 
-def identity_names(user: str, root: Path) -> list[str]:
-    """Names that identify this machine or its owner, from the username and the folder
-    the checkout sits in.
+def remote_owner() -> str | None:
+    """The account this repository belongs to, from the configured remote.
 
-    The folder above a checkout is the owner's home on a developer machine, which is
-    what this was written for. On GitHub Actions the layout is
-    `/home/runner/work/<repo>/<repo>`, so the parent is the repository's own name --
-    and every `from drum2midi import ...` in the tree was reported as a leaked account
-    name. The gate failed on every CI run the project has ever had while passing on
-    every developer machine, which is the worst way round: the check that guards
-    publication was only ever green where publication does not happen.
-
-    A repository cannot leak its own name, so it is excluded by identity rather than by
-    a special case for one CI provider.
+    Needed because the other two sources of identity are environment-dependent and one
+    of them is wrong on CI. The owner is the same on every machine that has the remote,
+    which makes it the only identity worth guarding that a build server can also know.
     """
-    return [n for n in {user, root.parent.name}
-            if len(n) > 2 and n.lower() != root.name.lower()]
+    try:
+        out = subprocess.run(["git", "remote", "get-url", "origin"],
+                             capture_output=True, text=True, cwd=ROOT, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", out.stdout.strip())
+    return m.group(1) if m else None
+
+
+def identity_names(user: str, root: Path, owner: str | None = None,
+                   ci: bool = False) -> list[str]:
+    """Names that identify this machine or its owner.
+
+    Three sources, and the reason there are three is that the first two were wrong in
+    opposite directions on a build server.
+
+    The folder above a checkout is the owner's home on a developer machine. On GitHub
+    Actions the layout is `work/<repo>/<repo>`, so the parent is the repository's own
+    name, and every `from drum2midi import ...` was reported as a leaked account. A
+    repository cannot leak its own name, so it is excluded.
+
+    The ambient username is the author on a developer machine and a shared robot
+    account on CI -- where it is `runner`, an ordinary English word that appears in
+    this repository in the phrase "the batch runner waits". Guarding it there flagged
+    prose. On CI it identifies nobody and is dropped.
+
+    That would leave CI guarding nothing, which is worse, because the real account name
+    could be committed and only a developer's own run would notice. So the owner from
+    the git remote is added: knowable everywhere, identical everywhere, and already
+    exempted where it legitimately appears, in the clone URL.
+    """
+    names = {root.parent.name}
+    if user and not ci:
+        names.add(user)
+    if owner:
+        names.add(owner)
+    return sorted(n for n in names if len(n) > 2 and n.lower() != root.name.lower())
 
 
 # Checked separately from RULES so the message can say why, and so an empty username
 # does not match everything.
-IDENTITY = identity_names(USER, ROOT)
+IS_CI = bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
+IDENTITY = identity_names(USER, ROOT, remote_owner(), IS_CI)
 
 
 def own_repo_url() -> re.Pattern | None:
