@@ -51,18 +51,23 @@ tom interval is ±0.22 and spans both directions.
 > 0.691 and 0.690. [The detail, including a claim withdrawn from this
 > section](#where-each-side-wins).
 >
-> **Both sides have that slider, and neither was touched.** Each ReStem stem has its own
-> trigger editor — Thresh, Hold, Sustain, Release, Blend — with Thresh defaulting to
-> −60.0 dB, which is their equivalent of our `--thresholds`. Everything here was run at
-> their defaults against ours. Worth stating precisely, because a precision gap is exactly
-> what a threshold moves: **our hi-hat threshold is 0.22, which is stock ADTOF, not a
-> value we chose** — the only class where our default differs from upstream is snare, and
-> snare is a row where the two systems are indistinguishable. So the class carrying the
-> win runs on a number neither we nor they picked for this comparison.
+> **Both sides have a control like that, and neither was touched — but they are not the
+> same control.** Each ReStem stem has its own trigger editor with **Thresh** defaulting
+> to −60.0 dB, a level in dBFS, which is 0.001 of full scale. Ours is a peak-picking
+> threshold on ADTOF's per-class sigmoid output — dimensionless, 0 to 1, where a real
+> recording produces activations up to about 0.80 and 6.8% of frames clear 0.22. One asks
+> how loud the signal is, the other how sure the model is. **The two numbers cannot be
+> mapped onto each other from outside either product.**
 >
-> What we cannot know from outside is whether −60.0 dB is what a competent ReStem user
-> would actually use. We have asked them, and undertaken to re-run all 23 recordings at
-> whatever they answer.
+> What can be said is that neither side was tuned for this comparison: **our hi-hat
+> threshold is 0.22, which is stock ADTOF, not a value we chose.** The only class where
+> our default departs from upstream is snare, and snare is a row where the two systems
+> are indistinguishable. So the class carrying the overall result runs on a number
+> neither we nor they picked.
+>
+> Whether −60.0 dB is what a competent ReStem user would actually work at is a question
+> only they can answer, and we have asked, undertaking to re-run all 23 recordings at
+> whatever they say.
 >
 > The ReStem team have been written to and told this is public. If they say the product
 > was used incorrectly, these numbers get rerun and corrected here, and the correction
