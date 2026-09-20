@@ -14,11 +14,19 @@ and only adds the interval around them.
     python significance.py
     python significance.py --rounds 10000 --ours bench/note36
     python significance.py --own-ci          # interval around our own per-class F1
+    python significance.py --theirs restem_midi_better   # their weaker mode
 
 The default --ours is bench/ceiling, the export the README's tables are built from.
 bench/note36 predates TOM_CEILING and still scores toms at 0.605; pointing this script
 at it reproduces every row of the README except toms, which is the one row the ceiling
 moves. The directory measured is printed in the header so no log is ambiguous about it.
+
+The default --theirs is restem_midi, which holds ReStem's **Best (Offline) + Bleed
+Reduction** output -- its best mode on this material, and what the README publishes
+against. restem_midi_better holds the Better (Offline) renders the first comparison used
+and scores 0.820 instead of 0.834. Both are kept because the difference between them is
+itself a published result, and because a script whose default quietly reproduces a
+superseded number is a defect this project has already had once.
 """
 
 from __future__ import annotations

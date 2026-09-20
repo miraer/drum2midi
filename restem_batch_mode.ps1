@@ -46,16 +46,53 @@ function Say([string] $m) {
     Add-Content -Path $log -Value $line
 }
 
+function Close-StaleDialog {
+    # A batch that dies mid-track leaves the file dialog open, and the dialog's own
+    # 160 elements then hide the main window's mode text -- so every later track fails
+    # with "Load unavailable" and the guard reports the mode as unreadable. Closing it
+    # first makes a restart resume instead of failing 59 times in a row.
+    try {
+        $w = Get-RestemWindow
+        if (-not $w) { return }
+        $wins = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+          (New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::Window)))
+        foreach ($d in $wins) {
+            try {
+                $d.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()
+                Say ("closed a stale dialog: " + $d.Current.Name)
+                Start-Sleep -Seconds 2
+            } catch { }
+        }
+    } catch { }
+}
+
 function Current-Mode {
-    $w = Get-RestemWindow
-    if (-not $w) { return $null }
-    $all = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-                      [System.Windows.Automation.Condition]::TrueCondition)
-    ($all | Where-Object { $_.Current.Name -match '\((Offline|Realtime)\)' } |
-       Select-Object -First 1).Current.Name
+    # Retried, because FindAll throws ElementNotAvailableException when the window is
+    # mid-redraw between renders. An overnight run died on the second track that way:
+    # one transient failure of the guard looked exactly like the guard refusing, and
+    # 59 recordings did not happen. A guard that cannot survive a repaint is not a
+    # guard, it is another way to lose a night.
+    for ($try = 1; $try -le 5; $try++) {
+        try {
+            $w = Get-RestemWindow
+            if (-not $w) { Start-Sleep -Seconds 3; continue }
+            $all = $w.FindAll([System.Windows.Automation.TreeScope]::Descendants,
+                              [System.Windows.Automation.Condition]::TrueCondition)
+            $name = ($all | Where-Object { $_.Current.Name -match '\((Offline|Realtime)\)' } |
+                       Select-Object -First 1).Current.Name
+            if ($name) { return $name }
+        } catch {
+            # ElementNotAvailableException and friends: the window moved under us
+        }
+        Start-Sleep -Seconds 3
+    }
+    return $null
 }
 
 $mode = Current-Mode
+if (-not $mode) { Close-StaleDialog; $mode = Current-Mode }
 if (-not $mode) { Say "ReStem is not running or its window is unreadable"; exit 1 }
 if ($mode -ne $Expect) {
     Say "mode is '$mode' but '$Expect' was expected - refusing to run"
@@ -73,34 +110,50 @@ foreach ($track in $Tracks) {
 
     # re-check every time: a crash and restart could reset the selector
     $now = Current-Mode
+    if (-not $now) { Close-StaleDialog; $now = Current-Mode }
+    if (-not $now) { Say "mode unreadable after retries - stopping"; break }
     if ($now -ne $Expect) { Say "mode changed to '$now' - stopping"; break }
 
     $before = [datetime]::MinValue
     if (Test-Path $cacheJson) { $before = (Get-Item $cacheJson).LastWriteTime }
 
-    $win = Get-RestemWindow
-    $load = Find-ByName $win "Load"
-    if (-not $load) { Say "Load unavailable for $track"; $failed += $track; continue }
-    Invoke-Btn $load
-    Start-Sleep -Seconds 2
-    if (-not (Submit-FileDialog $src)) { Say "could not submit $track"; $failed += $track; continue }
-    Wait-DialogGone 20 | Out-Null
-
-    $t0 = Get-Date
-    $deadline = $t0.AddMinutes($TimeoutMinutes)
     $ok = $false
-    while ((Get-Date) -lt $deadline) {
-        Start-Sleep -Seconds 10
-        if ((Test-Path $cacheJson) -and (Get-Item $cacheJson).LastWriteTime -gt $before) {
-            Start-Sleep -Seconds 4
-            Copy-Item $cacheJson $dest -Force
-            $ok = $true
-            break
+    $t0 = Get-Date
+    try {
+        $win = Get-RestemWindow
+        $load = Find-ByName $win "Load"
+        if (-not $load) { Say "Load unavailable for $track"; $failed += $track; continue }
+        Invoke-Btn $load
+        Start-Sleep -Seconds 2
+        if (-not (Submit-FileDialog $src)) { Say "could not submit $track"; $failed += $track; continue }
+        Wait-DialogGone 20 | Out-Null
+
+        $t0 = Get-Date
+        $deadline = $t0.AddMinutes($TimeoutMinutes)
+        while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 10
+            if ((Test-Path $cacheJson) -and (Get-Item $cacheJson).LastWriteTime -gt $before) {
+                Start-Sleep -Seconds 4
+                Copy-Item $cacheJson $dest -Force
+                $ok = $true
+                break
+            }
+            try {
+                $w = Get-RestemWindow
+                if (-not $w) { Say "window disappeared during $track"; break }
+                $err = Find-ByName $w "OK"
+                if ($err) { try { Invoke-Btn $err } catch {}; Say "render error on $track"; break }
+            } catch {
+                # a repaint during the poll is not a failure; the cache check above is
+                # what decides whether the render finished
+            }
         }
-        $w = Get-RestemWindow
-        if (-not $w) { Say "window disappeared during $track"; break }
-        $err = Find-ByName $w "OK"
-        if ($err) { try { Invoke-Btn $err } catch {}; Say "render error on $track"; break }
+    } catch {
+        # One unavailable UI element used to end the batch. Losing a track is a cost
+        # worth paying to keep the other 59.
+        Say ("{0} threw: {1}" -f $track, $_.Exception.Message)
+        $failed += $track
+        continue
     }
 
     if ($ok) {
