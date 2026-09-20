@@ -57,10 +57,38 @@ proven impossible.
 
 | | what would settle it |
 |---|---|
-| **Reproduce the ENST figures independently** | `TOM_CEILING = 0.45` is the shipped default and every figure justifying it came from one machine. The MDB side was cross-checked and matched exactly; the ENST side was not. |
+| **Reproduce the ENST figures independently** | ✅ done 20 Sept. A second machine reproduced kick, snare, hi-hat and cymbals to three decimals with identical intervals; toms differed by exactly the +0.197 the ceiling buys, which identified their run as pre-ceiling rather than a disagreement. |
 | **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training |
-| **Synthetic training data with realistic degradation** | whether it moves any class on a corpus it was not synthesised from |
+| ~~**Synthetic training data with realistic degradation**~~ | ❌ **closed 20 Sept as measured-unnecessary.** See below. |
 | **ENST as the acoustic counterweight** | it ships isolated close-mic tom stems, which is exactly what the stem-fusion stage consumes; unexplored |
+
+### Why synthetic training data was closed without being built
+
+The case for it was that a model needs more timbral variety than one corpus provides.
+E-GMD already **is** that variety — 1059 performances rendered through 43 kits — so the
+question is whether the variety it has generalises. The second machine measured it by
+holding out whole kits, which E-GMD's own split never does.
+
+It does generalise, and where it fails is not our problem:
+
+| held-out kit | tom F1 |
+|---|---|
+| 60s Rock, Arena Stage, Cassette, Classic Rock, Jazz, Alternative, Acoustic Kit | 0.601 – 0.683 |
+| JingleStacks, Dark Hybrid | 0.358 – 0.430 |
+| **909 Simple, Ele-Drum** | **0.058, 0.015** |
+
+Every kit at the top is an acoustic set, every kit at the bottom is a drum machine, and
+`Ele-Drum` returns 0.015 across three independent held-out runs. The model transfers
+across acoustic timbre for free and collapses on drum machines — **and nobody is asking
+this tool to transcribe a 909.** Synthesising more of what it already handles buys
+nothing, and the gap that actually matters, an electronic kit against a miked kit in a
+room, is not in E-GMD at all.
+
+One methodological result worth more than the conclusion: **the headline drop is not a
+stable quantity.** Across four seeds it ranged +0.045 to +0.177 and one interval contained
+zero, because the number is just how many electronic kits landed in the held-out eight.
+The per-kit map is the finding; any single averaged drop would have been a sampling
+artefact quoted as a result.
 
 ---
 

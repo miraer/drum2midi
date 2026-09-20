@@ -593,10 +593,30 @@ which separates them:
 |---|---|---|---|
 | afro | 0.347 (7) | 0.775 (10) | **−0.428, CI [−0.653, −0.323]** |
 
-Same style, same corpus, same scoring — so it is the beater. The one other mallet
-recording is a tom solo by a different drummer and it scores 0.531 against 0.599 for the
-stick tom solo, pointing the same way on a sample too small to resample, which the script
-says rather than dressing up.
+ENST contains **no** recording of one drummer playing one piece with two beaters — the
+corpus assigns one beater per drummer per style — so that pairing cannot be made. The
+second machine found the next best thing: a control confounded in the *opposite*
+direction. Drummer 1 played all four beaters, so holding the player fixed and letting
+the style vary is available (`enst_beater_within_drummer.py`):
+
+| within drummer 1 | soft | sticks | difference |
+|---|---|---|---|
+| rods | 0.832 | 0.782 | +0.049 [−0.037, +0.150] |
+| brushes | 0.554 | 0.782 | **−0.228 [−0.310, −0.128]** |
+| mallets | 0.347 | 0.782 | **−0.435 [−0.679, −0.315]** |
+
+**−0.433 holding style, −0.435 holding drummer.** Two controls whose confounds point in
+orthogonal directions, agreeing to two thousandths. An effect that survives both is not
+explained by either. Rods, which are barely softer than sticks, show no degradation at
+all — the negative control the argument needed and did not have.
+
+**Brushes are not mallets, though.** At every annotated onset the model's activation for
+that onset's own class sits at a median of **2.18×** its threshold for brushes against
+**0.50×** for mallets, and 76% of brush onsets clear their threshold against 37% of
+mallet ones. Brushes are a class that is heard and scored badly; mallets are a class that
+is largely not heard. About 11% of the brush gap sits in the band a lower threshold would
+reach, which makes [Limitation 6](#limitations) a tuning problem with a bound on it, and
+[Limitation 7](#limitations) a property of the signal.
 
 This is [the same deafness as Limitation 8](#limitations) with a name attached: where
 that one describes passages inside a track, this is the material property that produces
@@ -1547,15 +1567,19 @@ python setup_env.py --check
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.
 6. **Jazz** — brushes and swing remain the hardest material. ENST puts a number on the
-   brush half: MICRO 0.616 across 32 brush recordings against 0.873 for sticks.
+   brush half: MICRO 0.616 across 32 brush recordings against 0.873 for sticks, and
+   −0.228 [−0.310, −0.128] within a single drummer. Unlike mallets this is a **tuning**
+   problem with a bound: brush onsets sit at a median 2.18× their threshold and 76% clear
+   it, so the model hears them; about 11% of the gap is in reach of a lower threshold.
 7. **Soft beaters.** Mallets score MICRO **0.409** against 0.841 for every other beater,
-   95% CI [−0.660, −0.351], and emit only 41% as many notes as the annotation contains.
-   The same afro material played with sticks scores 0.775 against 0.347, so it is the
-   beater rather than the repertoire. One mallet recording of 210 transcribes to nothing
-   at all. Half of those onsets are noise the model cannot see; about a tenth sit just
-   under the threshold, and [lowering it to reach them costs far more than it
-   buys](#-lowering-the-thresholds-to-rescue-soft-beaters). `enst_mallets.py` and
-   `enst_beater_activations.py` measure it; nothing yet fixes it.
+   95% CI [−0.660, −0.351] holding the style, and −0.435 [−0.679, −0.315] holding the
+   drummer instead — two controls with orthogonal confounds agreeing to two thousandths.
+   They emit only 41% as many notes as the annotation contains, and one mallet recording
+   of 210 transcribes to nothing at all. Half of those onsets are noise the model cannot
+   see; about a tenth sit just under the threshold, and [lowering it to reach them costs
+   far more than it buys](#-lowering-the-thresholds-to-rescue-soft-beaters).
+   `enst_mallets.py`, `enst_beater_activations.py` and `enst_beater_within_drummer.py`
+   measure it; nothing yet fixes it.
 8. **Passages ADTOF cannot hear at all.** On one real recording, 24 seconds containing 70
    audible onsets transcribed to nothing. This is not a threshold that could be lowered —
    the activations there peak at 0.008 to 0.08 against thresholds of 0.14 to 0.32, which
@@ -1651,6 +1675,7 @@ transcriber from scratch.
 | **Analysis** | |
 | `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
 | `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
+| `enst_beater_within_drummer.py` | the same question with the confound reversed: one drummer, four beaters |
 | `analyze_ghosts.py` | recall by hit strength; is it fixable by threshold |
 | `analyze_ghost_fusion.py` | do stems recover quiet hits |
 | `analyze_pedal.py` | feature separability for pedal hi-hat |

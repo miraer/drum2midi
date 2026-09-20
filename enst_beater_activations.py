@@ -46,6 +46,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--mix", default="wet_mix", choices=["wet_mix", "dry_mix"])
+    ap.add_argument("--soft", default="mallets",
+                    choices=["mallets", "brushes", "rods"],
+                    help="the soft beater to compare against sticks")
     ap.add_argument("--style", default="afro",
                     help="material played with both beaters, so the comparison is fair")
     ap.add_argument("--limit", type=int, default=None,
@@ -67,7 +70,7 @@ def main() -> int:
         print(f"ENST not found at {data}; run: python fetch_enst.py")
         return 1
 
-    picked = {"mallets": [], "sticks": []}
+    picked = {args.soft: [], "sticks": []}
     for d in (1, 2, 3):
         for ann in sorted((data / f"drummer_{d}" / "annotation").glob("*.txt")):
             stem = ann.stem
@@ -81,14 +84,14 @@ def main() -> int:
     for b in picked:
         picked[b] = picked[b][: args.limit]
 
-    if not picked["mallets"] or not picked["sticks"]:
+    if not picked[args.soft] or not picked["sticks"]:
         print(f"need both beaters on '{args.style}' material; found "
-              f"{len(picked['mallets'])} mallet and {len(picked['sticks'])} stick")
+              f"{len(picked[args.soft])} {args.soft} and {len(picked['sticks'])} stick")
         return 1
 
     print(f"thresholds {thr}")
     print(f"material '{args.style}', {args.mix}, no separation, device={args.device}")
-    print(f"{len(picked['mallets'])} mallet and {len(picked['sticks'])} stick "
+    print(f"{len(picked[args.soft])} {args.soft} and {len(picked['sticks'])} stick "
           f"recordings\n")
 
     summary = {}
@@ -145,21 +148,31 @@ def main() -> int:
     print(f"{'beater':<10}{'onsets':>8}{'median':>9}{'>=thr':>9}"
           f"{'near miss':>11}{'noise':>9}{'gap 95th':>10}")
     print("-" * 66)
-    for b in ("sticks", "mallets"):
+    for b in ("sticks", args.soft):
         s = summary[b]
         print(f"{b:<10}{s['n']:>8}{s['median']:>9.2f}{s['over']:>8.0%}"
               f"{s['near']:>11.0%}{s['noise']:>9.0%}{s['floor']:>10.3f}")
 
-    m, k = summary["mallets"], summary["sticks"]
+    m, k = summary[args.soft], summary["sticks"]
     print(f"\n'near miss' is half a threshold up to the threshold; 'noise' is below "
           f"half.\n'gap 95th' is what the channel does between hits: a threshold below "
           f"it fires\non silence.")
-    verdict = ("a near miss -- lowering thresholds would trade false positives for them"
-               if m["near"] > m["noise"] else
-               "noise -- no threshold recovers these, as with Limitation 8")
-    print(f"\nFor mallets the missing onsets are mostly {verdict}.")
+    # An earlier version compared the two bands to each other and announced "mostly
+    # noise" on a 13-against-11 margin, which read as a finding and was a coin toss.
+    # The median against the stick control is the comparison that carries weight, and
+    # the recoverable share is stated as a bound rather than a verdict.
+    ratio = m["median"] / max(k["median"], 1e-9)
+    print(f"\n{args.soft} sit at {m['median']:.2f} of their threshold against "
+          f"{k['median']:.2f} for sticks, a factor of {1 / max(ratio, 1e-9):.1f}.")
     print(f"Sticks clear their threshold on {k['over']:.0%} of onsets, "
-          f"mallets on {m['over']:.0%}.")
+          f"{args.soft} on {m['over']:.0%}.")
+    print(f"At most {m['near']:.0%} of {args.soft} onsets are recoverable by a lower "
+          f"threshold;\n{m['noise']:.0%} sit below half a threshold and nothing reaches "
+          f"those.")
+    if m["median"] < 1.0:
+        print(f"A median below 1.0 means the typical {args.soft} onset does not clear "
+              f"its threshold\nat all, which is a different condition from a class that "
+              f"clears it and scores badly.")
     return 0
 
 
