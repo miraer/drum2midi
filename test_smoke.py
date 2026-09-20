@@ -997,6 +997,57 @@ def test_install_advice_names_an_interpreter():
     assert not bare, f"these tell the reader to use whatever pip is on PATH: {bare}"
 
 
+@test
+def test_separator_declares_the_programs_it_runs():
+    """A separator's dependencies include the programs it shells out to, not just imports.
+
+    separator_missing exists so that a missing dependency is reported before ADTOF
+    spends minutes transcribing. It checked imports only, so audio-separator's call to
+    `ffmpeg -version` was invisible to it: a machine without ffmpeg transcribed a
+    four-and-a-half minute recording in full and then failed with the child process's
+    own last traceback line, "FileNotFoundError: [WinError 2] The system cannot find
+    the file specified", naming neither ffmpeg nor what to do about it.
+
+    ffmpeg is in no requirements file either, because nothing here imports it, so the
+    installer could not have warned about it in advance. That is what makes it worth a
+    test rather than a one-line fix.
+    """
+    import drum2midi
+
+    assert "ffmpeg" in [p for p, _ in drum2midi.SEPARATOR_BINARIES.get("uvr", ())], (
+        "the default separator runs ffmpeg and no longer declares it: "
+        f"{drum2midi.SEPARATOR_BINARIES}")
+
+    # The installer has to be able to say so before a conversion is attempted.
+    doctor = (ROOT / "setup_env.py").read_text(encoding="utf-8")
+    assert 'shutil.which("ffmpeg")' in doctor, (
+        "setup_env.py --check does not look for ffmpeg")
+
+    # And the advice has to name a real way to get it, per platform. It lives in
+    # setup_env because the installer needs it too, and one copy cannot drift.
+    import setup_env
+    advice = setup_env.ffmpeg_advice()
+    assert "ffmpeg" in advice.lower(), f"unhelpful ffmpeg advice: {advice}"
+    assert not hasattr(drum2midi, "ffmpeg_advice"), (
+        "two copies of the ffmpeg advice: setup_env owns it")
+
+    # The precheck must actually fire on a binary, not only on a missing import.
+    class _Args:
+        separator = "uvr"
+        no_separate = False
+
+    real_which = shutil.which
+    try:
+        shutil.which = lambda prog, *a, **kw: None if prog == "ffmpeg" else "/x"
+        found = drum2midi.separator_missing(_Args())
+    finally:
+        shutil.which = real_which
+    assert found is not None, "a missing ffmpeg is not reported before work starts"
+    what, why, how, _ = found
+    assert "ffmpeg" in why.lower() and "PATH" in why, (
+        f"the reason does not say what is wrong: {why}")
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

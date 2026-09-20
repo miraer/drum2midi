@@ -361,12 +361,24 @@ verifies the result. The MDX23C drum separator downloads itself on the first con
 
 **If you have an NVIDIA GPU**, install a CUDA build of torch before or after the above:
 the default wheel on Windows carries no CUDA, so the card sits idle and everything runs
-on the CPU without saying why. `python devices.py` reports that when it happens and names
-the card. Get the exact command from
+on the CPU without saying why. `.\.venv\Scripts\python.exe devices.py` reports that when
+it happens and names the card. Get the exact command from
 [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — the CUDA
 version in the index URL depends on your driver and is deliberately not quoted here,
 because a hard-coded one in this file was three releases out of date the day it was
 written.
+
+**FFmpeg is also required**, and it is a program rather than a Python package, so
+`pip` will not bring it in:
+
+```powershell
+winget install Gyan.FFmpeg     # then open a new terminal, so PATH is re-read
+```
+
+`brew install ffmpeg` on macOS, `sudo apt install ffmpeg` on Debian or Ubuntu.
+audio-separator — the default separator — runs `ffmpeg -version` before it does
+anything, so without it stage 2 of 4 cannot start. `--separator none` skips separation
+altogether and does not need it, at the cost of flat velocity.
 
 `models/velocity.pkl` and `models/pedal.pkl` ship with the repository (2.3 MB). They are
 scikit-learn pickles trained on the Groove MIDI Dataset by `train_models.py`; retraining

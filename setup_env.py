@@ -329,6 +329,8 @@ def check(install_failed: bool = False) -> int:
     print(f"{OK}LarsNet weights" if lars.exists()
           else f"{WARN}LarsNet weights  (only needed for --separator larsnet)")
 
+    # ffmpeg is checked with the packages above rather than here: it is required
+    # for the default separator, and these two genuinely are optional.
     print("\n  Optional tools")
     fs = (shutil.which("fluidsynth")
           or (list((ROOT / "tools").glob("fluidsynth/**/fluidsynth*"))

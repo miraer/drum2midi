@@ -41,6 +41,14 @@ mido>=1.3
 
 # Separation. audio-separator pulls the MDX23C drum model on first use and also
 # mirrors htdemucs, which matters where dl.fbaipublicfiles.com is unreachable.
+#
+# audio-separator also needs FFMPEG, which is a program rather than a package and so
+# cannot be listed here. It runs `ffmpeg -version` on startup and dies without it.
+# Nothing in this project imports ffmpeg, which is why it went undocumented until it
+# broke a conversion:
+#   Windows:  winget install Gyan.FFmpeg    (then a new terminal, for PATH)
+#   macOS:    brew install ffmpeg
+#   Linux:    sudo apt install ffmpeg
 audio-separator>=0.30
 onnxruntime>=1.17
 # audioread was here and is gone. Nothing in this repository imports it, pip reports it
