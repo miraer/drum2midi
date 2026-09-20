@@ -126,9 +126,15 @@ artefact quoted as a result.
   which an NPU should genuinely win. Now more interesting than it was: the NPU is within
   1.4x of the GPU on this model, so if it draws meaningfully less it may be the better
   device even without being the faster one.
-- **ReStem's `Other` stem** — our converter does not emit pitch 60. Harmless for onset
-  scoring, since it is not a scored class, but on one recording it was 22% of what ReStem
-  emitted. Decide whether dropping it flatters their precision.
+- **ReStem's `Other` stem** — this entry said our converter does not emit pitch 60. It
+  does: `restem_to_midi.py` has mapped `other` → 60 since the first commit, so the claim
+  was wrong about our own code. What was actually observed is that three notes did not
+  line up on one comparison, and whether the `trigger_events.json` carried them at all
+  can no longer be checked — ReStem overwrites its export directory on every render.
+  None of the 23 benchmark recordings produce `other` events, so nothing published
+  depends on it. **To close:** one render with every stem enabled, on material that
+  produces `other` events, then `compare_restem_export.py`. Needs a human, because the
+  quality mode cannot be set by script, and the trial expires 23 September here.
 - **`TOM_CEILING` is the conservative end of a measured trade**, not an optimum. Ceilings
   of 0.32 to 0.40 buy more on dense material and cost MDB significantly; the exchange
   rate is measured. 0.45 assumes people mostly convert tom-sparse material, which is a
