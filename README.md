@@ -844,8 +844,19 @@ the same code (`compare_with_restem.py`).
 ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
 object before publication. Everything below was learned from the outside — from its
 exports, its `trigger_events.json`, its interface and its published user's guide — by
-people with an obvious stake in the answer. Five specific reasons to hold it loosely:
+people with an obvious stake in the answer. Six specific reasons to hold it loosely:
 
+- **Some rows rest on far fewer recordings than the table implies.** The onset counts are
+  not the sample size. Toms appear in 7 of the 23 recordings and one of them carries a
+  third of them; cymbals have 1,002 onsets but an effective sample of 4.5 recordings, with
+  37% in a single track. Even hi-hat — the row carrying the headline — is 8.9 effective
+  recordings, 27.6% of it one Disco excerpt. The bootstrap already reflects this, which is
+  why the tom interval is [−0.313, +0.129], but any sentence that says "23 recordings"
+  about a per-class row is saying more than is there. Measured by
+  `corpus_representativeness.py`, which also drops each class's largest contributor and
+  recomputes: every conclusion survives, and the hi-hat advantage *grows* from +0.139 to
+  +0.173. So the result is not an artefact of one recording — and the tom and cymbal rows
+  are still carried by about four apiece, which no robustness check can fix.
 - **The corpus is 21.8 minutes long and comes from one place.** All 23 recordings are
   `MusicDelta_*` excerpts — one production series, median length 37 seconds, shortest 13.
   They are not 23 independent sources; drummer, room and engineer are unknown and
@@ -882,11 +893,12 @@ correction they send gets applied here and labelled as a correction.
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
 
-**Which quality mode, and why it does not matter.** ReStem offers Better (Offline) and
-Best (Offline), the latter with an optional Bleed Reduction. The runs above used Better,
-and that was not recorded at the time — the export does not carry the mode, so it had to
-be established afterwards by re-transcribing tracks and matching the exports event for
-event (`restem_one.ps1`, `compare_restem_runs.py`).
+**Which quality mode, and what is actually known about it.** ReStem offers Better
+(Offline) and Best (Offline), the latter with an optional Bleed Reduction. The runs above
+used Better, and that was not recorded at the time — the export does not carry the mode,
+so it had to be established afterwards by re-transcribing tracks and matching the exports
+event for event (`restem_one.ps1`, `compare_restem_runs.py`). What the evidence covers is
+counted by `verify_restem_modes.py`, which hashes every render on disk:
 
 | | MusicDelta_Rock_Drum | MusicDelta_Beatles_Drum |
 |---|---|---|
@@ -899,6 +911,21 @@ Better and Best produced **identical MIDI** on both tracks checked — one with 
 one with the most. Only Bleed Reduction changed anything, and it lost on both: on Rock it
 emits 7 toms where the reference has none; on Beatles it gains 0.009 on toms and loses
 0.011 on snare.
+
+**Say what that rests on, because it is less than it reads like.** Three tracks have been
+rendered in both modes — FunkJazz at 367 events, Beatles at 123, Rock at 24. Every one
+agreed byte for byte, with no differing byte anywhere. But 514 events is **5.6% of the
+9,168 ReStem emitted across this corpus**, and 71% of that sample is a single recording.
+"The mode does not reach the transcription" is a generalisation from three tracks, and it
+is stated here as one. The other 20 recordings were rendered in Better and never rendered
+in Best, so for those the claim is an extrapolation and nothing else.
+
+**One thing that was not being looked for.** The same track rendered on different days is
+also byte-identical — three such comparisons, all exact. ReStem's pipeline is
+deterministic, which is why the mode agreement means anything at all: without it, two
+renders agreeing would have been consistent with the output simply not varying much. That
+result arrived as a by-product of re-rendering Beatles on 20 September for an unrelated
+reason, and nobody had thought to check it.
 
 **That identity was doubted here and then tested properly**, because the vendor documents
 Better and Best as different models and byte-identical trigger events from both is an
@@ -921,9 +948,11 @@ wrong:
 | separated stems | — | **all 7 differ** | **all 7 differ** |
 | `trigger_events.json` | 367 events | **byte-identical**, 367 | **differs**, 359 |
 
-The modes are real and the separation genuinely changes. **TrigNet lands on exactly the
-same events regardless** — its transcription is insensitive to the separation quality it
-is given, at least on this material.
+The modes are real and the separation genuinely changes. **On the three tracks rendered
+both ways, TrigNet lands on exactly the same events** — its transcription appears
+insensitive to the separation quality it is given. Three tracks is what that sentence is
+worth; it is the reason to believe the comparison was not distorted by the mode, not a
+proof that it could not have been.
 
 The third column is the control, and it is the reason the second column can be trusted.
 Bleed Reduction reaches the transcription where the quality selector does not: eight

@@ -87,6 +87,14 @@ def onsets(rows, picks) -> int:
     return sum(rows[n][f]["ref"] for n in picks for f in FAMILIES)
 
 
+def class_f1(rows, picks, family) -> float:
+    tp = ref = est = 0
+    for name in picks:
+        v = rows[name][family]
+        tp, ref, est = tp + v["tp"], ref + v["ref"], est + v["est"]
+    return prf(tp, ref, est)[2]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -181,6 +189,36 @@ moves the result by less than the interval has not shown the corpus to be unrepr
 -- it has shown that this particular kind of unrepresentativeness does not reach the
 answer. And a reweighting that moves it by more than the interval means the headline is
 partly a statement about MDB's genre mix, which no bootstrap would ever have revealed.""")
+
+    print("\nhow many recordings each class actually rests on")
+    print(f"{'class':<10}{'onsets':>8}{'tracks':>8}{'top share':>11}{'eff. n':>8}"
+          f"{'delta':>9}{'drop top':>10}  largest contributor")
+    print("-" * 88)
+    for f in FAMILIES:
+        counts = sorted(((ours[n][f]["ref"], n) for n in names), reverse=True)
+        tot = sum(c for c, _ in counts)
+        if not tot:
+            continue
+        nz = [c for c, _ in counts if c]
+        eff = 1 / sum((c / tot) ** 2 for c in nz)
+        top_n, top_name = counts[0][0], counts[0][1]
+        rest = [n for n in names if n != top_name]
+        d_all = class_f1(ours, names, f) - class_f1(theirs, names, f)
+        d_cut = class_f1(ours, rest, f) - class_f1(theirs, rest, f)
+        print(f"{PRETTY.get(f, f):<10}{tot:>8}{len(nz):>8}{top_n/tot:>10.1%}{eff:>8.1f}"
+              f"{d_all:>+9.3f}{d_cut:>+10.3f}  "
+              f"{top_name.replace('MusicDelta_', '').replace('_Drum', '')}")
+    print("-" * 88)
+    print("""'eff. n' is the inverse Simpson index over the per-recording shares: the number of
+equally-sized recordings that would carry the same concentration. A class with 1002
+onsets spread over four effective recordings has the evidence of four recordings, not of
+a thousand onsets, and quoting the onset count invites the opposite conclusion.
+
+'drop top' removes the single largest contributor to that class and recomputes. Every
+conclusion survives it, and the hi-hat advantage grows rather than shrinks -- so the
+result is not an artefact of one recording. That is the reassuring half. The other half
+is that toms are carried by 7 recordings of 23 and cymbals by 4.5 effective ones, and no
+robustness check makes those rows interpretable.""")
 
     print("\nand this is not the only real drumming we hold")
     print(f"{'corpus':<22}{'recs':>6}{'minutes':>9}{'onsets':>9}{'toms':>8}  what it is")
