@@ -1,13 +1,23 @@
 # Core pipeline. Versions are the ones this was developed and measured against;
 # newer ones generally work, with the torchaudio caveat noted below.
 #
+# Python 3.10 - 3.13, and the ceiling is not ours. audio-separator depends on
+# diffq-fixed, which ships wheels for cp310-cp313 only; on 3.14 pip falls back to its
+# sdist and the build fails, so the default separator cannot be installed at all.
+# Its own metadata says `requires_python: >=3.7.0`, which is why the failure arrives
+# as a compiler error deep in a dependency rather than as a version check.
+# 3.13 has a Windows wheel but no manylinux one, so 3.12 is the safest everywhere and
+# is what CI uses.
+#
 # Install torch first if you want a specific build. The plain `pip install torch`
 # wheel on Windows has NO CUDA, so an NVIDIA card sits idle and everything runs on
 # the CPU without saying why -- `python devices.py` now reports that when it happens.
-#   NVIDIA:  pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   NVIDIA:  pick the command at https://pytorch.org/get-started/locally/
 #   CPU:     pip install torch --index-url https://download.pytorch.org/whl/cpu
 #   Intel:   python setup_env.py --with-intel-gpu
-# Pick a matching CUDA version at https://pytorch.org/get-started/locally/
+# No CUDA version is named here on purpose. The index carries cu118 through cu134 and
+# the right one depends on the driver; an earlier version of this comment hard-coded
+# cu124, which was already three releases stale on the day it was written.
 #
 # ADTOF-pytorch is not on PyPI and must be installed from git:
 #   git clone --depth 1 https://github.com/xavriley/ADTOF-pytorch.git

@@ -137,11 +137,11 @@ def unused_gpu() -> Optional[Tuple[str, str]]:
                    if "+cpu" in version or "cu" not in version
                    else "torch reports CUDA unavailable; check the driver")
             return (card,
-                    f"{why} (torch {version}). Install the CUDA build:\n"
-                    f"       pip install --force-reinstall torch "
-                    f"--index-url https://download.pytorch.org/whl/cu124\n"
-                    f"       or pick your version at "
-                    f"https://pytorch.org/get-started/locally/")
+                    f"{why} (torch {version}). Install a CUDA build:\n"
+                    f"       https://pytorch.org/get-started/locally/ gives the exact\n"
+                    f"       command for your driver. The CUDA version in the index URL\n"
+                    f"       matters and is not named here: it goes stale faster than\n"
+                    f"       this file does.")
         if "intel" in low and ("arc" in low or "iris" in low):
             return (card,
                     f"this torch is not the XPU build (torch {version}). Install it "

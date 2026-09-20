@@ -242,6 +242,14 @@ a drum to its own channel with `--channels 36=3`.
 
 ## Install
 
+**Python 3.10 to 3.13; use 3.12 if you have the choice.** The upper bound is not this
+project's: `audio-separator` depends on `diffq-fixed`, which publishes wheels for
+cp310–cp313 only, so on 3.14 pip falls back to a source build that fails and the default
+separator cannot be installed at all. Its metadata claims `>=3.7.0`, which is why the
+failure arrives as a compiler error inside a dependency rather than as a version check.
+3.13 has a Windows wheel but no Linux one, so 3.12 is the safest everywhere and is what
+CI runs.
+
 ```powershell
 git clone https://github.com/miraer/drum2midi.git
 cd drum2midi
@@ -249,9 +257,22 @@ python -m venv .venv
 .\.venv\Scripts\python.exe setup_env.py
 ```
 
+Run every command with the interpreter in `.venv`, not a bare `python`. On Windows a
+bare `python` is usually the Store alias rather than the environment you just built, and
+`setup_env.py` now prints the path it actually verified for that reason.
+
 That installs the Python packages, clones ADTOF-pytorch (it is not on PyPI) and then
 verifies the result. The MDX23C drum separator downloads itself on the first conversion
 (~400 MB).
+
+**If you have an NVIDIA GPU**, install a CUDA build of torch before or after the above:
+the default wheel on Windows carries no CUDA, so the card sits idle and everything runs
+on the CPU without saying why. `python devices.py` reports that when it happens and names
+the card. Get the exact command from
+[pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) — the CUDA
+version in the index URL depends on your driver and is deliberately not quoted here,
+because a hard-coded one in this file was three releases out of date the day it was
+written.
 
 `models/velocity.pkl` and `models/pedal.pkl` ship with the repository (2.3 MB). They are
 scikit-learn pickles trained on the Groove MIDI Dataset by `train_models.py`; retraining
