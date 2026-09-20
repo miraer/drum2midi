@@ -419,9 +419,17 @@ MDX23C is the default because of quality. On a CPU it is slow; on a GPU it is no
 
 | separator | CPU | Intel Arc GPU | a 4-minute song |
 |---|---|---|---|
-| `uvr` (default) | ~15x slower than real time | **~1.9x slower** | 60 min → **~7.5 min** |
+| `uvr` (default) | ~15x slower than real time † | **~1.9x slower** | 60 min → **~7.5 min** |
 | `larsnet` | ~5x faster than real time | unchanged | ~50 s |
 | `--no-separate` | ~3x faster than real time | unchanged | ~30 s |
+
+† **Read the CPU column as one machine, not as "the CPU".** That 15x was measured on the
+Core Ultra 7 laptop this project is developed on. The same separator on a Ryzen desktop
+measured **2.1x slower than real time** — 562 s for 269.9 s of audio — which is a sevenfold
+spread between two machines on the same work. Two points are not a table, so the figure
+above is left as it was measured rather than averaged into something that describes
+neither machine. The GPU column has the same caveat and the same excuse. This is the
+caveat the ReStem section already applies to *their* timings; it belongs here too.
 
 ### How many CPU threads
 
@@ -918,7 +926,7 @@ people with an obvious stake in the answer. Seven specific reasons to hold it lo
   corpus here — ENST-Drums holds 210 recordings, 106 minutes and 45,097 onsets of real
   kits against MDB's 23, 21.8 and 7,924, with a tom share of 5.78% against 1.14%. The
   comparison runs on the smallest of them only because that is the one ReStem was ever
-  pointed at. The trial that made it possible lapses on 26 September.
+  pointed at. The trial that made it possible has days rather than weeks left.
 - **Articulation thresholds were left at their defaults.** ReStem's hi-hat and tom
   classification boundaries are user-adjustable, and the vendor documents adjusting them
   when articulations land on the wrong note. We adjusted nothing, which is a fair
