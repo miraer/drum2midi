@@ -1538,19 +1538,26 @@ annotated snare, against a circular-shift null:
 
 | | near a snare | chance | lift |
 |---|---|---|---|
-| MDB false toms | 65.0% | 26.2% | **2.48×** |
-| ENST false toms | 60.8% | 25.7% | **2.36×** |
-| MDB *true* toms | 18.6% | — | — |
+| MDB false toms, shipped config (`tom_bleed.py`) | **77.9%** | 19.9% [5.9%, 33.8%] | **3.92×** |
+| MDB *true* toms, same run | 18.2% | — | the control |
+| MDB false toms, second machine's fixed-threshold cell | 65.0% | 26.2% | 2.48× |
+| ENST false toms, same | 60.8% | 25.7% | 2.36× |
 
-Kick shows the same at 2.9× and 2.4×; cymbals show nothing. The tom channel is
-substantially **the model answering "tom" to a snare**, which is a confusion inside the
-network and not something any threshold reaches. Suppressing it — keeping a tom onset only
+The two machines measured different threshold policies, so the lifts differ; the effect
+does not. Kick shows the same at 2.9× and 2.4×, cymbals show nothing, and real toms show
+nothing.
+
+**Which network is confused?** The pipeline has two — a separator and ADTOF, the
+transcriber — and the answer is ADTOF, decisively. Running the same 23 tracks with and
+without separation changes **all 23 output files** (2808 snare notes against 2506) and
+leaves the tom notes **bit-identical**: 134 estimates, 66 correct, the same bleed figures
+to a decimal. The separator neither causes this nor fixes it. It is ADTOF answering "tom"
+to a snare, in a model we do not train, and no threshold reaches it. Suppressing it — keeping a tom onset only
 where the tom activation beats snare and kick — gains +0.041 [+0.002, +0.106] on MDB and
 loses −0.019 [−0.036, −0.005] on ENST, because it trades recall for precision and the two
 corpora sit on opposite sides of that balance. The margin was swept rather than fitted:
 its neighbour at 1.25 is twice the size and indistinguishable from zero, which a single
 fitted point would have hidden.
-
 A **gate** — deciding whether a recording contains toms at all, rather than which
 threshold to use — is the one idea here with headroom: perfect gating is worth +0.152 on
 MDB. The tom activation's maximum separates has-toms from no-toms at **AUC 0.973 on MDB
@@ -1876,6 +1883,7 @@ transcriber from scratch.
 | `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
 | `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
 | `enst_beater_within_drummer.py` | the same question with the confound reversed: one drummer, four beaters |
+| `tom_bleed.py` | do false toms land on snares, and is it the separator or the transcriber |
 | `analyze_ghosts.py` | recall by hit strength; is it fixable by threshold |
 | `analyze_ghost_fusion.py` | do stems recover quiet hits |
 | `analyze_pedal.py` | feature separability for pedal hi-hat |
