@@ -18,8 +18,10 @@ measured track that turns ~9.5 minutes into ~1.5 minutes without changing a sing
 of the output (stem correlation 1.000000).
 
 CUDA is treated as fast for both stages because cuDNN provides fused recurrent kernels
-that XPU and MPS do not. That is the documented behaviour of those libraries rather than
-something measured here -- this machine has no NVIDIA GPU. `--device cuda` forces it.
+that XPU and MPS do not. That was the documented behaviour of those libraries rather
+than a measurement until an RTX 4070 SUPER was benchmarked: the real transcriber runs
+74.9 ms there against 4766.0 ms on the CPU, 63.6x faster, where the same model is 4.1x
+slower on the Intel GPU. `--device cuda` forces it.
 """
 
 from __future__ import annotations
