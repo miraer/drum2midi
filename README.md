@@ -856,8 +856,11 @@ people with an obvious stake in the answer. Five specific reasons to hold it loo
   0.015, against a published interval of ±0.032 — so *that* form of unrepresentativeness
   does not reach the answer. Which is a narrower reassurance than it sounds.
 - **ReStem was never run on a second corpus.** Our own 0.935 on IDMT-SMT-Drums is a
-  second-corpus check on us alone; the comparison has none. The trial that made it
-  possible lapses on 26 September.
+  second-corpus check on us alone; the comparison has none. Nor is MDB the largest real
+  corpus here — ENST-Drums holds 210 recordings, 106 minutes and 45,097 onsets of real
+  kits against MDB's 23, 21.8 and 7,924, with a tom share of 5.78% against 1.14%. The
+  comparison runs on the smallest of them only because that is the one ReStem was ever
+  pointed at. The trial that made it possible lapses on 26 September.
 - **Articulation thresholds were left at their defaults.** ReStem's hi-hat and tom
   classification boundaries are user-adjustable, and the vendor documents adjusting them
   when articulations land on the wrong note. We adjusted nothing, which is a fair

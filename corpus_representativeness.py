@@ -54,6 +54,20 @@ GENRE = {
 # onsets of 14.3M. Measured by us while surveying it for training data, not quoted.
 EGMD_TOM_SHARE = 0.0749
 
+# What else is on disk, so "23 recordings" is never mistaken for "all the real data we
+# have". Counted by the commands named, not estimated. ENST figures are the set
+# benchmark_enst.py actually scores (phrase, solo, minus-one, MIDI-minus-one on wet_mix);
+# IDMT is split by filename prefix, which is how the dataset distinguishes its three kinds.
+OTHER_CORPORA = [
+    # name, recordings, minutes, onsets, tom share, acoustic?, note
+    ("ENST-Drums", 210, 106.4, 45097, 0.0578, True,
+     "real kits, but only 3 drummers, 3 rooms"),
+    ("IDMT RealDrum", 14, None, 1289, 0.0, True,
+     "a real kit in a room, no toms or cymbals"),
+    ("IDMT WaveDrum+Techno", 81, None, 6638, 0.0, False,
+     "samples and a drum machine"),
+]
+
 
 def genre_of(stem: str) -> str:
     return GENRE.get(stem.replace("MusicDelta_", "").replace("_Drum", ""), "unlabelled")
@@ -166,14 +180,36 @@ Compare those against the interval before reading anything into them. A reweight
 moves the result by less than the interval has not shown the corpus to be unrepresentative
 -- it has shown that this particular kind of unrepresentativeness does not reach the
 answer. And a reweighting that moves it by more than the interval means the headline is
-partly a statement about MDB's genre mix, which no bootstrap would ever have revealed.
+partly a statement about MDB's genre mix, which no bootstrap would ever have revealed.""")
 
-What none of this can test, and what should be said plainly wherever the number appears:
-21.8 minutes of one production house's genre demonstrations is not a sample of recorded
-drumming. It is the material that exists with onset-level hand annotation, which is a
-different property entirely. The second corpus in the README is there for this reason and
-is the only real defence -- a claim that holds on IDMT-SMT-Drums as well is a claim that
-has survived a change of everything except the code being measured.""")
+    print("\nand this is not the only real drumming we hold")
+    print(f"{'corpus':<22}{'recs':>6}{'minutes':>9}{'onsets':>9}{'toms':>8}  what it is")
+    print("-" * 92)
+    mins = sum(durs.values()) / 60 if durs else 0.0
+    print(f"{'MDB Drums':<22}{len(names):>6}{mins:>9.1f}{total:>9}{toms:>7.2%}  "
+          f"the corpus above, and the only one ReStem has been run on")
+    ac_r, ac_o = len(names), total
+    for nm, recs, m, ons, tom, acoustic, note in OTHER_CORPORA:
+        mm = f"{m:>9.1f}" if m else f"{'—':>9}"
+        print(f"{nm:<22}{recs:>6}{mm}{ons:>9}{tom:>7.2%}  {note}")
+        if acoustic:
+            ac_r += recs
+            ac_o += ons
+    print("-" * 92)
+    print(f"real acoustic in total: {ac_r} recordings, {ac_o} onsets — "
+          f"{ac_o/total:.1f}x the corpus the headline runs on.")
+    print("""
+So the honest summary of the evidence base is not "23 recordings". It is that ENST holds
+5.7x the onsets of MDB on real kits with a tom share in the right range, and that the
+comparison runs on MDB only because that is the one ReStem was ever pointed at.
+
+ENST is not a cure for the problem described above, and claiming it would be would repeat
+the mistake. It is 210 recordings from 3 drummers in 3 rooms: for anything that depends on
+the player or the kit, the number of independent units is nearer 3 than 210, and an
+interval over its recordings is too narrow in the same way. What it offers is a DIFFERENT
+bias -- other players, other rooms, exercises instead of genre demonstrations, and toms
+that actually occur. A result that survives both corpora has survived a change of
+everything except the code.""")
     return 0
 
 
