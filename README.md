@@ -50,6 +50,14 @@ almost entirely by the hi-hat. The per-class rows for kick, snare and **toms** a
 evidence of anything: MDB holds just **90 tom onsets, 1.14% of the set**, so the tom
 interval is ±0.23 and spans both directions.
 
+**And +0.048 is not a general superiority.** Read down the table rather than across it:
+we win the hi-hat and the cymbals clearly, ReStem wins the snare and the toms by smaller
+and unresolved margins, and the kick is a wash. A single aggregate figure invites the
+reading that one system is better at drums; what these 23 recordings show is that one is
+better at cymbals and hi-hats on this material and the other is not worse anywhere it
+matters. The second machine, scoring the same renders with an independently written
+scorer, reached the same shape.
+
 > **⚠ These are our measurements of someone else's product, and they may be wrong.**
 > ReStem's developers were not involved in any of this and have not reviewed it. We are
 > not neutral parties — we measured a competitor to our own work, using software we had
