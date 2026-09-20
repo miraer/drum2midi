@@ -378,32 +378,66 @@ def _audio_separator(src: Path, model: str, outdir: Path, device: str) -> Path:
     return outdir
 
 
+# Python modules each separator imports, as (module, what it is, pip name).
+SEPARATOR_MODULES = {
+    "uvr": [("audio_separator", "the audio-separator package", "audio-separator")],
+    "larsnet": [("yaml", "PyYAML", "pyyaml"),
+                ("torchaudio", "torchaudio", "torchaudio")],
+    "hybrid": [("yaml", "PyYAML", "pyyaml"),
+               ("torchaudio", "torchaudio", "torchaudio")],
+}
+
+# Programs a separator runs that are not Python packages at all. audio-separator
+# calls `ffmpeg -version` before it does anything else, so a missing ffmpeg stops the
+# default separator dead -- and nothing here imports it, which is exactly why it was
+# absent from every dependency list this project had.
+SEPARATOR_BINARIES = {
+    "uvr": [("ffmpeg", "FFmpeg")],
+}
+
+
 def separator_missing(args) -> Optional[tuple]:
-    """What the chosen separator needs and cannot import, checked before any work.
+    """What the chosen separator needs and has not got, checked before any work.
 
     Separation is step 2 of 4, so a missing dependency used to surface only after
     ADTOF had transcribed the whole file -- minutes of work thrown away to reach an
-    error that was knowable at the start. Returns (module, description, how to fix)
-    or None.
+    error that was knowable at the start.
+
+    That kept happening after this function existed, because it only looked for
+    Python modules. audio-separator shells out to ffmpeg on startup, and with no
+    ffmpeg installed the failure arrived as the child process's own last traceback
+    line, relayed verbatim: "FileNotFoundError: [WinError 2] The system cannot find
+    the file specified". It names neither ffmpeg nor a remedy, and it came after a
+    full transcription of a four-and-a-half minute recording.
+
+    Returns (what is needed, why it is not usable, how to fix, extra detail or None).
     """
     import importlib.util
+    import shutil
 
-    needs = {
-        "uvr": [("audio_separator", "the audio-separator package",
-                 "pip install audio-separator")],
-        "larsnet": [("yaml", "PyYAML", "pip install pyyaml"),
-                    ("torchaudio", "torchaudio", "pip install torchaudio")],
-        "hybrid": [("yaml", "PyYAML", "pip install pyyaml"),
-                   ("torchaudio", "torchaudio", "pip install torchaudio")],
-    }
+    from devices import pip_here
+    # setup_env owns the per-platform ffmpeg instructions and imports nothing outside
+    # the standard library, so there is one copy of that advice rather than two that
+    # can drift. The dependency runs this way round because setup_env has to work
+    # before anything in requirements.txt is installed.
+    from setup_env import ffmpeg_advice
+
     if getattr(args, "no_separate", False):
         return None
-    for module, what, how in needs.get(getattr(args, "separator", ""), ()):
+    chosen = getattr(args, "separator", "")
+
+    for module, what, package in SEPARATOR_MODULES.get(chosen, ()):
         try:
-            if importlib.util.find_spec(module) is None:
-                return module, what, how
+            found = importlib.util.find_spec(module) is not None
         except (ImportError, ValueError):
-            return module, what, how
+            found = False
+        if not found:
+            return (what, f"`import {module}` fails in this interpreter",
+                    f"{pip_here()} install {package}", sys.executable)
+
+    for program, what in SEPARATOR_BINARIES.get(chosen, ()):
+        if shutil.which(program) is None:
+            return (what, f"`{program}` is not on PATH", ffmpeg_advice(), None)
     return None
 
 
@@ -1208,10 +1242,10 @@ def convert_one(args, src: Path, out_path: Path) -> int:
 
     missing = separator_missing(args)
     if missing:
-        module, what, how = missing
-        log(f"ERROR: --separator {args.separator} needs {what}, and "
-            f"`import {module}` fails in this interpreter.")
-        log(f"       {sys.executable}")
+        what, why, how, detail = missing
+        log(f"ERROR: --separator {args.separator} needs {what}, and {why}.")
+        if detail:
+            log(f"       {detail}")
         log(f"       {how}")
         log("       Or run with --separator none to skip separation entirely; "
             "velocity is then flat.")
