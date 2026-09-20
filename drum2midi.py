@@ -367,6 +367,35 @@ def _audio_separator(src: Path, model: str, outdir: Path, device: str) -> Path:
     return outdir
 
 
+def separator_missing(args) -> Optional[tuple]:
+    """What the chosen separator needs and cannot import, checked before any work.
+
+    Separation is step 2 of 4, so a missing dependency used to surface only after
+    ADTOF had transcribed the whole file -- minutes of work thrown away to reach an
+    error that was knowable at the start. Returns (module, description, how to fix)
+    or None.
+    """
+    import importlib.util
+
+    needs = {
+        "uvr": [("audio_separator", "the audio-separator package",
+                 "pip install audio-separator")],
+        "larsnet": [("yaml", "PyYAML", "pip install pyyaml"),
+                    ("torchaudio", "torchaudio", "pip install torchaudio")],
+        "hybrid": [("yaml", "PyYAML", "pip install pyyaml"),
+                   ("torchaudio", "torchaudio", "pip install torchaudio")],
+    }
+    if getattr(args, "no_separate", False):
+        return None
+    for module, what, how in needs.get(getattr(args, "separator", ""), ()):
+        try:
+            if importlib.util.find_spec(module) is None:
+                return module, what, how
+        except (ImportError, ValueError):
+            return module, what, how
+    return None
+
+
 def separate_uvr(src: Path, device: str, length: int) -> Dict[str, np.ndarray]:
     """UVR MDX23C drum separator (aufr33/jarredou). Six stems - it is the only
     option here that splits ride from crash. Much slower than LarsNet on CPU.
@@ -1166,10 +1195,27 @@ def convert_one(args, src: Path, out_path: Path) -> int:
 
     t0 = time.time()
 
-    from devices import SEPARATOR, TRANSCRIBER, pick_devices, summary
+    missing = separator_missing(args)
+    if missing:
+        module, what, how = missing
+        log(f"ERROR: --separator {args.separator} needs {what}, and "
+            f"`import {module}` fails in this interpreter.")
+        log(f"       {sys.executable}")
+        log(f"       {how}")
+        log("       Or run with --separator none to skip separation entirely; "
+            "velocity is then flat.")
+        return 1
+
+    from devices import SEPARATOR, TRANSCRIBER, pick_devices, summary, unused_gpu
     picked = pick_devices(args.device)
     dev_sep, dev_trans = picked[SEPARATOR], picked[TRANSCRIBER]
     log(f"      {summary(args.device)}")
+    idle_gpu = unused_gpu()
+    if idle_gpu and dev_sep == "cpu":
+        card, how = idle_gpu
+        log(f"      note: {card} is installed and unused.")
+        for line in how.splitlines():
+            log(f"      {line.strip()}" if line.startswith(" ") else f"      {line}")
     if dev_trans == "cpu":
         from cpu_threads import apply as apply_threads
         apply_threads(verbose=True)

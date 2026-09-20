@@ -151,11 +151,13 @@ def _build_images(style: ttk.Style, p) -> None:
     }, border=10)
 
     # the primary action reads as a solid block of the logo's blue
+    face = accent_face(p)
+    down = _shade(face, 0.82)
     _slab(f"{pre}.accentbutton", style, {
-        "": _rounded(40, h, r, p.accent, p.accent_dark),
+        "": _rounded(40, h, r, face, down),
         "disabled": _rounded(40, h, r, p.disabled, p.disabled),
-        "pressed": _rounded(40, h, r, p.accent_dark, p.accent_dark),
-        "active": _rounded(40, h, r, p.accent_dark, p.accent_dark),
+        "pressed": _rounded(40, h, r, down, down),
+        "active": _rounded(40, h, r, down, down),
     }, border=10)
 
     # --- text fields --------------------------------------------------------------
@@ -279,8 +281,15 @@ def _layouts(style: ttk.Style, p) -> None:
     style.layout("TLabelframe", [(f"{pre}.groupbox", {"sticky": "nsew"})])
 
 
-def _colours(style: ttk.Style, p) -> None:
-    """Colours for everything, including the parts that stay as clam drawings."""
+def _colours(style: ttk.Style, p, drawn: bool = True) -> None:
+    """Colours for everything, including the parts that stay as clam drawings.
+
+    `drawn` says whether the image elements were installed. It matters for exactly one
+    widget: the accent button paints white text, which is only legible on the accent
+    image behind it. Without Pillow there is no image, clam draws its ordinary grey
+    button, and white-on-grey made the Convert button vanish completely on a machine
+    that had everything else working.
+    """
     style.configure(".", background=p.base, foreground=p.ink, fieldbackground=p.field,
                     bordercolor=p.line, lightcolor=p.base, darkcolor=p.base,
                     troughcolor=p.base, focuscolor=p.accent, insertcolor=p.ink)
@@ -300,6 +309,18 @@ def _colours(style: ttk.Style, p) -> None:
     style.map("Accent.TButton",
               foreground=[("disabled", p.base), ("active", "#ffffff"),
                           ("pressed", "#ffffff")])
+    if not drawn:
+        # No image element behind it, so clam's own button face has to carry the
+        # accent colour or the white label is invisible.
+        face = accent_face(p)
+        down = _shade(face, 0.82)
+        style.configure("Accent.TButton", background=face,
+                        lightcolor=face, darkcolor=face, bordercolor=down)
+        style.map("Accent.TButton",
+                  background=[("disabled", p.base), ("pressed", down),
+                              ("active", down)],
+                  foreground=[("disabled", p.disabled), ("active", "#ffffff"),
+                              ("pressed", "#ffffff")])
 
     style.configure("TCheckbutton", background=p.base, padding=(0, 3))
     style.configure("TRadiobutton", background=p.base, padding=(0, 3))
@@ -342,21 +363,24 @@ def _colours(style: ttk.Style, p) -> None:
 def apply(root: tk.Misc, mode: str = "light") -> type:
     """Install and select the theme. Returns the palette so callers can match colours.
 
-    Safe to call when Pillow is missing: the colours still apply, only the rounded
-    corners are lost.
+    Safe to call when Pillow is missing: the colours still apply and the accent button
+    falls back to a painted background, only the rounded corners are lost.
     """
     p = PALETTES[mode]
     style = ttk.Style(root)
     if p.name not in style.theme_names():
         style.theme_create(p.name, parent="clam")
     style.theme_use(p.name)
+    drawn = False
     if Image is not None:
         try:
             _build_images(style, p)
             _layouts(style, p)
+            drawn = True
         except tk.TclError:
-            pass  # elements already registered by an earlier call
-    _colours(style, p)
+            # elements already registered by an earlier call, so they are there
+            drawn = True
+    _colours(style, p, drawn)
 
     # classic tk widgets (Text, Canvas, menus) do not read ttk styles
     root.tk_setPalette(background=p.base, foreground=p.ink,
@@ -391,6 +415,47 @@ def readable(colour: str, p) -> str:
     h, l, s = colorsys.rgb_to_hls(r, g, b)
     r, g, b = colorsys.hls_to_rgb(h, max(l, 0.60), min(s, 0.60))
     return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
+
+def _shade(colour: str, factor: float) -> str:
+    """Same hue, scaled lightness. Used to derive a pressed state from a face colour."""
+    r, g, b = (int(colour[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    r, g, b = colorsys.hls_to_rgb(h, max(0.0, min(1.0, l * factor)), s)
+    return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
+
+def accent_face(p) -> str:
+    """The shade the primary button is painted, so its white label stays legible.
+
+    The dark palette's accent is a lighter blue, and white on it measures 2.89 against
+    the 3.0 a UI component needs -- the Convert button was the least readable control
+    in the window while also being the most important one. Derived rather than
+    hard-coded so a change to either blue cannot quietly reintroduce it.
+    """
+    return p.accent if contrast("#ffffff", p.accent) >= 3.0 else p.accent_dark
+
+
+def contrast(a: str, b: str) -> float:
+    """WCAG contrast ratio between two "#rrggbb" colours, 1.0 (same) to 21.0.
+
+    Exists because a test that asked only whether two colours *differed* let the
+    invisible Convert button through: #ffffff on #fafbfc are different strings and
+    the same colour to a human eye. 3.0 is the WCAG threshold for interface
+    components and large text.
+    """
+    def lum(c: str) -> float:
+        if not c.startswith("#") or len(c) != 7:
+            raise ValueError(f"not a #rrggbb colour: {c!r}")
+        out = []
+        for i in (1, 3, 5):
+            v = int(c[i:i + 2], 16) / 255
+            out.append(v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]
+
+    la, lb = lum(a), lum(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
 
 
 def _demo() -> None:

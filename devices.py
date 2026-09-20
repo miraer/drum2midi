@@ -24,7 +24,7 @@ something measured here -- this machine has no NVIDIA GPU. `--device cuda` force
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 # Stages that can run somewhere other than the CPU.
 SEPARATOR = "separator"
@@ -90,6 +90,65 @@ def pick_devices(requested: str = "auto") -> Dict[str, str]:
     }
 
 
+def unused_gpu() -> Optional[Tuple[str, str]]:
+    """A GPU the operating system can see and torch cannot, with what to do about it.
+
+    `available: cpu` on a machine with a GeForce 4070 reads as a statement about the
+    hardware when it is really a statement about the torch build: the default wheel on
+    PyPI for Windows carries no CUDA at all. Looking through the OS rather than through
+    torch is the whole point, since torch is the thing that is blind here.
+
+    Returns (what the OS reports, how to fix it) or None.
+    """
+    import os
+    import subprocess
+
+    try:
+        import torch
+        version = torch.__version__
+        if torch.cuda.is_available():
+            return None
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
+            return None
+    except Exception:
+        version = "not installed"
+
+    names = ""
+    if os.name == "nt":
+        try:
+            names = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "(Get-CimInstance Win32_VideoController).Name"],
+                capture_output=True, text=True, timeout=30).stdout
+        except Exception:
+            names = ""
+    else:
+        try:
+            names = subprocess.run(["nvidia-smi", "-L"], capture_output=True,
+                                   text=True, timeout=30).stdout
+        except Exception:
+            names = ""
+
+    for line in names.splitlines():
+        card = line.strip()
+        low = card.lower()
+        if any(k in low for k in ("nvidia", "geforce", "quadro", "rtx", "tesla")):
+            why = ("this torch has no CUDA support"
+                   if "+cpu" in version or "cu" not in version
+                   else "torch reports CUDA unavailable; check the driver")
+            return (card,
+                    f"{why} (torch {version}). Install the CUDA build:\n"
+                    f"       pip install --force-reinstall torch "
+                    f"--index-url https://download.pytorch.org/whl/cu124\n"
+                    f"       or pick your version at "
+                    f"https://pytorch.org/get-started/locally/")
+        if "intel" in low and ("arc" in low or "iris" in low):
+            return (card,
+                    f"this torch is not the XPU build (torch {version}). Install it "
+                    f"with:\n       python setup_env.py --with-intel-gpu")
+    return None
+
+
 def summary(requested: str = "auto") -> str:
     """One line for the log: what was chosen and why."""
     picked = pick_devices(requested)
@@ -111,3 +170,8 @@ if __name__ == "__main__":
         print(f"  {d:<6} {describe_device(d)}")
     print()
     print(summary("auto"))
+    idle = unused_gpu()
+    if idle:
+        card, how = idle
+        print(f"\nnote: {card} is installed and is not being used.")
+        print(f"      {how}")

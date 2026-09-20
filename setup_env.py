@@ -35,6 +35,43 @@ SOUNDFONT_URL = ("https://ftp.osuosl.org/pub/musescore/soundfont/"
 OK, WARN, BAD = "  ok   ", "  warn ", "  MISS "
 
 
+def interpreter() -> str:
+    """The interpreter that actually holds what was just installed or verified.
+
+    Everything here installs into `sys.executable` and checks the same one, so advice
+    that says a bare `python` is advice about a different program. On Windows a bare
+    `python` is usually the Store alias rather than the project's virtualenv, which is
+    how a passing --check turns into ModuleNotFoundError on the very next line.
+    """
+    exe = Path(sys.executable)
+    try:
+        return str(Path(".") / exe.relative_to(ROOT))
+    except ValueError:
+        return str(exe)
+
+
+def path_python() -> str | None:
+    """What a bare `python` would run, if that is not the interpreter in use."""
+    found = shutil.which("python")
+    if not found:
+        return "nothing on PATH"
+    try:
+        if Path(found).resolve() == Path(sys.executable).resolve():
+            return None
+    except OSError:
+        pass
+    return found
+
+
+def warn_if_bare_python_differs() -> None:
+    other = path_python()
+    if other is None:
+        return
+    print(f"\n{WARN}a bare `python` here runs {other},")
+    print("       which is not the interpreter the checks above describe. Use the path")
+    print("       shown in the commands, or activate the environment first.")
+
+
 def run(*args, check=True) -> int:
     print(f"    $ {' '.join(str(a) for a in args[:6])}"
           + (" ..." if len(args) > 6 else ""))
@@ -167,7 +204,7 @@ def install_xpu() -> None:
     pip(*runtime)
     pip("--force-reinstall", "--no-deps", "torch", "torchvision",
         "--index-url", "https://download.pytorch.org/whl/xpu")
-    print("  installed; verify with:  python devices.py")
+    print(f"  installed; verify with:  {interpreter()} devices.py")
 
 
 def check() -> int:
@@ -175,7 +212,13 @@ def check() -> int:
     problems = 0
 
     print("  Python packages")
-    for mod, why in (("torch", "required"), ("librosa", "required"),
+    # numpy and scipy are listed here rather than left to arrive with something else:
+    # 67 scripts in this repository import numpy directly, so it is a dependency in its
+    # own right. Relying on librosa to drag it in meant --check could report that
+    # everything required was in place and then test_smoke.py would fail on `import
+    # numpy` one line later, which is exactly what happened to someone.
+    for mod, why in (("torch", "required"), ("numpy", "required"),
+                     ("scipy", "required"), ("librosa", "required"),
                      ("pretty_midi", "required"), ("mido", "required"),
                      ("soundfile", "required"),
                      ("audio_separator", "required for the default separator"),
@@ -240,11 +283,15 @@ def check() -> int:
             print(f"       {_dev.summary('auto')}")
         else:
             import torch
-            hint = ""
-            if _intel_gpu_present() and "+xpu" not in torch.__version__:
-                hint = ("  <- an Intel GPU is present but this is not the XPU build of "
-                        "torch; see 'GPU acceleration' in README.md")
-            print(f"{WARN}no GPU in use, running on the CPU{hint}")
+            from devices import unused_gpu
+            idle = unused_gpu()
+            if idle:
+                card, how = idle
+                print(f"{WARN}{card} is installed and not being used")
+                for line in how.splitlines():
+                    print(f"       {line.strip()}")
+            else:
+                print(f"{WARN}no GPU in use, running on the CPU")
     except Exception as exc:
         print(f"{WARN}could not query devices ({exc})")
 
@@ -258,7 +305,8 @@ def check() -> int:
         print(f"\n{problems} required component(s) missing - run without --check to install")
         return 1
     print("\neverything required is in place; try:")
-    print("    python test_smoke.py")
+    print(f"    {interpreter()} test_smoke.py")
+    warn_if_bare_python_differs()
     return 0
 
 
@@ -291,7 +339,7 @@ def main() -> int:
         install_xpu()
     elif _intel_gpu_present():
         print("\nAn Intel GPU was detected. Separation runs about 12x faster on it:")
-        print("    python setup_env.py --with-intel-gpu")
+        print(f"    {interpreter()} setup_env.py --with-intel-gpu")
     return check()
 
 

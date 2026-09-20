@@ -1,8 +1,13 @@
 # Core pipeline. Versions are the ones this was developed and measured against;
 # newer ones generally work, with the torchaudio caveat noted below.
 #
-# Install torch first if you want a specific build:
-#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+# Install torch first if you want a specific build. The plain `pip install torch`
+# wheel on Windows has NO CUDA, so an NVIDIA card sits idle and everything runs on
+# the CPU without saying why -- `python devices.py` now reports that when it happens.
+#   NVIDIA:  pip install torch --index-url https://download.pytorch.org/whl/cu124
+#   CPU:     pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   Intel:   python setup_env.py --with-intel-gpu
+# Pick a matching CUDA version at https://pytorch.org/get-started/locally/
 #
 # ADTOF-pytorch is not on PyPI and must be installed from git:
 #   git clone --depth 1 https://github.com/xavriley/ADTOF-pytorch.git

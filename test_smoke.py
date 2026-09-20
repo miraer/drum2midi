@@ -514,6 +514,70 @@ def test_every_script_answers_help():
 
 
 @test
+def test_accent_button_visible_without_pillow():
+    """The Convert button must stay legible when Pillow is absent.
+
+    Pillow is optional, and without it theme.apply skips the image elements and lets
+    clam draw its ordinary grey button -- but the accent style still painted its label
+    white. White on grey made the Convert button disappear entirely on a machine where
+    everything else worked, which reads as "the GUI has no start button" rather than as
+    a missing optional dependency.
+    """
+    import builtins
+    import importlib
+    import sys
+    try:
+        import tkinter as tk
+        from tkinter import ttk
+        root = tk.Tk()
+    except ImportError:
+        return          # tkinter not installed (some Linux builds)
+    except Exception:
+        return          # no display
+
+    real_import = builtins.__import__
+
+    def without_pillow(name, *a, **kw):
+        if name == "PIL" or name.startswith("PIL."):
+            raise ImportError("simulated absence")
+        return real_import(name, *a, **kw)
+
+    saved = {k: v for k, v in sys.modules.items()
+             if k == "theme" or k.startswith("PIL")}
+    try:
+        for k in saved:
+            del sys.modules[k]
+        builtins.__import__ = without_pillow
+        theme_nopil = importlib.import_module("theme")
+        builtins.__import__ = real_import
+        assert theme_nopil.Image is None, "the Pillow-absent case was not simulated"
+
+        root.withdraw()
+        for mode in ("light", "dark"):
+            theme_nopil.apply(root, mode)
+            style = ttk.Style(root)
+            fg = style.lookup("Accent.TButton", "foreground")
+            bg = style.lookup("Accent.TButton", "background")
+            assert fg and bg, f"{mode}: accent button has no colours at all"
+            # Difference is not legibility: #ffffff on #fafbfc are different strings
+            # and indistinguishable on screen, which is how this shipped.
+            ratio = theme_nopil.contrast(fg, bg)
+            assert ratio >= 3.0, (
+                f"{mode}: Convert button is {fg} on {bg}, contrast {ratio:.2f}, "
+                f"below the 3.0 needed to be seen")
+    finally:
+        builtins.__import__ = real_import
+        for k in list(sys.modules):
+            if k == "theme" or k.startswith("PIL"):
+                del sys.modules[k]
+        sys.modules.update(saved)
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
+@test
 def test_theme_palette_matches_the_logo():
     """The window and the logo must not drift apart into two different blues.
 
