@@ -1447,12 +1447,18 @@ every backbeat.
 **Why ENST disagreed, and it is not the separator.** On ENST's stick material the same
 halving costs 0.009 and *improves* toms, 0.400 → 0.667. The first version of this section
 blamed the separation path. That was wrong: the second machine's MDB sweep is also
-`--no-separate` and collapses the same way. The difference is **tom density** — MDB holds
-90 tom onsets, ENST's stick material holds 2001. On sparse material any over-firing
-destroys precision; on dense material the extra notes mostly land on real toms. Which is
-`TOM_CEILING`'s own lesson from the other side: a percentile is a proportional cap that
-fails on dense material, a fixed threshold is an absolute cap that fails on sparse
-material, and **neither policy knows the density it is working in**.
+`--no-separate` and collapses the same way.
+
+The second version blamed **tom density** — MDB holds 90 tom onsets, ENST's stick material
+2001 — and concluded that neither policy knows the density it works in. The diagnosis was
+right and the remedy it implies is wrong, which took a third round to separate. Among
+recordings that *have* toms the two corpora want nearly the same threshold: oracle median
+0.26 on MDB against 0.19 on ENST, with overlapping quartiles. What differs is how many
+recordings have **no toms at all** — 16 of 23 on MDB against 74 of 210 on ENST — and
+**79.3% of MDB's false tom onsets come from recordings with no toms in them.**
+
+So sparse material does not want a different threshold. A per-frame threshold **cannot
+say "none"**, and MDB is mostly recordings where "none" is the right answer.
 
 Nor is a narrower version available on the tom channel. The second machine swept the two
 channels separately, on a common fixed-threshold base so the hidden policy switch could
@@ -1503,8 +1509,62 @@ almost never picks the stock 0.32: across the 23 MDB tracks it sits at the `TOM_
 and equals 0.32 on **none** of them. The constant it replaced was wrong in both
 directions depending on the track, which is why bounding it was worth +0.197 on ENST.
 
-### ❌ Tuning all five thresholds globally (my earlier result was biased)
+### ❌ A tom threshold that adapts to how tom-dense the material is
 
+The obvious answer to "neither policy knows the density it works in" is to measure the
+density and adapt. It was prototyped and it is dead, rejected three ways
+(`density_tom_policy.py`, `density_fair_test.py`).
+
+Fitting `thr = c0 − c1·p98.5` on one corpus and testing on the other puts **c1 at zero in
+every direction**: the fit prefers a constant. A scale-free reparameterisation, which can
+express any monotone mapping and cannot be defeated by units, loses **0.247 to 0.318** tom
+F1 out of sample in one direction and fits flat in the other.
+
+The test that settles it needs no policy at all. Take each recording's *oracle* threshold
+— the one that maximises its own tom F1 — and correlate it with the true tom density read
+straight from the reference:
+
+| | ENST (n=136) | MDB (n=7) |
+|---|---|---|
+| oracle threshold vs true tom rate | **ρ = −0.057** | ρ = +0.714 |
+
+**A perfect density estimator would still not know which threshold to choose.** The
+premise is false at the root rather than at the estimator, and the MDB column is seven
+recordings pointing the other way, which is what seven recordings do.
+
+**What is really wrong with the tom channel** is not the threshold, and the measurement
+that shows it is cheap. Taking every false tom onset and asking how often it lands near an
+annotated snare, against a circular-shift null:
+
+| | near a snare | chance | lift |
+|---|---|---|---|
+| MDB false toms | 65.0% | 26.2% | **2.48×** |
+| ENST false toms | 60.8% | 25.7% | **2.36×** |
+| MDB *true* toms | 18.6% | — | — |
+
+Kick shows the same at 2.9× and 2.4×; cymbals show nothing. The tom channel is
+substantially **the model answering "tom" to a snare**, which is a confusion inside the
+network and not something any threshold reaches. Suppressing it — keeping a tom onset only
+where the tom activation beats snare and kick — gains +0.041 [+0.002, +0.106] on MDB and
+loses −0.019 [−0.036, −0.005] on ENST, because it trades recall for precision and the two
+corpora sit on opposite sides of that balance. The margin was swept rather than fitted:
+its neighbour at 1.25 is twice the size and indistinguishable from zero, which a single
+fitted point would have hidden.
+
+A **gate** — deciding whether a recording contains toms at all, rather than which
+threshold to use — is the one idea here with headroom: perfect gating is worth +0.152 on
+MDB. The tom activation's maximum separates has-toms from no-toms at **AUC 0.973 on MDB
+and 0.963 on ENST**, and fitted on ENST and tested on MDB it delivers **+0.028 [+0.000,
++0.089]** — a fifth of the available headroom, not clear of zero. Gating is asymmetric:
+silencing a recording that does have toms costs every true positive it had, and a ranking
+that good says nothing about where to put the operating point.
+
+Kept as a negative result. `clamp(p98.5, TOM_FLOOR, TOM_CEILING)` stands, because nothing
+fitted honestly and tested out of sample beat it. And the whole question — two rounds of
+work across two machines — moves MICRO by **±0.001**, since toms are 90 of MDB's 7924
+onsets. That is worth stating next to the effort it took.
+
+### ❌ Tuning all five thresholds globally (my earlier result was biased)
 I originally tuned thresholds on all 23 tracks and reported on those same 23 tracks.
 Honest 2-fold cross-validation: tuned thresholds score **0.848** against ADTOF's stock
 **0.850** — no gain at all, and toms got worse (0.322 → 0.265) with the per-fold choices

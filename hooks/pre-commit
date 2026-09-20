@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Runs the privacy and publication gate before every commit.
+#
+# It exists because the gate was previously something to remember, and the one time it
+# was not remembered a 3 MB video went public unreviewed -- swept in by `git add -A`
+# while committing something else entirely.
+#
+# Wire it up once per clone:
+#
+#     git config core.hooksPath hooks
+#
+# To commit anyway, in the rare case where the gate is wrong:
+#
+#     git commit --no-verify
+#
+# Prefer fixing the check over reaching for that, since a gate people routinely bypass
+# is not a gate.
+
+set -e
+
+for py in .venv/Scripts/python.exe .venv/bin/python python3 python; do
+    if [ -x "$py" ] || command -v "$py" >/dev/null 2>&1; then
+        exec "$py" check_privacy.py
+    fi
+done
+
+echo "pre-commit: no python found, skipping check_privacy.py" >&2
+exit 0

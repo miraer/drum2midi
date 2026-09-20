@@ -58,7 +58,7 @@ proven impossible.
 | | what would settle it |
 |---|---|
 | **Reproduce the ENST figures independently** | ✅ done 20 Sept. A second machine reproduced kick, snare, hi-hat and cymbals to three decimals with identical intervals; toms differed by exactly the +0.197 the ceiling buys, which identified their run as pre-ceiling rather than a disagreement. |
-| **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training |
+| **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training. **Sharper now:** the tom channel fires on snares at 2.4× chance, so what training has to fix is a confusion, not a threshold. |
 | ~~**Synthetic training data with realistic degradation**~~ | ❌ **closed 20 Sept as measured-unnecessary.** See below. |
 | **ENST as the acoustic counterweight** | it ships isolated close-mic tom stems, which is exactly what the stem-fusion stage consumes; unexplored |
 
@@ -155,6 +155,9 @@ nobody proposes them again without new evidence:
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |
 | Tuning all five thresholds globally | overfitting — 0.848 held out against a stock 0.850 |
+| Lowering thresholds for soft beaters | 588 extra tom notes buy five real ones; helps mallets, harms brushes |
+| A density-aware tom threshold | an *oracle* density estimator still would not know the threshold: ρ = −0.057 |
+| Suppressing snare bleed in the tom channel | +0.041 on MDB, −0.019 on ENST — trades recall for precision |
 | Learned pedal hi-hat classifier | does not transfer |
 | Learned ride/crash classifier | no better than the rule it replaced |
 | Running ADTOF on isolated stems | worse than on the mix |

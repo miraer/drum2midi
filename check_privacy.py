@@ -105,6 +105,20 @@ FORBIDDEN = [
 MEDIA = re.compile(r"\.(wav|mp3|flac|aiff?|m4a|ogg|opus|mid|midi)$", re.I)
 TEXT = re.compile(r"\.(py|pyw|md|txt|json|ya?ml|ps1|sh|bat|cfg|ini|toml|gitignore)$", re.I)
 
+# Publishing something is a decision, and this is where the decision gets made rather
+# than assumed. A file of one of these kinds appearing in a commit for the first time
+# is stopped until a human has put it in .publish-allow.
+#
+# This exists because `git add -A` swept a 3 MB pitch video into an unrelated commit and
+# pushed it, twice after saying in writing that it would not ship unreviewed. Every
+# content check passed, because the content was fine -- the question nothing asked was
+# whether the file belonged in the repository at all.
+PUBLISHED_DELIBERATELY = Path(".publish-allow")
+BINARY = re.compile(
+    r"\.(mp4|mov|mkv|webm|avi|wav|mp3|flac|m4a|ogg|opus|zip|7z|gz|tar|rar|"
+    r"ckpt|onnx|pth|pt|safetensors|bin|exe|dll|msi|pdf|psd|sketch)$", re.I)
+BIG_BYTES = 512 * 1024
+
 ALLOW = re.compile(
     r"<user>|<name>|<username>|\$env:|%USERNAME%|~/|placeholder|example\.com|"
     r"your\.name|C:\\\\Users\\\\<|noreply\.github\.com|users\.noreply",
@@ -116,6 +130,56 @@ def staged_files() -> list[Path]:
                          capture_output=True, text=True, cwd=ROOT,
                          encoding="utf-8", errors="replace")
     return [ROOT / line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+def newly_added() -> list[Path]:
+    """Files this commit would add to the repository for the first time."""
+    out = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=A"],
+                         capture_output=True, text=True, cwd=ROOT,
+                         encoding="utf-8", errors="replace")
+    return [ROOT / line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+def allowed_to_publish() -> set[str]:
+    path = ROOT / PUBLISHED_DELIBERATELY
+    if not path.exists():
+        return set()
+    out = set()
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            out.add(line.replace("\\", "/"))
+    return out
+
+
+def check_new_files(paths: list[Path]) -> list[tuple[str, str]]:
+    """Which of these additions should not be published without someone saying so."""
+    allowed = allowed_to_publish()
+    stopped = []
+    for path in paths:
+        try:
+            rel = path.relative_to(ROOT).as_posix()
+        except ValueError:
+            continue
+        if rel in allowed:
+            continue
+        size = path.stat().st_size if path.exists() else 0
+        if BINARY.search(path.name):
+            stopped.append((rel, f"binary or media, {size/1024:.0f} KB"))
+        elif size > BIG_BYTES and not TEXT.search(path.name):
+            stopped.append((rel, f"{size/1024:.0f} KB and not a text file"))
+    return stopped
+
+
+def hook_installed() -> bool:
+    """Is the check wired to run by itself, or does someone have to remember it?"""
+    out = subprocess.run(["git", "config", "--get", "core.hooksPath"],
+                         capture_output=True, text=True, cwd=ROOT,
+                         encoding="utf-8", errors="replace")
+    configured = out.stdout.strip()
+    if configured and (ROOT / configured / "pre-commit").exists():
+        return True
+    return (ROOT / ".git" / "hooks" / "pre-commit").exists()
 
 
 def tracked_files() -> list[Path]:
@@ -202,11 +266,27 @@ def main() -> int:
     fatal, warn = scan(paths)
     print(f"checked {len(paths)} file(s)")
 
+    # Only meaningful for a real commit: an explicit file list or --all is someone
+    # asking about content, not about what is being published.
+    new_stopped = [] if (args.files or args.all) else check_new_files(newly_added())
+
     if warn:
         print(f"\n{len(warn)} thing(s) worth a look:")
         for rel, n, label, hit in warn[:20]:
             where = f"{rel}:{n}" if n else rel
             print(f"  {where}  {label}: {hit}")
+
+    if new_stopped:
+        print(f"\n{len(new_stopped)} file(s) this commit would publish for the first "
+              f"time:")
+        for rel, why in new_stopped:
+            print(f"  {rel}  ({why})")
+        print("\nNothing here is necessarily wrong. The point is that publishing a\n"
+              "binary is a decision, and `git add -A` makes it by accident. If it\n"
+              "should ship, say so once:\n")
+        for rel, _why in new_stopped:
+            print(f"    echo {rel} >> {PUBLISHED_DELIBERATELY}")
+        print("\nIf it should not, unstage it and add it to .gitignore.")
 
     if fatal:
         print(f"\n{len(fatal)} thing(s) that must not be committed:")
@@ -215,9 +295,14 @@ def main() -> int:
             print(f"  {where}  {label}: {hit}")
         print("\nFix them, or if one is a false positive, make that obvious in the text\n"
               "(a placeholder like <user>) rather than weakening the check.")
+
+    if fatal or new_stopped:
         return 1
 
     print("no machine paths, personal names, private drafts or credentials found")
+    if not (args.files or args.all) and not hook_installed():
+        print("\nNote: this check is not wired to run by itself. One command fixes "
+              "that:\n    git config core.hooksPath hooks")
     return 0
 
 

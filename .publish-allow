@@ -1,0 +1,11 @@
+# Files this repository publishes on purpose.
+#
+# check_privacy.py stops a commit that would add a binary, a media file or anything
+# large for the first time, unless it is listed here. The point is not that binaries
+# are dangerous — it is that `git add -A` publishes things by accident, and this makes
+# it an explicit act instead.
+#
+# One path per line, relative to the repository root, forward slashes.
+#
+# Not listed on purpose:
+#   docs/pitch.mp4   the pitch video, which ships when a human has watched it
