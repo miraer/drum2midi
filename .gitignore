@@ -65,3 +65,8 @@ note36.zip
 # Vendor documentation: redistribution is explicitly prohibited in the document
 *Users-Guide*.pdf
 *.pdf
+
+# The pitch video. Built by bench/video/make_video.py, reviewed by a human before it
+# ships: it was once swept into a commit by `git add -A` and pushed unreviewed. Delete
+# this line to publish it.
+docs/pitch.mp4
