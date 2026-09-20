@@ -94,12 +94,38 @@ artefact quoted as a result.
 
 ## Smaller, and specific
 
-- **MDX23C through OpenVINO** — the one NPU case never measured. The
-  [investigation](README.md) settled the question on a toy convolution and on the real
-  ADTOF model, and both said no. The separator itself was never tried. Toy evidence
-  misled twice inside that same investigation, so this is a gap rather than a conclusion.
+- ~~**MDX23C through OpenVINO**~~ — ✅ **measured 20 Sept, and the earlier conclusion
+  does not survive.** The NPU investigation said OpenVINO loses everywhere; that was
+  measured on a toy convolution and on ADTOF, which is a small recurrent net. MDX23C is a
+  109 M-parameter convolutional one and behaves differently.
+
+  The whole model **cannot** be exported to ONNX: its STFT front-end works on complex
+  tensors and ONNX has no complex type. The convolutional body can, with the STFT left in
+  torch where it is cheap. On a 3-second chunk of real audio, medians of five runs:
+
+  | | time | vs torch cpu | vs torch xpu | max relative error |
+  |---|---|---|---|---|
+  | torch cpu | 7.77s | — | 0.20x | — |
+  | **torch xpu — what the pipeline uses today** | **1.55s** | 5.00x | — | — |
+  | OpenVINO CPU | 5.08s | 1.53x | 0.31x | 0.0000% |
+  | **OpenVINO GPU** | **0.85s** | 9.10x | **1.82x** | 0.2355% |
+  | OpenVINO NPU | 1.14s | 6.81x | 1.36x | 0.0742% |
+
+  So there is a real gain and it is **1.8x, not 9x**: against torch CPU it looks
+  enormous, but the pipeline has not used torch CPU for this stage in weeks. The NPU
+  finally wins something — 1.36x over the GPU path the tool actually takes — which is the
+  first positive NPU result in this project.
+
+  **Not adopted, and the reasons are listed rather than waved at.** The GPU output differs
+  from torch by 0.24% and nobody has measured what that does to onset F1; the STFT and
+  iSTFT stay in torch either way, so the end-to-end gain is smaller than the table; and
+  the export needs a 417 MB external-data file per model. `bench_mdx_openvino.py` runs
+  the whole thing, including the numerical check, because a speedup on a graph that
+  computes something else is not a speedup.
 - **Power draw** — never measured anywhere in this project, and it is the one axis on
-  which an NPU should genuinely win.
+  which an NPU should genuinely win. Now more interesting than it was: the NPU is within
+  1.4x of the GPU on this model, so if it draws meaningfully less it may be the better
+  device even without being the faster one.
 - **ReStem's `Other` stem** — our converter does not emit pitch 60. Harmless for onset
   scoring, since it is not a scored class, but on one recording it was 22% of what ReStem
   emitted. Decide whether dropping it flatters their precision.

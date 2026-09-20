@@ -419,6 +419,22 @@ velocity difference 0, maximum timing difference 0.000 ms (`compare_midi.py`).
 & $py drum2midi.py drums.wav -o out.mid --device cpu   # force one device
 ```
 
+**What about the NPU?** This machine has one (Intel AI Boost), and reaching it requires
+OpenVINO rather than torch. Measured on both stages, the answer is no for transcription
+and a qualified yes for separation:
+
+| | fastest available | notes |
+|---|---|---|
+| ADTOF, transcription | torch CPU | OpenVINO reaches 0.9x on the real model. A toy GRU suggested 12–15x, which is why toys are not evidence |
+| MDX23C, separation | OpenVINO GPU, **1.82x** over the torch XPU path | and the NPU reaches 1.36x, the first thing the NPU has won here |
+
+Not adopted. The separator's STFT front-end cannot be exported to ONNX at all — complex
+tensors have no ONNX type — so only the convolutional body crosses, the rest stays in
+torch, and the end-to-end gain is smaller than 1.82x. The GPU result also differs from
+torch by 0.24%, and what that costs in onset F1 is not measured.
+`bench_mdx_openvino.py` reproduces all of it, [with the full
+table](ROADMAP.md#smaller-and-specific).
+
 Intel GPUs need the XPU build of PyTorch, which is not what `pip install torch` gives
 you by default:
 
@@ -1812,6 +1828,7 @@ transcriber from scratch.
 | `train_models.py`, `train_cc4.py` | model training with held-out evaluation |
 | `train_ride.py`, `train_onset.py` | two ideas that were measured and rejected |
 | `bench_training.py` | is CPU training feasible (yes: 3.8 h for an onset detector) |
+| `bench_mdx_openvino.py` | can the separator run on the NPU, and is it faster than the path we use |
 | **Utilities** | |
 | `keep_awake.py` | stops Modern Standby from pausing an overnight run |
 | `bench_devices.py` | time each stage on each available device |
