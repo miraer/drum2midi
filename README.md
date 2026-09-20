@@ -1255,6 +1255,79 @@ Two things were needed to run it at all, both the same shape as bugs found elsew
 
 Worth revisiting when they publish weights trained on real recordings.
 
+### The rest of the alternatives, surveyed
+
+ADT_STR was measured because it looked like the one serious candidate. That is not a
+survey, so the second machine did one: every open drum transcriber with published
+weights, checked by reading repository trees, LICENSE files and release assets rather
+than READMEs.
+
+**The cheapest lead closed first.** Upstream ADTOF publishes **exactly one checkpoint** —
+`Frame_RNN_adtofAll_0`, 5.4 MB. Its code defines two architectures and forty named
+configs, but those are training recipes, not weights. Our port is the complete set of
+published ADTOF weights; there is no better one of those to switch to.
+
+Two things fell out of reading that repository, both about us rather than about them:
+
+- **Our thresholds are not stock.** Upstream publishes `[0.22, 0.24, 0.32, 0.22, 0.30]`;
+  ours differ on snare, which is the cross-validated change
+  [documented below](#-tuning-all-five-thresholds-globally-my-earlier-result-was-biased).
+  Deliberate, but it means our headline is not a figure for stock ADTOF, and anyone
+  comparing against the paper should know. On MDBDrums++ stock scores 0.807 against our
+  0.822.
+- **ADTOF-pytorch's own published number does not reproduce here.** Its README claims
+  F 88.51 on MDBDrums++ — a re-annotation of MDB whose audio is PCM-identical. Same
+  weights, same audio, all 23 tracks paired through the dataset's own metadata: **0.822**,
+  and 0.831 even at a 100 ms tolerance. The gap is in a protocol the README does not
+  state. Reported as a reproduction failure rather than smoothed, because it sets the
+  standard for the rest: published numbers are a check on setup, not ground truth.
+
+**One model measured: the Inverse Drum Machine** (Apache-2.0, 2.5 MB, feed-forward, 23
+tracks in 7 seconds on a CPU). Scored by the same code as the incumbent, which was itself
+re-scored rather than quoted:
+
+| class | IDM | ours | difference |
+|---|---|---|---|
+| kick | 0.837 | 0.961 | −0.124 [−0.182, −0.078] |
+| **snare** | **0.771** | **0.805** | **−0.034 [−0.080, +0.010]** |
+| hi-hat | 0.726 | 0.863 | −0.138 [−0.259, −0.045] |
+| toms | 0.184 | 0.589 | −0.405 [−0.530, −0.240] |
+| cymbals | 0.388 | 0.870 | −0.483 [−0.669, −0.302] |
+| **MICRO** | **0.703** | **0.860** | **−0.158 [−0.209, −0.119]** |
+
+It loses, and **snare is the one class where it is indistinguishable from ours**. The
+0.703 is its best global threshold chosen on MDB itself — with hindsight, in its favour,
+since it has no tuned operating point here; at its parameter-free 0.5 it scores 0.435.
+It is trained on synthetic drum-only stems and its authors publish no MDB numbers, so
+unlike ADT_STR there is no author figure to check the setup against.
+
+**The licence is the point of the exercise.** Apache-2.0 at 0.703 against CC BY-NC-SA at
+0.860 is the trade this survey exists to price, and today it is not worth taking.
+
+| system | weights licence | classes | runs on CPU |
+|---|---|---|---|
+| Inverse Drum Machine | Apache-2.0 | 9 | ✅ measured, 0.703 |
+| Vogl DAFx'18 | CC BY-NC-SA | 3 / 8 / 18 | ✅ not yet run |
+| dafx2018_adt | BSD-2 | large vocab | ✅ not yet run |
+| Omnizart | unstated | 13, but 3 emitted | ✅ not yet run |
+| DrummerScore | MIT | undocumented | ✅ not yet run |
+| Separate-and-Detect | MIT | **exactly our five** | ❌ 5.4 GB diffusion |
+| MT3, YourMT3 | Apache / GPL conflict | GM programs | ❌ autoregressive |
+| ADTLib | BSD-2 | 3 | ⚠️ needs TensorFlow 1 |
+
+Ruled out for having no published weights at all: DrummerNet, YODO, Player-Vs-Transcriber,
+ADTOS. Stock madmom contains no drum models.
+
+**A licence trap worth naming:** madmom's *code* is BSD but its *model files* are
+CC BY-NC-SA, so several systems that look permissive inherit a non-commercial constraint
+through a dependency. The licence column has to track weights separately from code —
+which is how we found that [our own port has no licence file at
+all](#licensing--read-before-using-commercially).
+
+Separate-and-Detect is the one to revisit the day this project has a GPU: it emits
+exactly our five classes and publishes MDB numbers, and it is the only candidate ruled
+out for cost rather than for quality.
+
 ### ❌ A learned onset detector on separated stems
 
 This was the last big untested idea, and the one the whole 417 MB training set was built
