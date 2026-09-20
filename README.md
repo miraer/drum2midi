@@ -51,6 +51,14 @@ tom interval is ±0.22 and spans both directions.
 > 0.691 and 0.690. [The detail, including a claim withdrawn from this
 > section](#where-each-side-wins).
 >
+> **And that difference sits on a slider we never touched.** Each ReStem stem has its own
+> trigger editor — Thresh, Hold, Sustain, Release, Blend — with Thresh at a default of
+> −60.0 dB, which is the control that governs how much a stem emits. Everything here was
+> run at their defaults against ours, which is the fairest comparison we could construct
+> from outside, but a precision gap is exactly what a threshold moves. **Our largest
+> number may describe their default rather than their model.** We have asked them which a
+> competent user would set, and undertaken to re-run all 23 recordings with it.
+>
 > The ReStem team have been written to and told this is public. If they say the product
 > was used incorrectly, these numbers get rerun and corrected here, and the correction
 > gets stated plainly rather than quietly edited in. That has already happened repeatedly
