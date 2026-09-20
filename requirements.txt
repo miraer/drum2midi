@@ -11,17 +11,25 @@
 #
 # Install torch first if you want a specific build. The plain `pip install torch`
 # wheel on Windows has NO CUDA, so an NVIDIA card sits idle and everything runs on
-# the CPU without saying why -- `python devices.py` now reports that when it happens.
-#   NVIDIA:  pick the command at https://pytorch.org/get-started/locally/
-#   CPU:     pip install torch --index-url https://download.pytorch.org/whl/cpu
-#   Intel:   python setup_env.py --with-intel-gpu
+# the CPU without saying why -- `.venv\Scripts\python.exe devices.py` reports that
+# when it happens.
+#
+# Run these through the virtualenv's own interpreter, not a bare `pip` or `pip3`.
+# pytorch.org gives the command as `pip3 install torch ...`, and on Windows a bare
+# pip3 is usually the system Python: the CUDA wheel then installs perfectly into an
+# interpreter this project never uses, and the only sign is that torch here still
+# says `+cpu`. `<interpreter> -m pip` cannot miss in that way.
+#   NVIDIA:  .venv\Scripts\python.exe -m pip install torch --index-url <from pytorch.org>
+#   CPU:     .venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+#   Intel:   .venv\Scripts\python.exe setup_env.py --with-intel-gpu
 # No CUDA version is named here on purpose. The index carries cu118 through cu134 and
 # the right one depends on the driver; an earlier version of this comment hard-coded
-# cu124, which was already three releases stale on the day it was written.
+# cu124, which was already three releases stale on the day it was written. The part
+# worth copying from pytorch.org is the index URL; the interpreter is ours.
 #
 # ADTOF-pytorch is not on PyPI and must be installed from git:
 #   git clone --depth 1 https://github.com/xavriley/ADTOF-pytorch.git
-#   pip install -e ./ADTOF-pytorch
+#   .venv\Scripts\python.exe -m pip install -e ./ADTOF-pytorch
 
 torch>=2.1
 numpy>=1.24

@@ -387,6 +387,37 @@ Optional extras:
 `--check` reports which device each stage will use. If an Intel GPU is present but torch
 cannot see it, the installer says so instead of silently running on the CPU.
 
+### NVIDIA: run that install through the virtualenv, not a bare `pip3`
+
+pytorch.org gives you the command as `pip3 install torch ...`. That is right in general
+and wrong here: on Windows a bare `pip3` is usually the system Python, not `.venv`.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --force-reinstall torch torchvision `
+    --index-url <the URL pytorch.org gave you>
+```
+
+**Take the index URL from them and keep the `-m pip`.** Which CUDA version you want is
+theirs to answer; which interpreter receives it is ours. Get the second half wrong and
+the install still succeeds and still reports nothing wrong — it puts a working CUDA build
+somewhere this project never looks, while `.venv` goes on holding `+cpu`. The symptom is
+a GPU the operating system can see and torch cannot:
+
+```
+note: NVIDIA GeForce RTX 4070 SUPER is installed and is not being used.
+      this torch has no CUDA support (torch 2.14.0+cpu). ...
+```
+
+`.\.venv\Scripts\python.exe devices.py` prints that, along with the exact command for
+the interpreter it is running in. If torch reports `+cpu` there after an install that
+looked like it worked, you installed into a different Python — check with:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+A CUDA build is named for it (`2.14.0+cu132`); a CPU one says `+cpu`.
+
 <details>
 <summary>Manual installation</summary>
 

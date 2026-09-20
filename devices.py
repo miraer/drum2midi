@@ -90,6 +90,39 @@ def pick_devices(requested: str = "auto") -> Dict[str, str]:
     }
 
 
+def interpreter_here() -> str:
+    """The interpreter this is running in, as something that can be typed back.
+
+    Advice that starts with a bare `python` or `pip3` is advice about whichever
+    interpreter PATH happens to point at, which on Windows is usually not the
+    project's virtualenv. Naming the one in hand removes the guess.
+    """
+    import sys
+    from pathlib import Path
+
+    exe = Path(sys.executable)
+    try:
+        return str(Path(".") / exe.relative_to(Path(__file__).resolve().parent))
+    except ValueError:
+        return str(exe)
+
+
+def pip_here() -> str:
+    """The pip invocation that reaches the interpreter this is running in.
+
+    pytorch.org hands you `pip3 install torch --index-url ...`, which is right in
+    general and wrong for a project that lives in a virtualenv. A bare `pip3` on
+    Windows is usually the system Python, so the CUDA wheel installs perfectly into an
+    interpreter the pipeline never looks at, and the only symptom is the message this
+    module prints -- a GPU the OS can see and torch cannot.
+
+    That is not hypothetical: it produced torch 2.14.0+cu132 with CUDA working in one
+    interpreter and 2.14.0+cpu in the project's .venv at the same time. So every
+    instruction here names an interpreter rather than trusting PATH.
+    """
+    return f"{interpreter_here()} -m pip"
+
+
 def unused_gpu() -> Optional[Tuple[str, str]]:
     """A GPU the operating system can see and torch cannot, with what to do about it.
 
@@ -137,15 +170,21 @@ def unused_gpu() -> Optional[Tuple[str, str]]:
                    if "+cpu" in version or "cu" not in version
                    else "torch reports CUDA unavailable; check the driver")
             return (card,
-                    f"{why} (torch {version}). Install a CUDA build:\n"
+                    f"{why} (torch {version}). Install a CUDA build into this\n"
+                    f"interpreter:\n"
                     f"       https://pytorch.org/get-started/locally/ gives the exact\n"
-                    f"       command for your driver. The CUDA version in the index URL\n"
-                    f"       matters and is not named here: it goes stale faster than\n"
-                    f"       this file does.")
+                    f"       command for your driver. The CUDA version in the index\n"
+                    f"       URL matters and is not named here: it goes stale faster\n"
+                    f"       than this file does.\n"
+                    f"       Run it as `{pip_here()} install ...`, not as a bare\n"
+                    f"       `pip3 install ...`. pytorch.org gives the bare form and\n"
+                    f"       on Windows that is usually a different Python: the wheel\n"
+                    f"       installs perfectly into an interpreter this project never\n"
+                    f"       opens, and the only symptom is this message again.")
         if "intel" in low and ("arc" in low or "iris" in low):
             return (card,
-                    f"this torch is not the XPU build (torch {version}). Install it "
-                    f"with:\n       python setup_env.py --with-intel-gpu")
+                    f"this torch is not the XPU build (torch {version}). Install it\n"
+                    f"with:  {interpreter_here()} setup_env.py --with-intel-gpu")
     return None
 
 
@@ -174,4 +213,7 @@ if __name__ == "__main__":
     if idle:
         card, how = idle
         print(f"\nnote: {card} is installed and is not being used.")
-        print(f"      {how}")
+        # line by line: the hint is several lines and only the first was indented,
+        # which broke the alignment exactly where a command has to be copied out
+        for line in how.splitlines():
+            print(f"      {line.strip()}")
