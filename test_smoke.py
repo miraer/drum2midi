@@ -514,6 +514,33 @@ def test_every_script_answers_help():
 
 
 @test
+def test_privacy_gate_does_not_flag_the_repository_itself():
+    """The gate must not treat the project's own name as a leaked account name.
+
+    It derives identity from the username and the folder above the checkout. On a
+    developer machine that folder is the owner's home, which is right. On GitHub
+    Actions the layout is /home/<user>/work/<repo>/<repo>, so the parent is the
+    repository, and every `from drum2midi import ...` was reported as a leak. The
+    result was a gate that failed on every CI run the project ever had and passed on
+    every machine a person looked at -- so nobody looked.
+    """
+    import check_privacy
+
+    # Placeholder usernames rather than literal home paths: the gate rejects
+    # /home/<a real name> on sight, and the shape of the path is all this test needs.
+    ci = check_privacy.identity_names("runner",
+                                      Path("/home/<user>/work/drum2midi/drum2midi"))
+    assert "drum2midi" not in [n.lower() for n in ci], (
+        f"the repository's own name is treated as an identity on CI: {ci}")
+    assert "runner" in ci, f"the CI username should still be guarded: {ci}"
+
+    dev = check_privacy.identity_names("someone",
+                                       Path("/home/<user>/projects/drum2midi"))
+    assert "projects" in dev and "someone" in dev, (
+        f"a developer layout must still yield both names: {dev}")
+
+
+@test
 def test_accent_button_visible_without_pillow():
     """The Convert button must stay legible when Pillow is absent.
 

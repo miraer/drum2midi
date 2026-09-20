@@ -56,9 +56,28 @@ RULES = [
     ("email address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]{2,}\b"), False),
 ]
 
-# Names that identify this machine or its owner. Checked separately so the message can
-# say why, and so an empty username does not match everything.
-IDENTITY = [n for n in {USER, ROOT.parent.name} if len(n) > 2]
+def identity_names(user: str, root: Path) -> list[str]:
+    """Names that identify this machine or its owner, from the username and the folder
+    the checkout sits in.
+
+    The folder above a checkout is the owner's home on a developer machine, which is
+    what this was written for. On GitHub Actions the layout is
+    `/home/runner/work/<repo>/<repo>`, so the parent is the repository's own name --
+    and every `from drum2midi import ...` in the tree was reported as a leaked account
+    name. The gate failed on every CI run the project has ever had while passing on
+    every developer machine, which is the worst way round: the check that guards
+    publication was only ever green where publication does not happen.
+
+    A repository cannot leak its own name, so it is excluded by identity rather than by
+    a special case for one CI provider.
+    """
+    return [n for n in {user, root.parent.name}
+            if len(n) > 2 and n.lower() != root.name.lower()]
+
+
+# Checked separately from RULES so the message can say why, and so an empty username
+# does not match everything.
+IDENTITY = identity_names(USER, ROOT)
 
 
 def own_repo_url() -> re.Pattern | None:
