@@ -73,10 +73,13 @@ tom interval is ±0.22 and spans both directions.
 > raises it. We have asked, and undertaken to re-run all 23 recordings at whatever they
 > say.
 >
-> The ReStem team have been written to and told this is public. If they say the product
+> The ReStem team have not been written to yet. The letter is written and not sent, and
+> publication was deliberately not made to wait on it — which means that as things stand
+> they are learning about this here or not at all. That is a choice with a cost and it is
+> ours. When it goes, it tells them plainly that this is public. If they say the product
 > was used incorrectly, these numbers get rerun and corrected here, and the correction
 > gets stated plainly rather than quietly edited in. That has already happened repeatedly
-> with our own claims, twice in this very section.
+> with our own claims — six times in this very section.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
@@ -993,6 +996,16 @@ guess happened to be flattering to us — it framed our largest win as possibly 
 which reads as modesty while resting on nothing. The real caveat, which the same document
 supplied, is the adjustable threshold above.
 
+A sixth was withdrawn on 20 September, and it is the one whose mechanism was new. This
+section used to say that three notes on ReStem's unscored `other` stem appeared in its
+MIDI without appearing in its JSON, and that the detail could never be rechecked because
+the product overwrites its export directory on every render. Both halves were wrong. The
+two files had come from renders 74 minutes apart, so they were never a matched pair in
+the first place; and rechecking was trivial — render again and capture the JSON and the
+MIDI from the same run, which gives 123 events, 123 notes, identical in time, pitch and
+velocity, and no pitch 60 at all. The claim implied a defect in someone else's exporter
+on evidence that was never evidence.
+
 Two of our reverse-engineered findings were confirmed by that document. The articulation
 mapping we recovered blind from the exports — closed below ≈0.46, open above ≈0.76 —
 matches the documented 0.465 and 0.798. And note 60, which we read as "detected but
@@ -1000,7 +1013,7 @@ unclassified", is documented as the Other stem's neutral fallback.
 
 **Where those claims came from is worth stating.** This project was built largely by an AI
 coding agent (GitHub Copilot) working under direction, and the retractions above fall into
-two kinds, both worth naming.
+three kinds, all worth naming.
 
 Four were the agent reading a point estimate as though it were a result — confidently,
 fluently, and wrongly. It never invented a number, and it never hedged one either. What
@@ -1013,6 +1026,13 @@ vendor's user's guide answered the question directly, had anyone gone to find it
 invented explanation survived for a few hours purely because it sounded careful. A rule
 about confidence intervals does nothing against that one. What worked was a person asking
 whether the manual had been read.
+
+The sixth is the least excusable of the three, because the rule that would have caught it
+was already written down here: a number is unusable until you can say what produced it.
+Two files were compared as though they were a matched pair when they were 74 minutes and
+two renders apart, and the mismatch that followed was attributed to the other side's
+software. Having the rule is not the same as applying it, and nothing in the process
+noticed. What caught it was re-running the comparison rather than re-reading it.
 
 The retractions are left in the text rather than quietly edited out, because a write-up
 that shows only the surviving claims tells you nothing about how hard they were tested.
