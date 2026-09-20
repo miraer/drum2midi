@@ -1333,11 +1333,22 @@ It is trained on synthetic drum-only stems and its authors publish no MDB number
 unlike ADT_STR there is no author figure to check the setup against.
 
 **And Vogl's DAFx'18 models, which overturn something this README said.** Two variants,
-an 8-class and an 18-class, CC BY-NC-SA like ADTOF so no licence gain. On MICRO both are
-tied with us — +0.009 [−0.041, +0.075] and −0.008 [−0.047, +0.037] — but the tie hides two
-real and opposite differences: **both beat us on snare** (+0.111 and +0.081, intervals
-clear of zero) and **we beat both on cymbals** (+0.143 and +0.231). A single headline
-number would have reported "no difference" and been useless.
+an 8-class and an 18-class, CC BY-NC-SA like ADTOF so no licence gain. Scored by the same
+code as everything else:
+
+| class | Vogl 8-class | Vogl 18-class | ours |
+|---|---|---|---|
+| kick | **0.974** | 0.969 | 0.961 |
+| **snare** | **0.916** | **0.886** | 0.805 |
+| hi-hat | 0.855 | 0.829 | 0.863 |
+| toms | 0.424 | 0.562 | 0.589 |
+| **cymbals** | 0.727 | 0.639 | **0.870** |
+| **MICRO** | 0.870 | 0.852 | **0.860** |
+
+On MICRO both are tied with us — +0.009 [−0.041, +0.075] and −0.008 [−0.047, +0.037] —
+but the tie hides two real and opposite differences: **both beat us on snare** (+0.111 and
++0.081, intervals clear of zero) and **we beat both on cymbals** (+0.143 and +0.231). A
+single headline number would have reported "no difference" and been useless.
 
 The result that matters is not the F-measure:
 
@@ -1371,7 +1382,7 @@ already on disk.
 | system | weights licence | classes | runs on CPU |
 |---|---|---|---|
 | Inverse Drum Machine | Apache-2.0 | 9 | ✅ measured, 0.703 |
-| Vogl DAFx'18 | CC BY-NC-SA | 3 / 8 / 18 | ✅ not yet run |
+| Vogl DAFx'18 | CC BY-NC-SA | 3 / 8 / 18 | ✅ measured, 0.870 and 0.852 — tied with us |
 | dafx2018_adt | BSD-2 | large vocab | ✅ not yet run |
 | Omnizart | unstated | 13, but 3 emitted | ✅ not yet run |
 | DrummerScore | MIT | undocumented | ✅ not yet run |
