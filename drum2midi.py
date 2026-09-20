@@ -326,14 +326,34 @@ def xpu_available() -> bool:
         return False
 
 
-def _audio_separator(src: Path, model: str, outdir: Path, device: str) -> Path:
-    outdir.mkdir(parents=True, exist_ok=True)
+def _separator_command(src: Path, model: str, outdir: Path, device: str) -> List[str]:
+    """The command that runs audio-separator on `device`.
+
+    Separate from _audio_separator so the device actually reaching the separator can
+    be asserted without running a separation, which is the longest stage here.
+
+    audio-separator chooses its own device and offers no way to say otherwise -- its
+    --help lists DirectML and fp16 but nothing for the CPU -- so both non-default
+    devices need the CLI wrapped in a patch rather than a flag.
+    """
     # audio_separator.utils.cli has no __main__ guard, so `-m` silently does nothing.
     # Prefer the console script and fall back to importing main() explicitly.
     exe = Path(sys.executable).parent / ("audio-separator.exe" if os.name == "nt"
                                          else "audio-separator")
     use_xpu = device != "cpu" and xpu_available()
-    if use_xpu:
+    if device == "cpu":
+        # `--device cpu` used to stop at this function: the flag picked the transcriber's
+        # device and was then dropped, the console script ran, and it logged "CUDA is
+        # available in Torch, setting Torch device to CUDA" and used the GPU. Measured
+        # on a 4070 SUPER, stage 2 took 26.6s under --device cpu and 26.9s under
+        # --device auto, while stages 1 and 3 slowed by 4.1x and 3.7x as they should.
+        # The longest stage of the pipeline ignored the flag entirely.
+        head = [sys.executable, "-c",
+                f"import sys; sys.path.insert(0, r'{ROOT}'); "
+                "from xpu_separate import force_cpu_audio_separator; "
+                "force_cpu_audio_separator(); "
+                "from audio_separator.utils.cli import main; sys.exit(main())"]
+    elif use_xpu:
         # audio-separator only knows cuda and mps, so its own entry point would run on
         # the CPU. Patch the device choice, then hand over to the unmodified CLI.
         head = [sys.executable, "-c",
@@ -345,8 +365,13 @@ def _audio_separator(src: Path, model: str, outdir: Path, device: str) -> Path:
     else:
         head = [sys.executable, "-c",
                 "import sys; from audio_separator.utils.cli import main; sys.exit(main())"]
-    cmd = head + [str(src), "-m", model, "--output_dir", str(outdir),
-                  "--model_file_dir", str(UVR_DIR / "models")]
+    return head + [str(src), "-m", model, "--output_dir", str(outdir),
+                   "--model_file_dir", str(UVR_DIR / "models")]
+
+
+def _audio_separator(src: Path, model: str, outdir: Path, device: str) -> Path:
+    outdir.mkdir(parents=True, exist_ok=True)
+    cmd = _separator_command(src, model, outdir, device)
 
     # Separation is by far the longest stage, so its progress is forwarded rather than
     # swallowed: audio-separator writes a tqdm bar to stderr, and the percentage from it
