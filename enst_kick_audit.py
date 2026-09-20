@@ -110,19 +110,31 @@ def main() -> int:
           f"{share:.1%} of them.")
 
     drummers = sorted({d for _, d, _, _, _, _, _ in rows})
-    print(f"\nDrummers covered: {', '.join(str(d) for d in drummers)} "
-          f"of 3.")
-    if len(drummers) < 3:
-        print("  That is the limit on this so far. ENST is three players with three kits,")
-        print("  and a kick that one kit produces unusually would look exactly like this.")
-        print("  The declared sample is stratified across all three, so the batch reaches")
-        print("  them on its own -- until it does, this is a statement about "
-              f"drummer {drummers[0]}, not about ENST.")
-    else:
-        print("  All three, so this is no longer a statement about one kit.")
+    print(f"\nby drummer, which is the breakdown that matters:")
+    print(f"{'drummer':<10}{'recordings':>12}{'ref kick':>10}{'theirs':>9}{'share':>9}")
+    print("-" * 50)
+    for d in drummers:
+        mine = [r for r in rows if r[1] == d]
+        rk = sum(r[2] for r in mine)
+        tk = sum(r[3] for r in mine)
+        print(f"{d:<10}{len(mine):>12}{rk:>10}{tk:>9}"
+              f"{(tk / rk if rk else 0):>9.1%}")
+    print("-" * 50)
+    print("""
+A single figure across drummers hides the only thing this measurement has found. If one
+player's share is near zero and another's is near a hundred, there is no fact here about
+the corpus or about their model in general -- there is a fact about one kit, and the
+aggregate is the average of a failure and a success, describing neither.
+
+An earlier version of this script printed only the total. On thirteen recordings, all of
+them one drummer, that total read as a catastrophic failure of their kick detector and
+was very nearly written up as one.""")
 
     print("\nCounts only. A recall figure would need matching in time, which is the next")
     print("step if this survives the dry-mix control and a second machine's renders.")
+    if len(drummers) < 3:
+        print(f"Drummers covered: {', '.join(str(d) for d in drummers)} of 3 -- "
+              f"the batch reaches the rest on its own.")
     return 0
 
 
