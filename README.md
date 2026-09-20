@@ -1397,12 +1397,29 @@ All on MDB, all with separation, 4000 resamples over tracks:
 | losing the ceiling | −0.008 [−0.023, +0.001] | −0.267 [−0.449, **+0.074**] |
 | halving, on top of that | **−0.046 [−0.066, −0.028]** | **−0.148 [−0.249, −0.043]** |
 
-The tom cost of halving is **−0.148, not the −0.414** this section first reported: the
-rest was the ceiling being switched off behind the flag. Note also that the ceiling row's
-own interval contains zero — MDB's 90 tom onsets cannot resolve it, which is exactly
+The tom cost of halving is **−0.148, not the −0.414** this section first reported. The
+remainder belongs to the ceiling being switched off behind the flag — but that row's own
+interval contains zero, so the honest statement is not "two thirds of the drop was the
+ceiling". It is that **the requested comparison confounds a resolvable effect with an
+unresolved one**: MDB's 90 tom onsets cannot settle a change that acts on the 2 tracks of
+23 where the adaptive threshold reaches the ceiling at all. That is
 [why ENST was bought](#enst-drums--the-corpus-that-can-actually-measure-toms). The second
-machine measured the same halving without separation and got tom −0.147, so the
-like-for-like number reproduces across machines and across the separation path.
+machine measured the same halving without separation and got tom −0.124 [−0.176, −0.034],
+so the like-for-like effect reproduces across machines and across the separation path.
+
+**The argument that needs no statistics.** Count what each policy actually finds among
+MDB's 90 annotated tom onsets:
+
+| | tom notes emitted | of them correct |
+|---|---|---|
+| adaptive, bounded by `TOM_CEILING` | 134 | **66** |
+| explicit stock threshold | 276 | 59 |
+| explicit halved threshold | **722** | 71 |
+
+Going from 134 estimates to 722 — **588 extra notes** — recovers **five** additional real
+toms. The stock fixed threshold is worse still: twice the estimates of the adaptive policy
+and fewer correct. Lowering the tom threshold does not find the toms it is missing; it
+fills the track with toms that are not there.
 
 It is still fatal. **722 tom notes where 90 were played**, and MICRO down 0.046 with the
 interval clear of zero. Toms sit under everything else on a real kit, and a threshold low
@@ -1419,13 +1436,28 @@ destroys precision; on dense material the extra notes mostly land on real toms. 
 fails on dense material, a fixed threshold is an absolute cap that fails on sparse
 material, and **neither policy knows the density it is working in**.
 
-Nor is a narrower version available. The second machine swept the channels separately:
-lowering the **tom** channel alone reproduces the full damage exactly — 722 notes, tom
-0.175 — so the other four contribute nothing, and even a gentle cut from 0.32 to 0.24
-still emits **524**. The **hi-hat** channel alone is nearly free on MDB at −0.005 MICRO,
-but MDB is all sticks, and the hi-hat channel is precisely where the two soft beaters
-disagree: mallets emit 0.28 notes per onset there and brushes 1.71. A global hi-hat cut
-would help one and worsen the other.
+Nor is a narrower version available on the tom channel. The second machine swept the two
+channels separately, on a common fixed-threshold base so the hidden policy switch could
+not contaminate the contrast:
+
+| channel lowered | MICRO | tom F1 | tom notes |
+|---|---|---|---|
+| neither (fixed stock) | 0.852 | 0.322 | 276 |
+| **tom only**, 0.32 → 0.22 | 0.837 | **0.198** | **576** |
+| **hi-hat only**, 0.22 → 0.15 | 0.852 | 0.322 | 276 |
+| both | 0.837 | 0.198 | 576 |
+
+The two channels are additive to four decimal places, and the split is the opposite of
+what I predicted in writing beforehand. **The tom channel is the entire cost** — −0.015
+MICRO [−0.034, −0.002] and −0.124 tom F1 [−0.176, −0.034]. **The hi-hat channel is free**
+— +0.000 MICRO [−0.007, +0.011], trading precision 0.889 → 0.858 against recall 0.839 →
+0.870 almost exactly evenly.
+
+Free on MDB, that is, and MDB is played entirely with sticks. The hi-hat channel there
+sits at 0.94 notes per annotated onset, slightly *under*-firing, so lowering it moves
+toward 1.0. On brushes it already sits at 1.71 and lowering it reaches 2.58. Same knob,
+opposite sides of the same target — which is why the only version of this idea left
+standing is a **beater-aware** threshold, and nothing of that is built or measured.
 
 Measured per beater on ENST, which settles it:
 
@@ -1442,8 +1474,16 @@ from 1.71 notes per onset to 2.58, and brush *toms* reach 5.17.
 
 So the recoverable band is real and reaching it is not worth it — a framing the second
 machine proposed, then retracted with the measurement that disproved it, having recorded
-the prediction in advance. What survives is that a **beater-aware** threshold is the only
-version of this idea still standing, and nothing of it is built or measured.
+the prediction in advance. My own prediction, that the hi-hat half would be harmful and
+the tom half the part worth keeping, was wrong in both directions. What survives is that
+a **beater-aware** threshold is the only version of this idea still standing, and nothing
+of it is built or measured.
+
+One more thing this measured, which was not the question asked. The adaptive policy
+almost never picks the stock 0.32: across the 23 MDB tracks it sits at the `TOM_FLOOR` of
+0.25 on the median track and reaches the `TOM_CEILING` of 0.45 on the two tom-heavy ones,
+and equals 0.32 on **none** of them. The constant it replaced was wrong in both
+directions depending on the track, which is why bounding it was worth +0.197 on ENST.
 
 ### ❌ Tuning all five thresholds globally (my earlier result was biased)
 
