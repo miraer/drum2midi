@@ -58,7 +58,8 @@ proven impossible.
 | | what would settle it |
 |---|---|
 | **Reproduce the ENST figures independently** | ✅ done 20 Sept. A second machine reproduced kick, snare, hi-hat and cymbals to three decimals with identical intervals; toms differed by exactly the +0.197 the ceiling buys, which identified their run as pre-ceiling rather than a disagreement. |
-| **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training. **Sharper now:** the tom channel fires on snares at 2.4× chance, so what training has to fix is a confusion, not a threshold. |
+| **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training. **Sharper now:** the tom channel fires on snares at 2.4× chance, so what training has to fix is a confusion, not a threshold. **And not obviously the answer:** E-GMD's own toms are 7.49% of onsets with 48.54% below velocity 60 — the same rare-and-quiet profile that produces a weak tom channel, so training on it may reproduce the problem rather than repair it. |
+| **Survey the alternatives to ADTOF** | one has been measured (ADT_STR, MICRO 0.673 against 0.882) and the rest have not. Every open ADT model with published weights, on the same 23 tracks, same scoring code, same bootstrap — published whether or not anything wins. The tom ceiling says this channel is badly used rather than at a limit, which makes "is there a better transcriber" a real question rather than a hopeful one. |
 | ~~**Synthetic training data with realistic degradation**~~ | ❌ **closed 20 Sept as measured-unnecessary.** See below. |
 | **ENST as the acoustic counterweight** | it ships isolated close-mic tom stems, which is exactly what the stem-fusion stage consumes; unexplored |
 
@@ -157,6 +158,7 @@ nobody proposes them again without new evidence:
 | Tuning all five thresholds globally | overfitting — 0.848 held out against a stock 0.850 |
 | Lowering thresholds for soft beaters | 588 extra tom notes buy five real ones; helps mallets, harms brushes |
 | A density-aware tom threshold | an *oracle* density estimator still would not know the threshold: ρ = −0.057 |
+| Post-processing toms on all five channels | ranking improves to AUC 0.962 and F1 *falls*; calibration encodes the fitted corpus's class balance |
 | Suppressing snare bleed in the tom channel | +0.041 on MDB, −0.019 on ENST — trades recall for precision |
 | Learned pedal hi-hat classifier | does not transfer |
 | Learned ride/crash classifier | no better than the rule it replaced |

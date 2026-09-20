@@ -1566,6 +1566,40 @@ and 0.963 on ENST**, and fitted on ENST and tested on MDB it delivers **+0.028 [
 silencing a recording that does have toms costs every true positive it had, and a ranking
 that good says nothing about where to put the operating point.
 
+**And post-processing on the full activation vector is not the cheap fix either.** A
+threshold is a one-dimensional classifier: it scores each candidate by the tom channel
+alone. The obvious next question is whether the other four channels carry the missing
+distinction — and they do, which makes the failure more interesting rather than less.
+
+Taking tom picks at a deliberately low threshold as candidates (919 on MDB, 7.9% true;
+5883 on ENST, 36.8% true) and fitting on one corpus to report on the other:
+
+| scorer | held-out AUC | realised tom F1 | Δ against the shipped policy |
+|---|---|---|---|
+| tom activation alone — what a threshold uses | 0.894 | 0.606 | +0.016 [−0.149, +0.242] |
+| logistic regression | 0.936 | 0.603 | +0.014 [−0.147, +0.247] |
+| gradient boosting | **0.962** | **0.533** | **−0.056** [−0.177, +0.162] |
+
+**Ranking improves and decisions get worse.** The best separator is the worst in F1, and
+no interval clears zero. The mechanism is legible: a classifier's calibration encodes the
+class balance it was fitted on, ENST candidates are 36.8% true and MDB's are 7.9%, so a
+model confident on ENST keeps far too much on MDB — and keeps it *confidently*, which is
+why the better ranker loses by more.
+
+Note what the ceiling says, though. Perfect keep/drop on those candidates would give tom
+F1 **0.896 on MDB and 0.906 on ENST**, against 0.589 and 0.539 today. **This channel is
+not near a limit; it is badly used.** What is missing is not information but a
+per-recording prior — how many toms to expect — and ρ = −0.057 says density does not
+supply it.
+
+So: the threshold cannot say "none", and neither can a classifier that does not know how
+many toms to expect. That is one wall in two costumes.
+
+**None of this establishes that retraining fixes it**, and the temptation to read it that
+way is worth resisting. E-GMD's own toms are 7.49% of its onsets with 48.54% of them
+below velocity 60 — rare and quiet, the same profile that produces a weak tom channel in
+the first place. Whether training on it repairs the confusion or reproduces it is open.
+
 Kept as a negative result. `clamp(p98.5, TOM_FLOOR, TOM_CEILING)` stands, because nothing
 fitted honestly and tested out of sample beat it. And the whole question — two rounds of
 work across two machines — moves MICRO by **±0.001**, since toms are 90 of MDB's 7924
