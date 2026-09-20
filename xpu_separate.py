@@ -10,6 +10,10 @@ whatever device it is given and falls back on its own.
 So the change needed is four lines, applied here as a monkey patch so the installed
 package stays untouched and upgradable.
 
+The same hook does a second job: `force_cpu_audio_separator()` pins the separator to
+the CPU, because `if cuda / elif mps / else cpu` has no way to be told "the CPU,
+please", and `drum2midi --device cpu` therefore did not apply to this stage at all.
+
 What is deliberately NOT assumed: that it will be faster. Conv2d measured 7.7x faster on
 this GPU, but the model also runs STFT, complex arithmetic and attention, and an
 integrated GPU shares bandwidth with the CPU. This script measures end-to-end time and
@@ -59,6 +63,38 @@ def patch_audio_separator() -> bool:
     Separator.setup_torch_device = setup_torch_device
     Separator._xpu_patched = True
     return xpu_available()
+
+
+def force_cpu_audio_separator() -> None:
+    """Pins audio-separator to the CPU whatever the machine has.
+
+    The opposite errand to the patch above and the same hook, which is why it lives
+    here: this module is the one place that knows the name of the method
+    audio-separator picks its device in, and a rename upstream should break one file.
+
+    It is needed because the library has no CPU option at all -- `audio-separator
+    --help` offers DirectML and fp16 and nothing for the CPU -- and chooses for itself
+    with `if cuda / elif mps / else cpu`. So `drum2midi --device cpu` reached every
+    stage except the separator, which is the longest of them.
+
+    CUDA_VISIBLE_DEVICES is the usual advice and is not good enough. The empty string
+    that gets quoted everywhere leaves torch.cuda.is_available() True on torch 2.14 --
+    measured, not assumed -- `-1` does work for CUDA but says nothing about MPS or
+    XPU, and patching the choice covers all three.
+    """
+    from audio_separator.separator.separator import Separator
+
+    if getattr(Separator, "_cpu_patched", False):
+        return
+
+    def setup_torch_device(self, system_info):
+        self.torch_device_cpu = torch.device("cpu")
+        self.torch_device = torch.device("cpu")
+        self.onnx_execution_provider = ["CPUExecutionProvider"]
+        self.logger.info("pinned to CPU by drum2midi --device cpu")
+
+    Separator.setup_torch_device = setup_torch_device
+    Separator._cpu_patched = True
 
 
 def describe() -> None:

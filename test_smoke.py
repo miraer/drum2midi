@@ -398,6 +398,62 @@ def test_device_selection_is_per_stage():
 
 
 @test
+def test_device_cpu_reaches_the_separator():
+    """Choosing a device has to arrive at the separator, not merely be decided.
+
+    The test above asserts pick_devices("cpu") returns cpu for the separator, and it
+    always did. The choice was then dropped on the floor: _audio_separator used it
+    only to decide whether to apply the XPU patch, and the command it built for
+    audio-separator carried no device at all. The library then chose for itself and
+    logged "CUDA is available in Torch, setting Torch device to CUDA".
+
+    What exposed it was a benchmark, not a test. On a 4070 SUPER stage 2 took 26.6s
+    under --device cpu and 26.9s under --device auto, while stages 1 and 3 slowed by
+    4.1x and 3.7x as they should. The stage a GPU helps most was the one stage the
+    flag never reached, and it is 68% of the run.
+    """
+    import drum2midi
+
+    cmds = {d: drum2midi._separator_command(Path("a.wav"), "m.ckpt", Path("o"), d)
+            for d in ("cpu", "cuda", "auto")}
+    assert any("force_cpu_audio_separator" in part for part in cmds["cpu"]), (
+        f"--device cpu does not reach the separator: {cmds['cpu']}")
+    for dev in ("cuda", "auto"):
+        assert not any("force_cpu" in part for part in cmds[dev]), (
+            f"--device {dev} pins the separator to the CPU: {cmds[dev]}")
+    for dev, cmd in cmds.items():
+        assert "m.ckpt" in cmd, f"--device {dev} lost the model: {cmd}"
+
+    # And the patch has to actually pin the device, not merely be referenced.
+    try:
+        from audio_separator.separator.separator import Separator
+    except Exception:
+        return          # audio-separator not installed; the command assertions stand
+
+    import logging
+
+    import xpu_separate
+
+    original = Separator.setup_torch_device
+    try:
+        xpu_separate.force_cpu_audio_separator()
+
+        class _Probe:
+            logger = logging.getLogger("probe")
+
+        probe = _Probe()
+        Separator.setup_torch_device(probe, {})
+        assert str(probe.torch_device) == "cpu", (
+            f"the patch left the separator on {probe.torch_device}")
+        assert probe.onnx_execution_provider == ["CPUExecutionProvider"], (
+            f"onnx provider not pinned: {probe.onnx_execution_provider}")
+    finally:
+        Separator.setup_torch_device = original
+        if hasattr(Separator, "_cpu_patched"):
+            del Separator._cpu_patched
+
+
+@test
 def test_drum_names_and_note_names_in_overrides():
     """--notes kick=C1 must mean the same as --notes 35=36.
 
