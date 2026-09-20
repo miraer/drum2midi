@@ -100,9 +100,24 @@ def ffmpeg_advice() -> str:
             "only read at launch)")
 
 
-def install_core() -> None:
+def install_core() -> bool:
+    """Installs the core packages; False if the requirements install did not finish.
+
+    The return value matters because pip resolves the whole file and can fail on
+    one package having already installed others, which leaves a half-built
+    environment. That exit code used to be printed by run() and then ignored, so
+    the script carried on to [2/3], ended with the verification banner, and said
+    everything required was in place. Someone ended up without Pillow that way and
+    nothing reported it until a test errored out on `import PIL` much later.
+    """
     print("\n[1/3] Python packages")
-    pip("-r", str(ROOT / "requirements.txt"))
+    ok = pip("-r", str(ROOT / "requirements.txt")) == 0
+    if not ok:
+        print()
+        print(f"{BAD}requirements.txt did not install cleanly")
+        print("       Some packages may still have gone in, so the checks at the end")
+        print("       will pass for those and the environment is incomplete anyway --")
+        print("       read pip's error above rather than the summary below.")
 
     print("\n[2/3] ADTOF-pytorch (not on PyPI)")
     target = ROOT / "ADTOF-pytorch"
@@ -116,6 +131,8 @@ def install_core() -> None:
 
     print("\n[3/3] MDX23C drum separator")
     print("    downloads automatically on first conversion (~400 MB)")
+
+    return ok
 
 
 def install_larsnet() -> None:
@@ -248,6 +265,7 @@ def check() -> int:
                              ("mir_eval", "benchmarks only", False),
                              ("sklearn", "learned velocity models only", False),
                              ("PIL", "GUI icons and make_logo.py only", False),
+                             ("tqdm", "benchmark and training scripts only", False),
                              ("yaml", "LarsNet only", False)):
         ok = have(mod)
         if ok:
@@ -371,7 +389,7 @@ def main() -> int:
         print("git is required and was not found on PATH")
         return 1
 
-    install_core()
+    core_ok = install_core()
     if args.with_larsnet:
         install_larsnet()
     if args.with_render:
@@ -381,7 +399,8 @@ def main() -> int:
     elif _intel_gpu_present():
         print("\nAn Intel GPU was detected. Separation runs about 12x faster on it:")
         print(f"    {interpreter()} setup_env.py --with-intel-gpu")
-    return check()
+    rc = check()
+    return 1 if rc or not core_ok else 0
 
 
 if __name__ == "__main__":

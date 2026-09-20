@@ -635,8 +635,37 @@ def test_theme_palette_matches_the_logo():
 
     theme.py restates the logo's colours as hex strings, because make_logo works in
     RGB tuples and the GUI needs "#rrggbb". Restating them means they can disagree.
+
+    Pillow is blocked while make_logo is imported, because it is optional here and the
+    palette is tuples: reading it must not need the drawing library. It did -- a
+    top-level `from PIL import ...` meant this test raised ModuleNotFoundError instead
+    of comparing anything on an install without Pillow, and CI installs Pillow, so the
+    only machines that could notice were the ones not running it.
     """
-    import make_logo
+    import builtins
+    import sys
+
+    real_import = builtins.__import__
+
+    def without_pillow(name, *a, **kw):
+        if name == "PIL" or name.startswith("PIL."):
+            raise ImportError("simulated absence")
+        return real_import(name, *a, **kw)
+
+    saved = {k: v for k, v in sys.modules.items()
+             if k == "make_logo" or k.startswith("PIL")}
+    try:
+        for k in saved:
+            del sys.modules[k]
+        builtins.__import__ = without_pillow
+        import make_logo
+    finally:
+        builtins.__import__ = real_import
+        for k in list(sys.modules):
+            if k == "make_logo" or k.startswith("PIL"):
+                del sys.modules[k]
+        sys.modules.update(saved)
+
     import theme
     for name, rgb in (("base", make_logo.PAPER), ("ink", make_logo.INK),
                       ("accent", make_logo.WAVE)):
@@ -816,15 +845,12 @@ def test_own_clone_url_is_the_only_account_exemption():
         "a different repository under the same account must still be rejected"
 
 
-@test
-def test_a_required_package_is_not_quietly_optional():
-    """setup_env.check() must fail when something required is absent.
+def _doctor_packages():
+    """The (module, why, needed) table that setup_env.check() prints.
 
-    Requiredness used to be inferred with `optional = why != "required"`, so an
-    entry whose note elaborated -- "required for the default separator" -- compared
-    unequal and turned optional. Measured at the time: with audio_separator
-    unimportable, --check printed "everything required is in place" and exited 0.
-    This reads the table back and insists the prose and the flag agree.
+    Read out of the source rather than by calling check(), which probes the whole
+    machine. Two tests want it: one that the prose and the flag agree, one that it
+    covers everything requirements.txt installs.
     """
     import ast
     import inspect
@@ -841,10 +867,63 @@ def test_a_required_package_is_not_quietly_optional():
                 continue
             if isinstance(mod, str) and isinstance(needed, bool):
                 rows.append((mod, why, needed))
+    return rows
+
+
+@test
+def test_a_required_package_is_not_quietly_optional():
+    """setup_env.check() must fail when something required is absent.
+
+    Requiredness used to be inferred with `optional = why != "required"`, so an
+    entry whose note elaborated -- "required for the default separator" -- compared
+    unequal and turned optional. Measured at the time: with audio_separator
+    unimportable, --check printed "everything required is in place" and exited 0.
+    This reads the table back and insists the prose and the flag agree.
+    """
+    rows = _doctor_packages()
     assert rows, "could not read the package table out of setup_env.check()"
     for mod, why, needed in rows:
         assert why.startswith("required") == needed, (
             f"{mod} is described as {why!r} but needed={needed}")
+
+
+@test
+def test_setup_check_looks_for_every_requirement():
+    """Whatever requirements.txt installs, `setup_env.py --check` must look for.
+
+    The two lists drift apart silently, and in the direction that hurts: the doctor
+    never mentioned Pillow at all, so an install that had dropped it reported a
+    healthy environment, and the absence surfaced much later as `No module named
+    'PIL'` from a smoke test that has nothing to do with installing anything.
+    """
+    # requirements.txt names distributions; --check imports modules.
+    import_name = {"pillow": "PIL", "pyyaml": "yaml", "scikit-learn": "sklearn",
+                   "audio-separator": "audio_separator"}
+    # Installed but deliberately not checked, with the reason. Empty on purpose:
+    # audioread was the only candidate and it was dropped from requirements.txt
+    # outright rather than exempted here. An entry in this map is a decision; an
+    # omission from the doctor's table is not, which is the distinction being kept.
+    unchecked = {}
+
+    checked = {mod.lower() for mod, _, _ in _doctor_packages()}
+    missing = []
+    for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        dist = line
+        for sep in "<>=!~[;":
+            dist = dist.split(sep)[0]
+        dist = dist.strip().lower()
+        if dist in unchecked:
+            continue
+        if import_name.get(dist, dist).lower() not in checked:
+            missing.append(dist)
+    assert not missing, (
+        "requirements.txt installs these and setup_env.py --check never looks for "
+        f"them: {missing}")
+
+
 
 def main() -> int:
     global _tmp
