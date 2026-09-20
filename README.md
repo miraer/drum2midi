@@ -99,7 +99,10 @@ it. Nothing was extracted from its model files. Reproduce with
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
 On a second, independent corpus — all 95 files of IDMT-SMT-Drums, 7927 onsets — the same
-settings score **0.935**, so this is not tuned to one dataset.
+settings score **0.935**, so this is not tuned to one dataset. That check covers our
+number only: ReStem has only ever been run on the 23 MDB recordings, so the *comparison*
+rests on 21.8 minutes of audio from a single production series. What that does and does
+not threaten is measured in `corpus_representativeness.py`.
 
 Every number in this README comes from a script in this repo. Negative results are
 reported next to positive ones — a dozen ideas that sounded good were measured and
@@ -841,8 +844,20 @@ the same code (`compare_with_restem.py`).
 ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
 object before publication. Everything below was learned from the outside — from its
 exports, its `trigger_events.json`, its interface and its published user's guide — by
-people with an obvious stake in the answer. Three specific reasons to hold it loosely:
+people with an obvious stake in the answer. Five specific reasons to hold it loosely:
 
+- **The corpus is 21.8 minutes long and comes from one place.** All 23 recordings are
+  `MusicDelta_*` excerpts — one production series, median length 37 seconds, shortest 13.
+  They are not 23 independent sources; drummer, room and engineer are unknown and
+  plausibly shared, and nothing in the dataset lets anyone check. The bootstrap treats
+  them as 23 independent draws because there is no other option, not because it is known
+  to be true. `corpus_representativeness.py` reports this and tests what can be tested:
+  regrouping the tracks by genre and dropping a whole genre moves the delta by at most
+  0.015, against a published interval of ±0.032 — so *that* form of unrepresentativeness
+  does not reach the answer. Which is a narrower reassurance than it sounds.
+- **ReStem was never run on a second corpus.** Our own 0.935 on IDMT-SMT-Drums is a
+  second-corpus check on us alone; the comparison has none. The trial that made it
+  possible lapses on 26 September.
 - **Articulation thresholds were left at their defaults.** ReStem's hi-hat and tom
   classification boundaries are user-adjustable, and the vendor documents adjusting them
   when articulations land on the wrong note. We adjusted nothing, which is a fair
@@ -857,8 +872,9 @@ people with an obvious stake in the answer. Three specific reasons to hold it lo
   no timing figure from here is quoted as a comparison.
 
 What can be stated without qualification: nothing was extracted from their model files,
-and nothing of theirs is redistributed. The ReStem team have been sent these results and
-any correction they send gets applied here and labelled as a correction.
+and nothing of theirs is redistributed. The ReStem team have **not** been contacted yet —
+a letter is written and unsent, and publication deliberately did not wait for it. Any
+correction they send gets applied here and labelled as a correction.
 
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
