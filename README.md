@@ -1346,16 +1346,19 @@ The result that matters is not the F-measure:
 | Vogl CRNN-18 | 43 | 14.0% | 14.5% | **0.96×** |
 | ADTOF (ours) | 68 | 77.9% | 20.2% | **3.86×** |
 
-**Vogl's 18-class model reaches a tom F1 statistically indistinguishable from ours —
-0.562 against 0.589, −0.027 [−0.277, +0.208] — without making the error at all.** Same
-audio, same scorer, same circular-shift null.
+Vogl's 18-class model reaches a tom F1 statistically indistinguishable from ours — 0.562
+against 0.589, −0.027 [−0.277, +0.208] — with a fraction of the snare confusion at its
+own operating point.
 
-That is an existence proof, and it kills a framing this README carried. The snare-tom
-confusion was described as something that might be inherent to the task — toms and snares
-overlapping in the mid-band, with no re-partitioning escaping it. **A different model on
-identical audio simply does not make it.** The confusion is ADTOF's, not drum
-transcription's. It does not follow that training would fix ours; it does follow that a
-model without the pathology is a thing that exists rather than a thing one hopes for.
+**Read that with its caveat, which took a second measurement to find.** Both models were
+picked with their own native peak picker, and both subtract a moving average, which
+removes sustained elevation — precisely what snare bleed looks like in a tom channel. With
+a plain local-maximum picker the same comparison gives 1.85× for Vogl against 2.11× for
+us: the ordering survives, the magnitude does not. And on raw activations, with no picker
+at all, **Vogl's tom channel rises at snares more than ours does.** The difference is not
+whether the confusion exists but [where in the confidence range it
+sits](#-a-tom-threshold-that-adapts-to-how-tom-dense-the-material-is), which is the more
+useful finding and the one that explains our failures.
 
 Vogl is not a candidate to switch to: 211 seconds a track against 1.7 for ADTOF, a
 pure-numpy 2018 CRNN, and no licence advantage. It is useful as a control, and the
@@ -1687,13 +1690,44 @@ without separation changes **all 23 output files** (2808 snare notes against 250
 leaves the tom notes **bit-identical**: 134 estimates, 66 correct, the same bleed figures
 to a decimal. The separator neither causes this nor fixes it.
 
-**And it is not inherent to the task.** An earlier version of this section suggested it
-might be — toms and snares overlap in the mid-band, and no re-partitioning of a five-class
-vocabulary escapes that. [Vogl's 18-class
-model](#the-rest-of-the-alternatives-surveyed) falsifies it: on the same 23 tracks, same
-scorer, same null, it reaches a tom F1 indistinguishable from ours — 0.562 against 0.589 —
-with a lift of **0.96×** against our 3.86×. It does not make the error at all. So this is
-a property of the weights we use, in a model we do not train.
+**And it is not unique to us, but its shape is.** A correction is owed here: an earlier
+version of this section said Vogl's 18-class model "does not make the error at all", on a
+lift of 0.96× against our 3.86×. That was measured with each model's own peak picker, both
+of which subtract a moving average — and a moving average removes sustained elevation,
+which is exactly what a snare bleeding into a tom channel looks like. The headline was
+partly a property of the measurement.
+
+Measured without any picker or threshold, on the raw activations, **every model's tom
+channel rises at annotated snares** — and Vogl's rises more than ours:
+
+| tom activation | at snares | at toms | at random frames | snare / random |
+|---|---|---|---|---|
+| ADTOF (ours) | 0.0933 | 0.5834 | 0.0325 | **2.87×** |
+| Vogl 8-class | 0.0192 | 0.3314 | 0.0052 | **3.71×** |
+| Vogl 18-class, three tom voices | 0.006–0.011 | 0.119–0.133 | 0.002–0.003 | 3.34–4.31× |
+
+What differs is **how the confusion survives thresholding**. Sweeping the threshold and
+plotting the lift against how many toms each model emits:
+
+| tom estimates emitted | ADTOF lift | Vogl 18-class lift |
+|---|---|---|
+| ~1590 / ~490 | 1.85× | 3.03× |
+| ~85 | **3.53×** | **1.85×** |
+| ~34 / ~45 | **6.00×** | **0.59×** |
+
+**Ours rises as we emit fewer toms. Theirs falls.** ADTOF's snare-confused tom detections
+are among its *most confident*, so raising the threshold preferentially keeps them. Vogl's
+confident tom detections are genuinely toms, so raising the threshold preferentially
+discards its confused ones.
+
+That is a worse fact about our model than the one first published, and a more useful one:
+**it explains why every output-side fix in this section failed.** There is no operating
+point that removes our confusion, because our confusion lives where the confidence is.
+
+It is the weights rather than the vocabulary. Vogl's 8-class model has a single tom
+channel exactly like ours and behaves like its 18-class sibling — 2.76× at 566 estimates
+falling to 1.05× at 104. Splitting toms into three voices is not what avoids the
+concentration, so a vocabulary change on a retrained ADTOF would not inherit it for free.
 
 Suppressing it — keeping a tom onset only
 where the tom activation beats snare and kick — gains +0.041 [+0.002, +0.106] on MDB and
