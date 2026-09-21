@@ -143,10 +143,21 @@ foreach ($t in $Tracks) {
     $paths += '"' + $p + '"'
 }
 
-$before = @{}
 $watch = Join-Path $root "restem_export"
-Get-ChildItem $watch -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
-    ForEach-Object { $before[$_.FullName] = $true }
+
+# Progress is "how many of MY tracks have a MIDI written since the queue started", not
+# "how many paths are new". Those differ whenever a track is rendered a second time --
+# a re-render overwrites a path that already existed, so the old test counted it as
+# nothing and a queue of seventeen sat at six while thirteen were on disk. Asking about
+# the queued tracks by name and by timestamp is correct either way.
+function Queue-Done([datetime] $since) {
+    $n = 0
+    foreach ($t in $Tracks) {
+        $m = Join-Path $watch "$t\$t`_midi.mid"
+        if ((Test-Path $m) -and ((Get-Item $m).LastWriteTime -gt $since)) { $n++ }
+    }
+    $n
+}
 
 Say "=== queue: $($Tracks.Count) file(s), mode '$mode'"
 $win = Get-RestemWindow
@@ -191,10 +202,9 @@ function Renderer-Cpu {
 $hardQuiet = 50   # 25 minutes at 30 s a turn
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
-    $now = @(Get-ChildItem $watch -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
-             Where-Object { -not $before.ContainsKey($_.FullName) })
-    if ($now.Count -ne $seen) {
-        $seen = $now.Count
+    $now = Queue-Done $t0
+    if ($now -ne $seen) {
+        $seen = $now
         $quiet = 0
         $stuckFor = 0
         Say ("{0} of {1} done after {2:N1} min" -f $seen, $Tracks.Count,
@@ -244,9 +254,10 @@ foreach ($t in $Tracks) {
     if ($sameDir) { break }
     $src = Join-Path $watch $t
     if (-not (Test-Path $src)) { continue }
-    $fresh = @(Get-ChildItem $src -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
-               Where-Object { -not $before.ContainsKey($_.FullName) })
-    if (-not $fresh.Count) { continue }     # pre-existing render, not ours to move
+    $m = Join-Path $src "$t`_midi.mid"
+    # Same test as the progress counter, for the same reason: a re-render overwrites an
+    # existing path, so asking whether the path is new would leave it behind.
+    if (-not ((Test-Path $m) -and ((Get-Item $m).LastWriteTime -gt $t0))) { continue }
     $dst = Join-Path $outDir $t
     if (Test-Path $dst) { Say "refusing to overwrite $t in $Out"; continue }
     Move-Item -LiteralPath $src -Destination $dst
