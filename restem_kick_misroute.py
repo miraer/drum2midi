@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -79,6 +80,59 @@ def pitches_of(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return kick, other
 
 
+def pitch_profile(names: list[str], shift: float) -> None:
+    """Which pitches sit near an annotated kick, and which of them move with the option.
+
+    The counts above cannot distinguish a misrouted kick from a drum that simply happens
+    to be struck at the same moment: snare and hi-hat coincide with the kick constantly,
+    and would show up near kick onsets under any labelling. The hi-hat row is therefore
+    the control. If the option were shifting labels wholesale, it would move too.
+    """
+    drummer_one = [n for n in names
+                   if (ENST / "drummer_1" / "annotation" / f"{n}.txt").exists()]
+    if not drummer_one:
+        return
+
+    seen: dict[str, Counter] = {arm: Counter() for arm in ARMS}
+    total = 0
+    for arm, base in ARMS.items():
+        total = 0
+        for name in drummer_one:
+            ref, _ = annotated_kicks(name)
+            if ref is None:
+                continue
+            total += len(ref)
+            mid = base / name / f"{name}_midi.mid"
+            if not mid.exists():
+                continue
+            pm = pretty_midi.PrettyMIDI(str(mid))
+            notes = sorted((n.start + shift, n.pitch)
+                           for inst in pm.instruments for n in inst.notes)
+            times = np.array([t for t, _ in notes])
+            pitches = np.array([p for _, p in notes])
+            for k in ref:
+                idx = np.where(np.abs(times - k) <= WINDOW)[0]
+                for p in set(pitches[idx]):
+                    seen[arm][int(p)] += 1
+
+    if not total:
+        return
+    print(f"\ndrummer 1 only, {len(drummer_one)} recording(s), {total} annotated kicks")
+    print("share of annotated kicks with an event of each pitch within 50 ms")
+    print(f"\n{'pitch':>6}{'on':>8}{'off':>8}{'change':>10}   ")
+    print("-" * 42)
+    names_by_pitch = {35: "kick", 36: "kick", 38: "snare", 41: "low tom",
+                      42: "hi-hat", 44: "hi-hat", 46: "hi-hat", 49: "crash",
+                      51: "ride", 60: "other"}
+    for p in sorted(set(seen["Bleed Reduction on"]) | set(seen["off"])):
+        a = seen["Bleed Reduction on"][p] / total
+        b = seen["off"][p] / total
+        if max(a, b) < 0.05:
+            continue
+        label = names_by_pitch.get(p, "")
+        print(f"{p:>6}{a:>8.0%}{b:>8.0%}{a - b:>+10.0%}   {label}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -131,6 +185,8 @@ def main() -> int:
         r = max(t["ref"], 1)
         print(f"{arm:<20} kick on 35/36: {t['kick']}/{t['ref']} ({t['kick'] / r:.0%})"
               f"   annotated kicks landing on note 60: {t['hit']} ({t['hit'] / r:.0%})")
+
+    pitch_profile(both, args.shift)
 
     on, off = tot["Bleed Reduction on"], tot["off"]
     print()
