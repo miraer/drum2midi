@@ -217,21 +217,34 @@ def check() -> int:
     # own right. Relying on librosa to drag it in meant --check could report that
     # everything required was in place and then test_smoke.py would fail on `import
     # numpy` one line later, which is exactly what happened to someone.
-    for mod, why in (("torch", "required"), ("numpy", "required"),
-                     ("scipy", "required"), ("librosa", "required"),
-                     ("pretty_midi", "required"), ("mido", "required"),
-                     ("soundfile", "required"),
-                     ("audio_separator", "required for the default separator"),
-                     ("mir_eval", "benchmarks only"),
-                     ("sklearn", "learned velocity models only"),
-                     ("yaml", "LarsNet only")):
+    #
+    # Requiredness is a field of its own and is deliberately not inferred from the
+    # explanation. It used to be `optional = why != "required"`, so any entry whose
+    # note elaborated -- "required for the default separator" -- compared unequal and
+    # went quietly optional. Measured: with audio_separator unimportable, --check
+    # printed "everything required is in place" and exited 0, on a machine where the
+    # default separator could not run at all. onnxruntime is listed for the related
+    # reason that audio_separator imports it lazily, so checking the wrapper alone
+    # says nothing about whether separation can actually start.
+    for mod, why, needed in (("torch", "required", True),
+                             ("numpy", "required", True),
+                             ("scipy", "required", True),
+                             ("librosa", "required", True),
+                             ("pretty_midi", "required", True),
+                             ("mido", "required", True),
+                             ("soundfile", "required", True),
+                             ("audio_separator", "required for the default separator", True),
+                             ("onnxruntime", "required for the default separator", True),
+                             ("mir_eval", "benchmarks only", False),
+                             ("sklearn", "learned velocity models only", False),
+                             ("PIL", "GUI icons and make_logo.py only", False),
+                             ("yaml", "LarsNet only", False)):
         ok = have(mod)
-        optional = why != "required"
         if ok:
             print(f"{OK}{mod}")
         else:
-            print(f"{WARN if optional else BAD}{mod}  ({why})")
-            problems += 0 if optional else 1
+            print(f"{WARN if not needed else BAD}{mod}  ({why})")
+            problems += 1 if needed else 0
 
     print("\n  Models")
     if have("adtof_pytorch"):

@@ -797,6 +797,36 @@ def test_own_clone_url_is_the_only_account_exemption():
         "a different repository under the same account must still be rejected"
 
 
+@test
+def test_a_required_package_is_not_quietly_optional():
+    """setup_env.check() must fail when something required is absent.
+
+    Requiredness used to be inferred with `optional = why != "required"`, so an
+    entry whose note elaborated -- "required for the default separator" -- compared
+    unequal and turned optional. Measured at the time: with audio_separator
+    unimportable, --check printed "everything required is in place" and exited 0.
+    This reads the table back and insists the prose and the flag agree.
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    import setup_env
+    tree = ast.parse(textwrap.dedent(inspect.getsource(setup_env.check)))
+    rows = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Tuple) and len(node.elts) == 3:
+            try:
+                mod, why, needed = (ast.literal_eval(e) for e in node.elts)
+            except ValueError:
+                continue
+            if isinstance(mod, str) and isinstance(needed, bool):
+                rows.append((mod, why, needed))
+    assert rows, "could not read the package table out of setup_env.check()"
+    for mod, why, needed in rows:
+        assert why.startswith("required") == needed, (
+            f"{mod} is described as {why!r} but needed={needed}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
