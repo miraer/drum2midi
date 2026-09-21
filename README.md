@@ -1494,6 +1494,10 @@ But in practice:
 | drum2midi | **0.754** | 1495/1747 | 156/238 | **19/230** |
 | ReStem | 0.691 | 1591/1595 | 37/251 | **3/513** |
 
+Each cell is correct over *that system's own* events in the class, not over the reference:
+the annotation carries 1847 closed, 269 open and 523 pedal onsets. A reader took the 513
+for a reference count, so it is worth stating.
+
 Both fail on pedal. Our own measurement independently agrees: across 1102 annotated
 hi-hat hits the pedal chick is not separable from a closed hat in the stem (peak 0.0457
 vs 0.0466, centroid 11993 vs 12454, d' between 0.01 and 0.48).
@@ -2443,7 +2447,9 @@ python setup_env.py --check
 1. **Speed.** MDX23C runs ~15x slower than real time on a CPU; ~1.9x on an Intel GPU.
 2. **Toms** — F1 0.589 on MDB's 90 annotated onsets, and 0.539 on ENST's 2617, which
    is the figure to trust. Still the weakest class by a wide margin.
-3. **Pedal hi-hat** — 19 of 230. Not solved by anyone, including ReStem (3 of 513).
+3. **Pedal hi-hat** — 19 correct of the 230 events we label pedal, against ReStem's 3 of
+   513. The denominators are each system's own pedal output, not the reference, which
+   carries 523 pedal onsets. Not solved by anyone.
 4. **Ghost notes** — 0.718 vs ReStem's 0.747.
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.

@@ -45,7 +45,10 @@ stage, not the broken one.
 
 ### Pedal hi-hat
 
-19 of 230 here; 3 of 513 for ReStem. A separate measurement suggests it may not be there
+19 correct of the 230 events we label pedal; 3 of 513 for ReStem. Those denominators are
+each system's own pedal output rather than the reference, which carries 523 pedal onsets —
+a reader took them for reference counts, so they are spelled out here. A separate
+measurement suggests it may not be there
 to find: across 1102 annotated hits the pedal chick and the closed hat differ by peak
 0.0457 against 0.0466 and centroid 11993 against 12454, with d′ between 0.01 and 0.48.
 Published as a probable limit of the signal rather than a defect, but it has not been
