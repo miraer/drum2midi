@@ -235,8 +235,9 @@ def tracked_files() -> list[Path]:
     return [ROOT / line.strip() for line in out.stdout.splitlines() if line.strip()]
 
 
-def scan(paths: list[Path]) -> tuple[list, list]:
+def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, int]:
     fatal, warn = [], []
+    read = 0
 
     for path in paths:
         # A file outside the repository is a normal thing to check -- a draft held
@@ -259,7 +260,15 @@ def scan(paths: list[Path]) -> tuple[list, list]:
         if MEDIA.search(rel) and any(ord(c) > 127 for c in rel):
             fatal.append((rel, 0, "media file with a non-ASCII name", rel))
 
-        if not TEXT.search(rel) or not path.exists():
+        # The extension list decides what gets read, which is right for a whole-tree
+        # sweep and wrong for a file somebody named on purpose. A commit message is
+        # the case that exposed it: `.git/COMMIT_EDITMSG` has no extension, so the
+        # commit-msg hook handed it over, the tool reported "checked 1 file(s)", and a
+        # machine path in the message passed the gate untouched. Naming a file is a
+        # request to read it.
+        if not path.exists():
+            continue
+        if not TEXT.search(rel) and not explicit:
             continue
         # This file defines the patterns, so it necessarily contains them. It is the
         # one exemption, and it is by exact name rather than by a rule anything else
@@ -270,6 +279,7 @@ def scan(paths: list[Path]) -> tuple[list, list]:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
+        read += 1
 
         for n, line in enumerate(lines, 1):
             if ALLOW.search(line):
@@ -289,7 +299,7 @@ def scan(paths: list[Path]) -> tuple[list, list]:
                     fatal.append((rel, n, f"machine or account name '{name}'",
                                   line.strip()[:70]))
                     break
-    return fatal, warn
+    return fatal, warn, read
 
 
 def main() -> int:
@@ -310,8 +320,14 @@ def main() -> int:
         print("nothing to check")
         return 0
 
-    fatal, warn = scan(paths)
-    print(f"checked {len(paths)} file(s)")
+    fatal, warn, read = scan(paths, explicit=bool(args.files))
+    # "checked N" used to count files the scanner had only looked at the name of, so a
+    # skipped file read as an inspected one. Say how many were actually opened.
+    if read == len(paths):
+        print(f"checked {len(paths)} file(s)")
+    else:
+        print(f"checked {len(paths)} file(s), {read} read for content "
+              f"({len(paths) - read} not a text type)")
 
     # Only meaningful for a real commit: an explicit file list or --all is someone
     # asking about content, not about what is being published.

@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Runs the same privacy gate over the commit message that pre-commit runs over the
+# staged files.
+#
+# The message was an unguarded channel. `pre-commit` checks file contents, so a machine
+# path or an account name in a commit message went straight to a public repository with
+# nothing objecting -- and commit messages here are long and quote paths, which is
+# exactly the habit that produces one. `git commit --amend` made it worse: with nothing
+# newly staged the file gate passes vacuously and reports "nothing to check", which
+# reads like approval of a commit it never inspected.
+#
+# Wired up by the same one-off as the other hook:
+#
+#     git config core.hooksPath hooks
+#
+# To commit anyway, in the rare case where the gate is wrong:
+#
+#     git commit --no-verify
+#
+# Prefer fixing the check over reaching for that, since a gate people routinely bypass
+# is not a gate.
+
+set -e
+
+msg="$1"
+[ -n "$msg" ] || exit 0
+
+for py in .venv/Scripts/python.exe .venv/bin/python python3 python; do
+    if [ -x "$py" ] || command -v "$py" >/dev/null 2>&1; then
+        if "$py" check_privacy.py "$msg"; then
+            exit 0
+        fi
+        echo "commit-msg: the message above was rejected, not the files" >&2
+        exit 1
+    fi
+done
+
+echo "commit-msg: no python found, skipping check_privacy.py" >&2
+exit 0

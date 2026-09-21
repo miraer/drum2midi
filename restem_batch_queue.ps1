@@ -167,5 +167,29 @@ while ((Get-Date) -lt $deadline) {
     }
 }
 
-Say ("=== queue end after {0:N1} min, {1} new file(s) in {2}" -f
-     ((Get-Date) - $t0).TotalMinutes, $seen, $Out)
+Say ("=== queue end after {0:N1} min, {1} new file(s)" -f
+     ((Get-Date) - $t0).TotalMinutes, $seen)
+
+# ReStem writes where its own dialog points, which is restem_export, and -Out did not
+# reach it: the parameter used to create an empty folder and the closing line then named
+# that folder as the location of the results. That is how two arms of a comparison end up
+# pooled in one directory -- which happened, and was caught only because a drummer-3 batch
+# in Best+ landed on top of nine renders made in the other mode. Names and timestamps
+# separated them that time. Rather than trust that twice, the run now moves its own output
+# out of the shared folder, so each arm is isolated by construction.
+$moved = 0
+foreach ($t in $Tracks) {
+    $src = Join-Path $watch $t
+    if (-not (Test-Path $src)) { continue }
+    $fresh = @(Get-ChildItem $src -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
+               Where-Object { -not $before.ContainsKey($_.FullName) })
+    if (-not $fresh.Count) { continue }     # pre-existing render, not ours to move
+    $dst = Join-Path $outDir $t
+    if (Test-Path $dst) { Say "refusing to overwrite $t in $Out"; continue }
+    Move-Item -LiteralPath $src -Destination $dst
+    $moved++
+}
+Say ("=== {0} of {1} render(s) moved into {2}" -f $moved, $seen, $Out)
+if ($moved -ne $seen) {
+    Say "WARNING: $seen file(s) appeared but $moved moved - check $watch for strays"
+}
