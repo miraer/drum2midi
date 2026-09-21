@@ -101,12 +101,33 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--own-ci", action="store_true",
                     help="also bootstrap our own per-class F1, not just the difference")
+    ap.add_argument("--exclude", default=None,
+                    help="comma-separated track names, or a file of them, to drop before "
+                         "bootstrapping -- for asking what the margin is without a "
+                         "particular failure of theirs carrying part of it")
     args = ap.parse_args()
 
     tracks = collect_tracks()
     if not tracks:
         print("MDB Drums not found; see the Install section of README.md")
         return 1
+
+    if args.exclude:
+        path = Path(args.exclude)
+        raw = path.read_text(encoding="utf-8") if path.exists() else args.exclude
+        drop = {n.strip().replace("_Drum", "") for n in raw.replace(",", "\n").splitlines()
+                if n.strip()}
+        before = len(tracks)
+        tracks = [t for t in tracks if t[0].stem.replace("_Drum", "") not in drop]
+        gone = before - len(tracks)
+        if gone != len(drop):
+            # Silently dropping nothing because a name was mistyped would produce the
+            # unexcluded number under an excluded heading, which is worse than an error.
+            print(f"--exclude named {len(drop)} track(s) but {gone} matched; "
+                  f"check the names", file=sys.stderr)
+            return 1
+        print(f"excluded {gone} track(s): {', '.join(sorted(drop))}")
+        print(f"{len(tracks)} track(s) remain\n")
 
     ours = per_track(args.ours, tracks)
     theirs = per_track(args.theirs, tracks)

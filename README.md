@@ -898,8 +898,28 @@ the same code (`compare_with_restem.py`).
 ReStem's developers had no part in it, have not reviewed it, and had no opportunity to
 object before publication. Everything below was learned from the outside — from its
 exports, its `trigger_events.json`, its interface and its published user's guide — by
-people with an obvious stake in the answer. Seven specific reasons to hold it loosely:
+people with an obvious stake in the answer. Eight specific reasons to hold it loosely:
 
+- **A fifth of the headline rests on four tracks where ReStem emits no hi-hat at all.**
+  `MusicDelta_Hendrix`, `MusicDelta_Reggae`, `MusicDelta_Rock` and `MusicDelta_Zeppelin`
+  produce **zero** hi-hat events against 34 to 64 annotated onsets each — while kick and
+  snare on those same tracks come back very nearly exact. It is not a mode effect: both
+  offline arms are equally silent, so this is ReStem producing nothing on 17% of the
+  corpus rather than a setting chosen badly. Corpus hi-hat recall of 89% hides it because
+  nineteen live tracks absorb four dead ones. Dropping them, via
+  `significance.py --exclude`:
+
+  | | all 23 | the 19 |
+  |---|---|---|
+  | MICRO | +0.048 [+0.023, +0.083] | **+0.038** [+0.014, +0.066] |
+  | hi-hat | +0.113 [+0.049, +0.216] | **+0.081** [+0.024, +0.160] |
+  | cymbals | +0.109 [+0.013, +0.382] | +0.109 [+0.015, +0.323] |
+
+  All three rows stay significant, so the conclusion survives the sensitivity analysis.
+  But a fifth of the MICRO margin and over a quarter of the hi-hat margin is a failure of
+  theirs rather than a quality difference, and the headline number does not say so. The
+  second machine found this by asking a per-track question of a corpus figure that had
+  already been checked and called clean.
 - **Some rows rest on far fewer recordings than the table implies.** The onset counts are
   not the sample size. Toms appear in 7 of the 23 recordings and one of them carries a
   third of them; cymbals have 1,002 onsets but an effective sample of 4.5 recordings, with

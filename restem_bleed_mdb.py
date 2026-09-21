@@ -63,6 +63,7 @@ def main() -> int:
     tot = {"ref": 0}
     per_arm = {a: {"est": 0, "tp": 0} for a in ARMS}
     collapsed: list[str] = []
+    silent: list[str] = []
 
     for t in tracks:
         # renders are named <track>_Drum.mid; annotations are <track>_class.txt
@@ -87,7 +88,18 @@ def main() -> int:
         # while the other keeps it. Flag it per track; do not let a mean hide it.
         if b[1] >= 5 and a[1] <= 0.2 * b[1]:
             collapsed.append(t)
-        mark = "  <-- collapse" if t in collapsed else ""
+        # A track dead in BOTH arms is invisible to that test, because it compares the
+        # arms to each other and not to the annotation. Four MDB tracks emit zero hi-hat
+        # in either mode, and this script's first version called that "no collapse" --
+        # true, and the wrong question. Those four carry 8 points of corpus hi-hat recall
+        # and nineteen live tracks absorb them.
+        if len(ref) >= 20 and a[0] == 0 and b[0] == 0:
+            silent.append(t)
+        mark = ""
+        if t in collapsed:
+            mark = "  <-- collapse"
+        elif t in silent:
+            mark = "  <-- silent in both"
         name = t if len(t) <= 33 else t[:30] + "..."
         print(f"{name:<34}{len(ref):>6}{a[0]:>8}{b[0]:>8}"
               f"{a[1] / max(len(ref), 1):>8.0%}{b[1] / max(len(ref), 1):>8.0%}{mark}")
@@ -110,11 +122,22 @@ def main() -> int:
         print(f"{len(collapsed)} track(s) collapse in Best+: {', '.join(collapsed)}")
         print("This is the ENST signature and it reproduces on MDB.")
     else:
-        print(f"No track collapses. The ENST {cls} failure does not reproduce on MDB,")
-        print("so the published MDB comparison is not measuring that bug.")
+        print(f"No track collapses between the modes. The ENST {cls} failure is not")
+        print("mode-specific here, so the published MDB comparison is not measuring it.")
         d = (bp["tp"] - ap["tp"]) / max(r, 1)
         print(f"Recall difference across the corpus: {d:+.1%} "
               f"(Better minus Best+), on {r} annotated onsets.")
+
+    if silent:
+        # Reported separately and unconditionally, because "no collapse" is a statement
+        # about the two modes agreeing and says nothing about whether either works.
+        n_ref = sum(1 for _ in silent)
+        print()
+        print(f"But {n_ref} track(s) emit NO {cls} at all, in EITHER mode:")
+        for t in silent:
+            print(f"  {t}")
+        print("That is not a mode effect. It is ReStem producing nothing on those")
+        print("recordings, and any comparison with ReStem on one side carries it.")
     return 0
 
 
