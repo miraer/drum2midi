@@ -99,13 +99,33 @@ if ($mode -ne $Expect) { Say "mode is '$mode' but '$Expect' was expected - refus
 # Matching case-sensitively and refusing anything in the top 150 pixels closed it a
 # third time.
 #
-# Restarting is safe, verified, and keeps the quality mode, which the application
-# remembers. So when Load is missing the script restarts rather than clicking: a
-# restart costs twenty seconds and a mis-click costs the run.
+# Restarting is safe and keeps the quality mode -- but only if ReStem is asked to close
+# rather than killed. The mode lives in memory and is written to its settings file on a
+# clean exit: `Stop-Process -Force` discards it, and this script used to do exactly that
+# while a comment here claimed the application remembered. It did not. The guard below
+# is the only reason that never produced renders filed under the wrong arm.
+#
+# WM_CLOSE via CloseMainWindow() exits in about two seconds and updates the settings
+# file. Force is kept as a fallback for a hung renderer, where the mode is lost anyway
+# and the guard will catch it.
 if (-not (Find-ByName (Get-RestemWindow) "Load")) {
     Say "Load is unavailable -- restarting ReStem rather than clicking anything"
-    $p = Get-Process -Name "ReStem*" -ErrorAction SilentlyContinue
-    foreach ($proc in $p) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+    foreach ($proc in @(Get-Process -Name "ReStem 2" -ErrorAction SilentlyContinue)) {
+        $null = $proc.CloseMainWindow()
+        for ($i = 0; $i -lt 15; $i++) {
+            Start-Sleep -Seconds 1
+            if (-not (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue)) { break }
+        }
+        if (Get-Process -Id $proc.Id -ErrorAction SilentlyContinue) {
+            Say "  it would not close on request; forcing, and the mode will be lost"
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        } else {
+            Say "  closed cleanly, so the quality mode is saved"
+        }
+    }
+    foreach ($proc in @(Get-Process -Name "restem_offline" -ErrorAction SilentlyContinue)) {
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    }
     Start-Sleep -Seconds 5
     & (Join-Path $root "restem_launch.ps1") | ForEach-Object { Say "  $_" }
     Start-Sleep -Seconds 3
@@ -216,7 +236,12 @@ Say ("=== queue end after {0:N1} min, {1} new file(s)" -f
 # separated them that time. Rather than trust that twice, the run now moves its own output
 # out of the shared folder, so each arm is isolated by construction.
 $moved = 0
+$sameDir = ((Resolve-Path $outDir).Path.TrimEnd('\') -eq (Resolve-Path $watch).Path.TrimEnd('\'))
+if ($sameDir) {
+    Say "-Out is the folder ReStem already writes to, so nothing needs moving"
+}
 foreach ($t in $Tracks) {
+    if ($sameDir) { break }
     $src = Join-Path $watch $t
     if (-not (Test-Path $src)) { continue }
     $fresh = @(Get-ChildItem $src -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
@@ -228,6 +253,6 @@ foreach ($t in $Tracks) {
     $moved++
 }
 Say ("=== {0} of {1} render(s) moved into {2}" -f $moved, $seen, $Out)
-if ($moved -ne $seen) {
+if (-not $sameDir -and $moved -ne $seen) {
     Say "WARNING: $seen file(s) appeared but $moved moved - check $watch for strays"
 }

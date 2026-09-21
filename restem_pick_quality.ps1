@@ -17,6 +17,13 @@
 #   4. the dropdown is not a separate top-level window either. Invoking the selector
 #      adds no window to the desktop root, so there is no popup to search.
 #
+# So a human sets it -- ONCE. The mode is held in memory and written to ReStem's own
+# settings file on a clean exit, so it survives restarts as long as the application is
+# asked to close rather than killed. Closing it with Stop-Process -Force throws the
+# setting away and the next launch comes back in whatever was last saved, which is how
+# an afternoon was spent believing the mode "did not stick".
+# Close with CloseMainWindow(); it exits in about two seconds and writes the file.
+#
 # What remains is a human clicking it. The launcher and the batch queue both read the
 # label and refuse to start when it does not match what was asked for, so a wrong mode
 # cannot silently produce renders filed under the wrong arm.
