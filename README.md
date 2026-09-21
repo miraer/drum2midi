@@ -748,7 +748,7 @@ spurious detections. On ENST **93%** of false toms are real drum hits assigned t
 class, and on MDB **100%** — 68 of 68 in the shipped output, with no phantom at all. And
 the confusion has a shape: it is with the other **membranes**, not with the kit in general.
 
-| origin of a false tom | MDB, 23 recordings | ENST, the declared 60 |
+| origin of a false tom | MDB, 68 false toms | ENST, 406 false toms |
 |---|---|---|
 | kick + snare, share of false toms | 88% | 91% |
 | their share of all onsets | 53.5% | 59% |
@@ -757,34 +757,32 @@ the confusion has a shape: it is with the other **membranes**, not with the kit 
 
 Metal is under-represented by more than half on both, while being the more common onset
 class. The classifier has learned to tell a membrane from a cymbal and has not learned
-which membrane. The second machine measured the same thing on a different sample — all
-210 ENST recordings, 849 misclassifications — and got a membrane lift of 1.45×, with the
-share holding at 88/69/84% across the three kits while the snare share alone swings
-58/38/38 and does not survive the split. Two samples and two scorers; the figures differ
-by sample and the direction does not.
+which membrane. The claim rests on the ENST column and on the second machine's larger
+sample — all 210 recordings, 849 misclassifications, membrane lift 1.45×, holding at
+88/69/84% across the three kits while the snare share alone swings 58/38/38 and does not
+survive the split. The MDB column is 68 events and corroborates rather than carries.
 
-**But on ENST the larger gap is recall, and that is the part ReStem does not share.**
-Scoring both systems the same way on the declared 60, 1 401 annotated tom onsets:
+**But on ENST the gap is recall, and it is the only part of it that clears zero.**
+Both systems on the declared 60, 1 401 annotated tom onsets, bootstrapped the same way as
+everything else here:
 
-| | ours | ReStem |
-|---|---|---|
-| tom events emitted | 1 085 | **2 405** |
-| matched to a reference onset | 648 | **1 236** |
-| tom precision | **0.597** | 0.514 |
-| tom recall | 0.463 | **0.882** |
-| tom F1 | 0.521 | **0.650** |
-| membrane lift among false toms | 1.54× | **1.39×** |
+| | ours | ReStem | difference | 95% over recordings | over drummers |
+|---|---|---|---|---|---|
+| tom precision | 0.597 | 0.514 | +0.083 | [−0.023, +0.207] | [−0.214, +0.120] |
+| **tom recall** | 0.463 | 0.882 | **−0.420** | **[−0.509, −0.308]** | **[−0.560, −0.329]** |
+| tom F1 | 0.521 | 0.650 | −0.128 | [−0.231, −0.011] | [−0.279, −0.096] |
+| tom events emitted | 1 085 | 2 405 | | | |
+| membrane lift among false toms | 1.54× | 1.39× | | | |
 
-Their false toms carry the same membrane bias ours do — 1.39× against our 1.54× — so the
-confusion is not something they solved and we did not. What separates the two systems is
-that **they emit toms and we do not**: more than twice as many tom events, catching 88% of
-the reference against our 46%, at *worse* precision than ours. On a corpus where toms are
-5.8% of onsets rather than MDB's 1.1%, under-emission costs far more than misclassification
-does.
+**Recall is the whole of it.** The apparent precision advantage does not clear zero under
+either resampling, so we cannot claim the other half of the trade — only the deficit. We
+find 46% of the toms in this corpus and they find 88%.
 
-An earlier version of this section had it the other way round, from MDB alone, where
-ReStem's false toms show no membrane bias at all (0.90×). That rests on 52 misclassified
-events against ENST's 1 070 and does not survive the larger corpus.
+Their false toms carry the same membrane bias ours do — 1.54× against 1.39× — so the
+confusion described above is not something they solved and we did not. What separates the
+two systems on this class is that they emit toms and we do not: more than twice as many
+events, at a precision we cannot show is better than theirs. MDB is no help here and says
+so loudly; that is [taken up below](#the-four-kinds-of-recording-are-not-the-same-material).
 
 One sub-case is visible on MDB, which ships articulation labels: **ghost notes become toms
 at 12%, against 3% for plain snare strokes**. A ghost note is a very quiet stroke with
@@ -826,17 +824,31 @@ MDB holds 90 tom onsets in 23 recordings, 1.1% of its annotations; ENST holds 1 
 is what `TOM_FLOOR` exists to prevent, and the adaptive policy is already the compromise
 between them rather than a mistake on the way to one.
 
-So the difference from ReStem on this class is partly a choice of operating point and
-partly not, and the two corpora separate the two. On ENST they emit 1.72 tom events per
-reference tom and accept 51% precision while we emit 0.77 and keep 60%: that is a
-trade, and on material where toms are 5.8% of onsets theirs is the better side of it.
-On MDB there is no trade to point at — **they beat us on precision and recall at once**,
-0.566 and 0.767 against our 0.493 and 0.733, while emitting *fewer* tom events than we do
-(1.36× the reference count against our 1.49×). Their tom F1 is also near-identical on the
-two corpora, 0.651 and 0.650, where ours moves 0.589 to 0.521.
+So what separates us from ReStem on this class is measurable on ENST and not on MDB, and
+on ENST it is emission. They emit 1.72 tom events per reference tom and we emit 0.77. It
+is tempting to call that a trade — their recall against our precision — but the precision
+half does not clear zero, so the honest version is one-sided: they emit more and find far
+more, and we cannot show we are paying less for it.
 
-Calling the whole of it conservatism would be flattering ourselves. On the smaller corpus
-we emit more and score worse, which is a gap rather than a preference.
+**MDB cannot say anything about this class and we should stop asking it to.** It holds 90
+tom onsets in 7 of its 23 recordings. The corpus-level difference there is **−0.062
+[−0.268, +0.193]** — the interval printed in the table at the top of this section — and it
+amounts to **three matched events**, 66 against 69. Resampling only the tom-bearing tracks
+gives [−0.198, +0.076]. The residue is two tracks disagreeing: ReStem takes `Beatles` by
+six matches, we take `Grunge` by seven, and the other five sit near zero. Which sign the
+corpus lands on is which of those two a resample happens to draw.
+
+An earlier version of this paragraph read the same MDB numbers as "they beat us on
+precision and recall at once — a gap rather than a preference", from 0.566/0.767 against
+0.493/0.733. That is the three events above, stated as though it were a finding, with the
+interval that refutes it already published twelve lines higher. The second machine caught
+it. It is the exact failure the confidence-interval rule exists to prevent, made on the
+corpus most likely to invite it.
+
+The same caution applies to anything drawn from the pair: comparing tom F1 across the two
+corpora, ours 0.589 and 0.521 against theirs 0.651 and 0.650, invites a story about whose
+numbers are stable across material. One of those four figures carries an interval of ±0.23.
+Two points, one of them that noisy, is not evidence of robustness in either direction.
 
 The four kinds of recording are not the same material, and toms do not score the same
 across them:
