@@ -825,11 +825,17 @@ MDB holds 90 tom onsets in 23 recordings, 1.1% of its annotations; ENST holds 1 
 is what `TOM_FLOOR` exists to prevent, and the adaptive policy is already the compromise
 between them rather than a mistake on the way to one.
 
-So the difference from ReStem on this class is a choice of operating point as much as a
-difference in ability: they emit 1.72 tom events per reference tom and accept 51%
-precision; we emit 0.77 and keep 60%. On material where toms are 5.8% of onsets theirs is
-the better bet, and it is the corpus we are measured on. That is worth saying plainly
-rather than presenting our conservatism as accuracy.
+So the difference from ReStem on this class is partly a choice of operating point and
+partly not, and the two corpora separate the two. On ENST they emit 1.72 tom events per
+reference tom and accept 51% precision while we emit 0.77 and keep 60%: that is a
+trade, and on material where toms are 5.8% of onsets theirs is the better side of it.
+On MDB there is no trade to point at — **they beat us on precision and recall at once**,
+0.566 and 0.767 against our 0.493 and 0.733, while emitting *fewer* tom events than we do
+(1.36× the reference count against our 1.49×). Their tom F1 is also near-identical on the
+two corpora, 0.651 and 0.650, where ours moves 0.589 to 0.521.
+
+Calling the whole of it conservatism would be flattering ourselves. On the smaller corpus
+we emit more and score worse, which is a gap rather than a preference.
 
 The four kinds of recording are not the same material, and toms do not score the same
 across them:
