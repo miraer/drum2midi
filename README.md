@@ -748,7 +748,7 @@ spurious detections. On ENST **93%** of false toms are real drum hits assigned t
 class, and on MDB **100%** — 68 of 68 in the shipped output, with no phantom at all. And
 the confusion has a shape: it is with the other **membranes**, not with the kit in general.
 
-| origin of a false tom | MDB | ENST |
+| origin of a false tom | MDB, 23 recordings | ENST, the declared 60 |
 |---|---|---|
 | kick + snare, share of false toms | 88% | 91% |
 | their share of all onsets | 53.5% | 59% |
@@ -757,10 +757,11 @@ the confusion has a shape: it is with the other **membranes**, not with the kit 
 
 Metal is under-represented by more than half on both, while being the more common onset
 class. The classifier has learned to tell a membrane from a cymbal and has not learned
-which membrane. The second machine measured this independently on 849 ENST
-misclassifications across three drummers, where the membrane share is 88/69/84% per kit —
-above baseline on every one — while the snare share alone swings 58/38/38 and does not
-survive the split.
+which membrane. The second machine measured the same thing on a different sample — all
+210 ENST recordings, 849 misclassifications — and got a membrane lift of 1.45×, with the
+share holding at 88/69/84% across the three kits while the snare share alone swings
+58/38/38 and does not survive the split. Two samples and two scorers; the figures differ
+by sample and the direction does not.
 
 **But on ENST the larger gap is recall, and that is the part ReStem does not share.**
 Scoring both systems the same way on the declared 60, 1 401 annotated tom onsets:
@@ -796,6 +797,7 @@ ADTOF's labels, and E-GMD is not ADTOF's training set.
 **Five remedies aimed at the misclassification were measured and none survived**, which is
 part of why this is written up as a limitation rather than fixed. None of them addresses
 the recall gap, which on ENST is the larger of the two problems:
+
 | | why it fails |
 |---|---|
 | lower the threshold | admits more of the same wrong drums |
@@ -807,12 +809,11 @@ the recall gap, which on ENST is the larger of the two problems:
 `tom_failure_probe.py`, `grid_filter_probe.py`, `class_confusion_probe.py` and
 `stem_confirm_validate.py` produce each of those rows.
 
-**And the recall half is an operating point, not a defect.** The onsets where we emit
-nothing are not inaudible to the model: at 239 missed ENST tom onsets the raw tom
-activation has a median of **0.444**, against a threshold of 0.45, so the signal is there
-and the cut is above it. The obvious inference — lower the cut — is wrong, and the two
-corpora say so in opposite directions. Taking the threshold that is optimal on ENST
-(0.16) and applying it to MDB, which was never used to choose it:
+**And the missed toms are not inaudible to the model.** At 239 missed ENST tom onsets the
+raw tom activation has a median of **0.444**, against a threshold of 0.45, so the signal
+is there and the cut sits just above it. The obvious inference — lower the cut — is wrong,
+and the two corpora say so in opposite directions. Taking the threshold that is optimal on
+ENST (0.16) and applying it to MDB, which was never used to choose it:
 
 | tom threshold | emitted | matched | precision | recall | F1 |
 |---|---|---|---|---|---|
