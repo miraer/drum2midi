@@ -80,13 +80,19 @@ def pitches_of(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return kick, other
 
 
-def pitch_profile(names: list[str], shift: float) -> None:
+def pitch_profile(names: list[str], shift: float) -> dict[str, dict[int, float]] | None:
     """Which pitches sit near an annotated kick, and which of them move with the option.
 
     The counts above cannot distinguish a misrouted kick from a drum that simply happens
     to be struck at the same moment: snare and hi-hat coincide with the kick constantly,
     and would show up near kick onsets under any labelling. The hi-hat row is therefore
     the control. If the option were shifting labels wholesale, it would move too.
+
+    Returns the per-pitch shares so the verdict can be drawn on this population. It used
+    to return nothing, and the verdict below was computed on the whole corpus while this
+    table showed drummer 1 -- so the table said the kick had moved and the last line said
+    it had not. Both were right about different populations, and the reader believes the
+    last line.
     """
     drummer_one = [n for n in names
                    if (ENST / "drummer_1" / "annotation" / f"{n}.txt").exists()]
@@ -131,6 +137,8 @@ def pitch_profile(names: list[str], shift: float) -> None:
             continue
         label = names_by_pitch.get(p, "")
         print(f"{p:>6}{a:>8.0%}{b:>8.0%}{a - b:>+10.0%}   {label}")
+
+    return {arm: {p: seen[arm][p] / total for p in seen[arm]} for arm in ARMS}
 
 
 def main() -> int:
@@ -186,11 +194,22 @@ def main() -> int:
         print(f"{arm:<20} kick on 35/36: {t['kick']}/{t['ref']} ({t['kick'] / r:.0%})"
               f"   annotated kicks landing on note 60: {t['hit']} ({t['hit'] / r:.0%})")
 
-    pitch_profile(both, args.shift)
+    prof = pitch_profile(both, args.shift)
 
     on, off = tot["Bleed Reduction on"], tot["off"]
     print()
+    # Corpus-wide: does the option null the kick across every drummer?
     moved = on["kick"] < 0.5 * on["ref"] <= off["kick"] and on["hit"] > off["hit"]
+    # Drummer 1 only, the population the table above describes. The control pitches
+    # have to stay put: if hi-hat and ride moved as well, this would be a wholesale
+    # relabelling rather than the kick going to the wrong stem.
+    moved_one = False
+    if prof:
+        a, b = prof["Bleed Reduction on"], prof["off"]
+        kick_gone = b.get(36, 0) > 0.5 and a.get(36, 0) < 0.1 * b.get(36, 1)
+        other_gained = a.get(60, 0) - b.get(60, 0) > 0.3
+        controls_still = all(abs(a.get(p, 0) - b.get(p, 0)) < 0.1 for p in (42, 51))
+        moved_one = kick_gone and other_gained and controls_still
     if args.shift:
         # Under the null control the verdict must not be reachable. An earlier version
         # printed it anyway, because displaced events still agree with the annotation
@@ -201,11 +220,20 @@ def main() -> int:
               f"and {off['hit'] / max(off['ref'], 1):.0%} with it off.")
         print("Compare against the undisplaced run; this arm of the test is meant to")
         print("fail, and no conclusion is drawn from it.")
-    elif moved:
-        print("The kick leaves pitch 35/36 and appears on pitch 60 when the option is on,")
-        print("on the same audio. It is being attributed to the wrong stem, not lost.")
     else:
-        print("The paired contrast does not show the kick moving to pitch 60 here.")
+        if moved_one:
+            print("On drummer 1 the kick leaves pitch 35/36 and appears on pitch 60 when")
+            print("the option is on, on the same audio, while hi-hat and ride stay put.")
+            print("It is being attributed to the wrong stem there, not lost.")
+        if moved:
+            print("Across every drummer the option also nulls the kick channel.")
+        elif moved_one:
+            print("Across every drummer it does not: the corpus keeps "
+                  f"{on['kick'] / max(on['ref'], 1):.0%} of its kick events with the "
+                  "option on, so this is a per-kit failure and the aggregate hides it.")
+        if not (moved or moved_one):
+            print("The paired contrast does not show the kick moving to pitch 60, either")
+            print("on drummer 1 or across the corpus.")
     return 0
 
 
