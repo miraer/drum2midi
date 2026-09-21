@@ -778,6 +778,36 @@ everything else here:
 either resampling, so we cannot claim the other half of the trade — only the deficit. We
 find 46% of the toms in this corpus and they find 88%.
 
+**Where the missed toms go.** 753 onsets go missing and each one falls into exactly one of
+three mechanisms, checked in an order that makes the partition unambiguous
+(`tom_recall_autopsy.py`):
+
+| why a missed tom was missed | count | of misses |
+|---|---|---|
+| **rejected by the threshold** | **419** | **56%** |
+| another class won | 253 | 34% |
+| the model never responds | 81 | 11% |
+
+Nothing lands in the picker's other two rejection paths — no tom is lost for failing to be
+a local maximum or for being merged into a neighbouring pick. The model is genuinely
+silent at only 11%.
+
+So more than half the deficit is the decision stage discarding a response the model made.
+That invites lowering the threshold, and the reason it does not work is visible in what
+those onsets look like. The picker thresholds `act − moving_average(act, 100 ms)`:
+
+| | n | raw activation | local mean | after subtraction | threshold |
+|---|---|---|---|---|---|
+| toms we do emit | 648 | 0.758 | 0.201 | **0.524** | 0.450 |
+| rejected by the threshold | 419 | 0.594 | 0.221 | **0.326** | 0.450 |
+
+Two things push them under at once. The model is **less confident** to begin with — 0.594
+against 0.758 — and **more of that response is eaten by its own context**, 43% against 27%,
+because a tom in a fill is preceded by 100 ms of tom. The rejected onsets are not strong
+responses caught by a badly set cut; they are weaker responses in denser passages. Dropping
+the cut far enough to admit a 0.326 admits everything else at that level too, which is
+exactly what happens to MDB below.
+
 Their false toms carry the same membrane bias ours do — 1.54× against 1.39× — so the
 confusion described above is not something they solved and we did not. What separates the
 two systems on this class is that they emit toms and we do not: more than twice as many
