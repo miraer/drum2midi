@@ -147,10 +147,22 @@ $t0 = Get-Date
 $deadline = $t0.AddMinutes($TimeoutMinutes)
 $seen = 0
 $quiet = 0
+$lastCpu = $null
 # The dialog closes when the batch STARTS, not when it ends -- an earlier version read
 # that as completion and reported the run finished after 16 seconds. Completion is
 # instead "no new output for long enough", measured against the folder ReStem writes
 # one subdirectory per track into.
+#
+# "Long enough" cannot be a fixed silence, though. ReStem renders in a separate process,
+# restem_offline, and a long recording can exceed any quiet window that is short enough
+# to be useful -- this loop once declared the run over at 2 of 8 while that process was
+# sitting at 99% of a core, six tracks still to go. So silence only counts while the
+# renderer is idle: if its CPU time is still climbing, it is working and the wait resets.
+function Renderer-Cpu {
+    $p = @(Get-Process -Name "restem_offline" -ErrorAction SilentlyContinue)
+    if (-not $p.Count) { return $null }
+    ($p | Measure-Object -Property CPU -Sum).Sum
+}
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
     $now = @(Get-ChildItem $watch -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
@@ -162,8 +174,21 @@ while ((Get-Date) -lt $deadline) {
              ((Get-Date) - $t0).TotalMinutes)
         if ($seen -ge $Tracks.Count) { break }
     } else {
-        $quiet++
-        if ($quiet -ge 20) { Say "no new output for 10 minutes - stopping"; break }
+        $cpu = Renderer-Cpu
+        if ($null -ne $cpu -and $null -ne $lastCpu -and ($cpu - $lastCpu) -gt 1) {
+            if ($quiet -ge 4) {
+                Say ("still rendering: restem_offline took {0:N0}s of CPU in the last " +
+                     "{1:N1} min, so the wait resets" -f ($cpu - $lastCpu), ($quiet * 0.5))
+            }
+            $quiet = 0
+        } else {
+            $quiet++
+            if ($quiet -ge 20) {
+                Say "no new output for 10 minutes and the renderer is idle - stopping"
+                break
+            }
+        }
+        $lastCpu = $cpu
     }
 }
 
