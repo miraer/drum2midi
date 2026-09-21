@@ -1,5 +1,7 @@
 # drum2midi
 
+[![tests](https://github.com/miraer/drum2midi/actions/workflows/tests.yml/badge.svg)](https://github.com/miraer/drum2midi/actions/workflows/tests.yml)
+
 ![drum2midi](docs/banner.png)
 
 Convert a mixed drum recording into MIDI, using only open-source models.
