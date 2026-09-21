@@ -152,6 +152,25 @@ FORBIDDEN = [
 MEDIA = re.compile(r"\.(wav|mp3|flac|aiff?|m4a|ogg|opus|mid|midi)$", re.I)
 TEXT = re.compile(r"\.(py|pyw|md|txt|json|ya?ml|ps1|sh|bat|cfg|ini|toml|gitignore)$", re.I)
 
+# Extensions are a fast path, not the decision. The repository's own git hooks are
+# extensionless shell scripts, so a machine path written into one of them was invisible
+# to a check that matched on name -- as was a commit message, which is what found this.
+# Anything small enough to read and free of NUL bytes is treated as text regardless of
+# what it is called.
+TEXT_SNIFF_BYTES = 64 * 1024
+
+
+def looks_textual(path: Path) -> bool:
+    if TEXT.search(path.name):
+        return True
+    try:
+        if path.stat().st_size > TEXT_SNIFF_BYTES:
+            return False
+        head = path.read_bytes()
+    except OSError:
+        return False
+    return b"\0" not in head
+
 # Publishing something is a decision, and this is where the decision gets made rather
 # than assumed. A file of one of these kinds appearing in a commit for the first time
 # is stopped until a human has put it in .publish-allow.
@@ -260,15 +279,15 @@ def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, int]:
         if MEDIA.search(rel) and any(ord(c) > 127 for c in rel):
             fatal.append((rel, 0, "media file with a non-ASCII name", rel))
 
-        # The extension list decides what gets read, which is right for a whole-tree
-        # sweep and wrong for a file somebody named on purpose. A commit message is
-        # the case that exposed it: `.git/COMMIT_EDITMSG` has no extension, so the
-        # commit-msg hook handed it over, the tool reported "checked 1 file(s)", and a
-        # machine path in the message passed the gate untouched. Naming a file is a
-        # request to read it.
+        # The extension list is a fast path, not the decision. A file somebody named on
+        # purpose is always read; anything else is read when it sniffs as text. A commit
+        # message exposed the old behaviour -- COMMIT_EDITMSG has no extension, so an
+        # explicit check of it reported "checked 1 file(s)" while reading nothing, and a
+        # machine path in the message passed untouched. The repository's own git hooks
+        # are extensionless too, and were equally invisible.
         if not path.exists():
             continue
-        if not TEXT.search(rel) and not explicit:
+        if not explicit and not looks_textual(path):
             continue
         # This file defines the patterns, so it necessarily contains them. It is the
         # one exemption, and it is by exact name rather than by a rule anything else
