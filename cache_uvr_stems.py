@@ -39,10 +39,27 @@ def complete(dest: Path) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
+    # The cache was MDB-only, which was fine while MDB was the only corpus with stems.
+    # Validating a stem-based rule needs the other corpus to fit on, and a second copy
+    # of this script differing by one path is how two caches drift apart.
+    ap.add_argument("--audio", type=Path, default=AUDIO,
+                    help="directory of wav files to separate (default: MDB drum_only)")
+    ap.add_argument("--cache", type=Path, default=CACHE,
+                    help="where to write the stems (default: bench/uvr_stems)")
+    ap.add_argument("--only", type=Path, default=None,
+                    help="file listing track stems to separate, one per line")
     args = ap.parse_args()
 
-    tracks = sorted(AUDIO.glob("*.wav"))[: args.limit]
-    todo = [w for w in tracks if not complete(CACHE / w.stem)]
+    cache = args.cache
+    tracks = sorted(args.audio.glob("*.wav"))
+    if args.only:
+        wanted = {n.strip() for n in args.only.read_text().splitlines() if n.strip()}
+        tracks = [w for w in tracks if w.stem in wanted]
+        missing = wanted - {w.stem for w in tracks}
+        if missing:
+            print(f"not found in {args.audio}: {len(missing)} of {len(wanted)}")
+    tracks = tracks[: args.limit]
+    todo = [w for w in tracks if not complete(cache / w.stem)]
     print(f"{len(tracks)} tracks, {len(tracks) - len(todo)} already cached, "
           f"{len(todo)} to separate")
     if not todo:
@@ -54,7 +71,7 @@ def main() -> int:
     if patch_audio_separator():
         print("  separator: Intel GPU (XPU)")
 
-    CACHE.mkdir(parents=True, exist_ok=True)
+    cache.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="uvrcache_"))
     t0 = time.time()
     try:
@@ -62,7 +79,7 @@ def main() -> int:
                         log_level=40)
         sep.load_model(model_filename=MODEL)
         for i, wav in enumerate(todo, 1):
-            dest = CACHE / wav.stem
+            dest = cache / wav.stem
             dest.mkdir(parents=True, exist_ok=True)
             produced = sep.separate(str(wav))
             kept = 0
@@ -84,8 +101,8 @@ def main() -> int:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    size = sum(f.stat().st_size for f in CACHE.rglob("*.flac")) / 1024 / 1024
-    print(f"\ncached {len(list(CACHE.iterdir()))} tracks, {size:.0f} MB -> {CACHE}")
+    size = sum(f.stat().st_size for f in cache.rglob("*.flac")) / 1024 / 1024
+    print(f"\ncached {len(list(cache.iterdir()))} tracks, {size:.0f} MB -> {cache}")
     return 0
 
 
