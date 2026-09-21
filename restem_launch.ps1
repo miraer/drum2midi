@@ -76,7 +76,37 @@ while ((Get-Date) -lt $deadline) {
     $btns = Get-Buttons $w
     $names = @($btns | ForEach-Object { $_.Current.Name })
 
-    if ($names -contains 'Load') { Say "main window is ready"; break }
+    # The trial prompt is checked FIRST, before anything else, because it overlays the
+    # main window rather than replacing it: Load is present in the tree underneath and
+    # an earlier version of this script declared the window ready while the prompt was
+    # still up and unanswered. Worse, that prompt carries a Close, and closing it
+    # instead of confirming quits the application -- which is what killed three runs
+    # before anyone noticed the dialog was there at all.
+    if (-not $confirmed) {
+        $hit = $null
+        foreach ($want in $CONFIRM) {
+            foreach ($b in $btns) { if ($b.Current.Name -ceq $want) { $hit = $b; break } }
+            if ($hit) { break }
+        }
+        if ($hit) {
+            Say ("confirming the startup prompt by pressing '" + $hit.Current.Name + "'")
+            $hit.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $confirmed = $true
+            Start-Sleep -Seconds 5
+            continue
+        }
+    }
+
+    if ($names -contains 'Load' -and $confirmed) { Say "main window is ready"; break }
+    if (($names -contains 'Load') -and -not ($names -contains 'Continue Trial')) {
+        # No prompt was ever seen and Load is live: the licence is already settled.
+        # The parentheses are load-bearing. Written as `-not $names -contains 'x'`,
+        # PowerShell binds -not to $names first, so the test reduces to
+        # `$false -contains 'x'` and the branch can never be taken -- which would hang
+        # this script to its deadline on any install that does not show the prompt.
+        Say "main window is ready, no startup prompt appeared"
+        break
+    }
 
     # A render in progress replaces Load with Stop, so the main window looks like an
     # unrecognised dialog full of choices. The mode text tells them apart: it is drawn

@@ -52,27 +52,24 @@ function Get-Elements {
 }
 
 function Find-DialogButton([string] $name) {
-    # Scoped by parent, not by name. `Close` is not unique -- the window's title bar
-    # has one too, and invoking the first match by name closed ReStem outright, which
-    # cost a restart and very nearly the mode setting with it. So: find the dialog's
-    # own `Change...` button, walk to its parent, and look only among that parent's
-    # descendants. Nothing outside the dialog can match.
+    # Scoped by geometry as well as by name, because neither alone is enough. `Close`
+    # exists twice: once on the dialog and once in the window chrome, in the same case,
+    # and invoking the chrome one shuts ReStem down -- which it did, twice, before this
+    # was written. The dialog's buttons sit well below the title bar; the chrome's do
+    # not. Anything in the top strip of the window is refused.
     $all = Get-Elements
     if (-not $all) { return $null }
-    $anchor = $null
+    $w = Get-RestemWindow
+    if (-not $w) { return $null }
+    $wr = $w.Current.BoundingRectangle
+    $floor = $wr.Y + 150
     foreach ($e in $all) {
-        if ($e.Current.Name -eq 'Change...' -and
-            $e.Current.ControlType.ProgrammaticName -eq 'ControlType.Button') { $anchor = $e; break }
-    }
-    if (-not $anchor) { return $null }
-    $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
-    $parent = $walker.GetParent($anchor)
-    if (-not $parent) { return $null }
-    $kids = $parent.FindAll([System.Windows.Automation.TreeScope]::Descendants,
-                            [System.Windows.Automation.Condition]::TrueCondition)
-    foreach ($k in $kids) {
-        if ($k.Current.Name -eq $name -and
-            $k.Current.ControlType.ProgrammaticName -eq 'ControlType.Button') { return $k }
+        if ($e.Current.ControlType.ProgrammaticName -ne 'ControlType.Button') { continue }
+        if ($e.Current.Name -cne $name) { continue }
+        $r = $e.Current.BoundingRectangle
+        if ($r.Y -lt $floor) { continue }          # title bar strip
+        if ($r.Width -le 0 -or $r.Height -le 0) { continue }
+        return $e
     }
     return $null
 }
@@ -95,13 +92,28 @@ function Current-Mode {
 $mode = Current-Mode
 if ($mode -ne $Expect) { Say "mode is '$mode' but '$Expect' was expected - refusing"; exit 1 }
 
-# A dialog left over from an earlier run holds its own queue and swallows the next
-# Load, so every later track reports a render error. Clear it before submitting.
-$stale = Find-DialogButton "Close"
-if ($stale) {
-    Say "closing a leftover Batch Process dialog"
-    $stale.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+# Leftover dialogs are NOT closed by this script any more, and the reason is worth the
+# space. `Close` appears twice in this window -- on the dialog and in the chrome -- in
+# the same case, and the dialog's caption is drawn so it cannot be used to tell them
+# apart. Matching by name closed ReStem. Matching case-sensitively closed it again.
+# Matching case-sensitively and refusing anything in the top 150 pixels closed it a
+# third time.
+#
+# Restarting is safe, verified, and keeps the quality mode, which the application
+# remembers. So when Load is missing the script restarts rather than clicking: a
+# restart costs twenty seconds and a mis-click costs the run.
+if (-not (Find-ByName (Get-RestemWindow) "Load")) {
+    Say "Load is unavailable -- restarting ReStem rather than clicking anything"
+    $p = Get-Process -Name "ReStem*" -ErrorAction SilentlyContinue
+    foreach ($proc in $p) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Seconds 5
+    & (Join-Path $root "restem_launch.ps1") | ForEach-Object { Say "  $_" }
     Start-Sleep -Seconds 3
+    $mode = Current-Mode
+    if ($mode -ne $Expect) {
+        Say "after the restart the mode reads '$mode', not '$Expect' - refusing"
+        exit 1
+    }
 }
 
 $paths = @()
