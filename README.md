@@ -743,6 +743,47 @@ far more tom-dense than anything in MDB. Buying the instrument immediately paid 
 itself: [it found that our tom threshold was capping its own
 output](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months).
 
+**What the tom errors actually are, and why no threshold reaches them.** They are not
+spurious detections. On ENST **90%** of false toms are real drum hits assigned the wrong
+class, and on MDB **100%** — 68 of 68 in the shipped output, with no phantom at all. And
+the confusion has a shape that reproduces on both corpora: it is with the other
+**membranes**, not with the kit in general.
+
+| origin of a false tom | MDB | ENST |
+|---|---|---|
+| kick + snare, share of false toms | 88.2% | 80.2% |
+| their share of all onsets | 53.5% | 55.4% |
+| **lift** | **1.65×** | **1.45×** |
+| hi-hat + cymbals, lift | 0.25× | 0.44× |
+
+Metal is under-represented by more than half on both, while being the more common onset
+class. The classifier has learned to tell a membrane from a cymbal and has not learned
+which membrane. The second machine measured this on 849 ENST misclassifications across
+three drummers, where the membrane share is 88/69/84% per kit — above baseline on every
+one — while the snare share alone swings 58/38/38 and does not survive the split.
+
+One sub-case is visible on MDB, which ships articulation labels: **ghost notes become toms
+at 12%, against 3% for plain snare strokes**. A ghost note is a very quiet stroke with
+almost no wire rattle and the drum's body tone dominant, which is what a tom sounds like.
+E-GMD's snare velocities are bimodal — two modes with a clear trough, across nine drummers
+and eight styles — so quiet strokes are a large share of what a snare does rather than an
+ornament. That is a hypothesis about what the model was taught, not a measurement of
+ADTOF's labels, and E-GMD is not ADTOF's training set.
+
+**Five remedies were measured and none survived**, which is the reason this is written up
+as a limitation rather than fixed:
+
+| | why it fails |
+|---|---|
+| lower the threshold | admits more of the same wrong drums |
+| require the onset to fall on the beat grid | a misclassified hit is played in time — phase error 0.071 against 0.036–0.111 for correct hits |
+| take the loudest activation instead of thresholding each class | at a false tom the snare column reads 0.057; it is not a close call the picker got wrong |
+| treat an isolated tom as suspicious | false toms cluster **more** than true ones, 6% isolated against 20%, because ghost notes repeat every bar |
+| confirm against the separated tom stem | fitted on MDB it looks decisive, 0.589 → 0.766; held out it gains **+0.006** on ENST and fitted on ENST itself it gains the same, so the separation is a property of MDB's isolated stems and not a policy |
+
+`tom_failure_probe.py`, `grid_filter_probe.py`, `class_confusion_probe.py` and
+`stem_confirm_validate.py` produce each of those rows.
+
 The four kinds of recording are not the same material, and toms do not score the same
 across them:
 
