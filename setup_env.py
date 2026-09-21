@@ -283,6 +283,13 @@ def check() -> int:
     print(f"{OK}FluidSynth" if fs else f"{WARN}FluidSynth  (render_midi.py only)")
     sf = ROOT / "tools" / "MuseScore_General.sf3"
     print(f"{OK}soundfont" if sf.exists() else f"{WARN}soundfont  (render_midi.py only)")
+    # ffmpeg is checked here and deliberately not listed in requirements.txt: it is a
+    # system program rather than a pip package, and nothing in the conversion path
+    # wants it -- audio is loaded with librosa. Only the demo tooling calls it
+    # (make_video.py, drive_gui.py, make_narration.ps1), which used to fail with a
+    # bare FileNotFoundError after a recording had already been set up.
+    print(f"{OK}ffmpeg" if shutil.which("ffmpeg")
+          else f"{WARN}ffmpeg  (demo video tooling only)")
 
     print("\n  Hardware")
     try:
