@@ -377,7 +377,7 @@ winget install Gyan.FFmpeg     # then open a new terminal, so PATH is re-read
 
 `brew install ffmpeg` on macOS, `sudo apt install ffmpeg` on Debian or Ubuntu.
 audio-separator — the default separator — runs `ffmpeg -version` before it does
-anything, so without it stage 2 of 4 cannot start. `--separator none` skips separation
+anything, so without it stage 2 of 4 cannot start. `--no-separate` skips separation
 altogether and does not need it, at the cost of flat velocity.
 
 `models/velocity.pkl` and `models/pedal.pkl` ship with the repository (2.3 MB). They are

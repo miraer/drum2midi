@@ -1272,7 +1272,7 @@ def convert_one(args, src: Path, out_path: Path) -> int:
         if detail:
             log(f"       {detail}")
         log(f"       {how}")
-        log("       Or run with --separator none to skip separation entirely; "
+        log("       Or run with --no-separate to skip separation entirely; "
             "velocity is then flat.")
         return 1
 
