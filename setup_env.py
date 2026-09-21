@@ -90,6 +90,16 @@ def have(module: str) -> bool:
                           capture_output=True, cwd=str(ROOT)).returncode == 0
 
 
+def ffmpeg_advice() -> str:
+    """How to install ffmpeg on this platform. From PR #1 by mykolad."""
+    if sys.platform == "darwin":
+        return "brew install ffmpeg"
+    if os.name != "nt":
+        return "sudo apt install ffmpeg   (or your distribution's equivalent)"
+    return ("winget install Gyan.FFmpeg   (then open a new terminal, because PATH is "
+            "only read at launch)")
+
+
 def install_core() -> None:
     print("\n[1/3] Python packages")
     pip("-r", str(ROOT / "requirements.txt"))
@@ -246,6 +256,24 @@ def check() -> int:
             print(f"{WARN if not needed else BAD}{mod}  ({why})")
             problems += 1 if needed else 0
 
+    # ffmpeg is a program rather than a package, so it cannot be a line in
+    # requirements.txt and does not go through have(). It is required all the same:
+    # audio_separator runs `ffmpeg -version` at startup and dies without it. Measured
+    # on a two-second clip with only ffmpeg's directory removed from PATH --
+    #
+    #   with ffmpeg:     wav ok, mp3 ok
+    #   without ffmpeg:  both fail, "UVR separator failed: FileNotFoundError [WinError 2]"
+    #
+    # so it is not merely a decoder for compressed input; plain wav fails too. An
+    # earlier version of this file called it "demo video tooling only" and let it
+    # warn, which was wrong on both counts.
+    if shutil.which("ffmpeg"):
+        print(f"{OK}ffmpeg")
+    else:
+        print(f"{BAD}ffmpeg  (required for the default separator)")
+        print(f"       {ffmpeg_advice()}")
+        problems += 1
+
     print("\n  Models")
     if have("adtof_pytorch"):
         print(f"{OK}ADTOF-pytorch")
@@ -283,13 +311,6 @@ def check() -> int:
     print(f"{OK}FluidSynth" if fs else f"{WARN}FluidSynth  (render_midi.py only)")
     sf = ROOT / "tools" / "MuseScore_General.sf3"
     print(f"{OK}soundfont" if sf.exists() else f"{WARN}soundfont  (render_midi.py only)")
-    # ffmpeg is checked here and deliberately not listed in requirements.txt: it is a
-    # system program rather than a pip package, and nothing in the conversion path
-    # wants it -- audio is loaded with librosa. Only the demo tooling calls it
-    # (make_video.py, drive_gui.py, make_narration.ps1), which used to fail with a
-    # bare FileNotFoundError after a recording had already been set up.
-    print(f"{OK}ffmpeg" if shutil.which("ffmpeg")
-          else f"{WARN}ffmpeg  (demo video tooling only)")
 
     print("\n  Hardware")
     try:
