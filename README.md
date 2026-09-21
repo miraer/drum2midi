@@ -15,6 +15,15 @@ https://github.com/user-attachments/assets/bd975252-bcd1-4494-be9c-3d4204996344
 in the repository at [`docs/pitch.mp4`](docs/pitch.mp4) for anyone reading this outside
 GitHub. The drum track is from the Groove MIDI Dataset, Magenta / Google, CC BY 4.0.</sub>
 
+> **The video predates two corrections below and has not been re-cut.** Its chart was drawn
+> against ReStem's weaker offline configuration: 0.820 where the current figure is 0.834, so
+> the margin on screen is **+0.062** where the published one is now **+0.048**. It says two
+> rows survive checking on MDB, which was true then — cymbals ran [−0.004, +0.373] and
+> contained zero. Against the stronger mode that row clears zero, so three survive. The video
+> also speaks only of the 23-recording corpus; the larger one says the two systems are level.
+> The tables below are current. The video is kept as it was rather than quietly re-rendered,
+> because it has been cited and a silently corrected recording is worse than a dated one.
+
 **Measured against [ReStem 2 Pro](https://restemapp.com/restem2)** — a $199 commercial
 product — on two hand-annotated corpora, in its best mode. **The answer depends on which
 corpus you ask:**
@@ -30,9 +39,11 @@ On the smaller corpus we are ahead and the interval clears zero. On the larger o
 and a half times the onsets, three kits in three rooms rather than one production series —
 the two systems are **level**, and the honest word is indistinguishable rather than "ahead
 by 0.002", because that interval comfortably contains a real loss. Both figures were
-measured the same way, against the same mode, with the same scorer, so the disagreement is
-a property of the corpora and not of the method. Neither is quoted anywhere without the
-other.
+measured the same way, by the same scorer, against ReStem's best offline separation; the
+two batches differ in one option, and [the table below](#the-same-comparison-on-a-larger-corpus-says-we-are-level)
+says which. The disagreement between the corpora is not explained by that option — it is
+worth +0.014 on MDB and nothing measurable on ENST. Neither figure is quoted anywhere
+without the other.
 
 One class goes clearly to ReStem and survives both bootstraps: **toms on ENST, −0.128
 [−0.231, −0.011]** — our clearest measured weakness, and [described below](#the-same-comparison-on-a-larger-corpus-says-we-are-level)
@@ -71,10 +82,11 @@ drift from the table. The last three rows have no interval and are not plotted.*
 
 That table is MDB. On **ENST-Drums** — 60 recordings declared before anything was
 rendered, 3 drummers, 18 814 onsets against MDB's 23 recordings and 7 924 — the same
-competitor, in the same mode, scored by the same code, comes out **level**:
+competitor, scored by the same code, comes out **level**:
 
 | | MDB, 23 recordings | ENST, 60 recordings |
 |---|---|---|
+| ReStem's mode | Best (Offline) + Bleed Reduction | Best (Offline), no Bleed Reduction |
 | onsets | 7 924 | **18 814** |
 | sources | one production series | 3 drummers, 3 rooms |
 | **MICRO, ours − theirs** | **+0.048** [+0.023, +0.083] | **+0.002** [−0.021, +0.027] |
@@ -83,6 +95,14 @@ competitor, in the same mode, scored by the same code, comes out **level**:
 | snare | −0.013 [−0.036, +0.010] | +0.007 [−0.025, +0.045] |
 | kick | +0.007 [−0.014, +0.037] | −0.029 [−0.079, +0.016] |
 | **toms** | −0.062 [−0.268, +0.193] | **−0.128 [−0.231, −0.011]** |
+
+**The two columns are not in the same ReStem mode, and that is stated rather than implied.**
+The batches were simply run that way. It is not what makes the corpora disagree: Bleed
+Reduction is worth +0.014 to ReStem on MDB and **+0.002 [−0.003, +0.005]** on the 26 ENST
+recordings held in both modes from the two kits where it behaves — no difference measured.
+It matters for one row only. The option empties drummer 1's kick entirely, and that kit is
+24 of these 60 recordings, so an ENST column rendered with it on would have a kick row that
+looks nothing like this one. `restem_bleed_enst.py`.
 
 **The honest word for the ENST column is "indistinguishable", not "ahead by 0.002".** The
 interval runs from −0.021 to +0.027 and comfortably contains a real loss. Nothing here
@@ -170,7 +190,8 @@ cymbal margins shrink to within noise and the tom margin hardens into a real los
 > **Its best mode is now the one measured, and it was not before.** These figures use
 > Best (Offline) + Bleed Reduction. All three offline modes were rendered across all 23
 > recordings on one machine: Better and Best (Offline) came out byte-identical on every
-> track, so that pair is settled, and Bleed Reduction is worth +0.014 MICRO to ReStem.
+> track, so that pair is settled, and Bleed Reduction is worth +0.014 MICRO to ReStem on
+> these 23 MDB recordings. On ENST it buys nothing measurable, +0.002 [−0.003, +0.005].
 > The earlier published figure of 0.820 was its weaker configuration and has been
 > restated rather than quietly replaced.
 >
@@ -1242,7 +1263,8 @@ people with an obvious stake in the answer. Eight specific reasons to hold it lo
   were using the weaker one.** All three offline modes have now been rendered across all
   23 recordings on a single machine. Better and Best (Offline) are byte-identical on
   every track, so that choice never cost ReStem anything. Best + Bleed Reduction is a
-  different matter: it is worth **+0.014 MICRO to ReStem**, 0.834 against 0.820, and the
+  different matter on this corpus: it is worth **+0.014 MICRO to ReStem** across these 23
+  MDB recordings, 0.834 against 0.820, and the
   published comparison had been measured against the weaker setting. The table has been
   restated. Two of the differences this changes are worth naming: Bleed Reduction gains
   ReStem the snare (0.845 → 0.857) and the hi-hat (0.754 → 0.779) and costs it the toms
