@@ -744,23 +744,46 @@ itself: [it found that our tom threshold was capping its own
 output](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months).
 
 **What the tom errors actually are, and why no threshold reaches them.** They are not
-spurious detections. On ENST **90%** of false toms are real drum hits assigned the wrong
+spurious detections. On ENST **93%** of false toms are real drum hits assigned the wrong
 class, and on MDB **100%** — 68 of 68 in the shipped output, with no phantom at all. And
-the confusion has a shape that reproduces on both corpora: it is with the other
-**membranes**, not with the kit in general.
+the confusion has a shape: it is with the other **membranes**, not with the kit in general.
 
 | origin of a false tom | MDB | ENST |
 |---|---|---|
-| kick + snare, share of false toms | 88.2% | 80.2% |
-| their share of all onsets | 53.5% | 55.4% |
-| **lift** | **1.65×** | **1.45×** |
-| hi-hat + cymbals, lift | 0.25× | 0.44× |
+| kick + snare, share of false toms | 88% | 91% |
+| their share of all onsets | 53.5% | 59% |
+| **lift** | **1.65×** | **1.54×** |
+| hi-hat + cymbals, lift | 0.25× | 0.22× |
 
 Metal is under-represented by more than half on both, while being the more common onset
 class. The classifier has learned to tell a membrane from a cymbal and has not learned
-which membrane. The second machine measured this on 849 ENST misclassifications across
-three drummers, where the membrane share is 88/69/84% per kit — above baseline on every
-one — while the snare share alone swings 58/38/38 and does not survive the split.
+which membrane. The second machine measured this independently on 849 ENST
+misclassifications across three drummers, where the membrane share is 88/69/84% per kit —
+above baseline on every one — while the snare share alone swings 58/38/38 and does not
+survive the split.
+
+**But on ENST the larger gap is recall, and that is the part ReStem does not share.**
+Scoring both systems the same way on the declared 60, 1 401 annotated tom onsets:
+
+| | ours | ReStem |
+|---|---|---|
+| tom events emitted | 1 085 | **2 405** |
+| matched to a reference onset | 648 | **1 236** |
+| tom precision | **0.597** | 0.514 |
+| tom recall | 0.463 | **0.882** |
+| tom F1 | 0.521 | **0.650** |
+| membrane lift among false toms | 1.54× | **1.39×** |
+
+Their false toms carry the same membrane bias ours do — 1.39× against our 1.54× — so the
+confusion is not something they solved and we did not. What separates the two systems is
+that **they emit toms and we do not**: more than twice as many tom events, catching 88% of
+the reference against our 46%, at *worse* precision than ours. On a corpus where toms are
+5.8% of onsets rather than MDB's 1.1%, under-emission costs far more than misclassification
+does.
+
+An earlier version of this section had it the other way round, from MDB alone, where
+ReStem's false toms show no membrane bias at all (0.90×). That rests on 52 misclassified
+events against ENST's 1 070 and does not survive the larger corpus.
 
 One sub-case is visible on MDB, which ships articulation labels: **ghost notes become toms
 at 12%, against 3% for plain snare strokes**. A ghost note is a very quiet stroke with
@@ -770,9 +793,9 @@ and eight styles — so quiet strokes are a large share of what a snare does rat
 ornament. That is a hypothesis about what the model was taught, not a measurement of
 ADTOF's labels, and E-GMD is not ADTOF's training set.
 
-**Five remedies were measured and none survived**, which is the reason this is written up
-as a limitation rather than fixed:
-
+**Five remedies aimed at the misclassification were measured and none survived**, which is
+part of why this is written up as a limitation rather than fixed. None of them addresses
+the recall gap, which on ENST is the larger of the two problems:
 | | why it fails |
 |---|---|
 | lower the threshold | admits more of the same wrong drums |
@@ -783,6 +806,30 @@ as a limitation rather than fixed:
 
 `tom_failure_probe.py`, `grid_filter_probe.py`, `class_confusion_probe.py` and
 `stem_confirm_validate.py` produce each of those rows.
+
+**And the recall half is an operating point, not a defect.** The onsets where we emit
+nothing are not inaudible to the model: at 239 missed ENST tom onsets the raw tom
+activation has a median of **0.444**, against a threshold of 0.45, so the signal is there
+and the cut is above it. The obvious inference — lower the cut — is wrong, and the two
+corpora say so in opposite directions. Taking the threshold that is optimal on ENST
+(0.16) and applying it to MDB, which was never used to choose it:
+
+| tom threshold | emitted | matched | precision | recall | F1 |
+|---|---|---|---|---|---|
+| shipped adaptive policy | 134 | 66 | 0.493 | 0.733 | **0.589** |
+| fixed 0.25 | 499 | 66 | 0.132 | 0.733 | 0.224 |
+| fixed 0.16, the ENST optimum | 722 | 71 | 0.098 | 0.789 | **0.175** |
+
+MDB holds 90 tom onsets in 23 recordings, 1.1% of its annotations; ENST holds 1 401 in
+60, 5.8%. A cut low enough to catch a tom fill buries a corpus that barely has toms, which
+is what `TOM_FLOOR` exists to prevent, and the adaptive policy is already the compromise
+between them rather than a mistake on the way to one.
+
+So the difference from ReStem on this class is a choice of operating point as much as a
+difference in ability: they emit 1.72 tom events per reference tom and accept 51%
+precision; we emit 0.77 and keep 60%. On material where toms are 5.8% of onsets theirs is
+the better bet, and it is the corpus we are measured on. That is worth saying plainly
+rather than presenting our conservatism as accuracy.
 
 The four kinds of recording are not the same material, and toms do not score the same
 across them:
