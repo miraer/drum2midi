@@ -83,6 +83,54 @@ def beater(name: str) -> str:
     return "other"
 
 
+def all_class_headroom(store, drum2midi, LABELS_5, PeakPicker) -> None:
+    """Is the headroom peculiar to toms, or does every class leave the same on the table?
+
+    Toms are the only class with an adaptive policy and the only class with a floor, so
+    a tom-only result says "fix the clamp". If snare, hi-hat and the rest show the same
+    gap on soft material, the fixed thresholds are the problem and no tom constant
+    repairs it. The distinction decides whether this is a one-line change or a redesign.
+    """
+    names = {0: "kick", 1: "snare", 2: "toms", 3: "hi-hat", 4: "cymbals"}
+    agg: dict[tuple[str, int], list[tuple[float, float]]] = {}
+    for beat, name, act, ref in store:
+        for col, cls in ((0, "KD"), (1, "SD"), (2, "TT"), (3, "HH"), (4, "CY")):
+            r = ref.get(cls, np.array([]))
+            if len(r) < 10:
+                continue
+            shipped = list(drum2midi.DEFAULT_THRESHOLDS)
+            est = PeakPicker(thresholds=shipped, fps=FPS).pick(
+                act[None, ...], labels=LABELS_5, label_offset=0)[0]
+            base = f1_at(r, np.array(sorted(est.get(LABELS_5[col], []))))
+            best = 0.0
+            for thr in SWEEP:
+                t = list(drum2midi.DEFAULT_THRESHOLDS)
+                t[col] = float(thr)
+                est = PeakPicker(thresholds=t, fps=FPS).pick(
+                    act[None, ...], labels=LABELS_5, label_offset=0)[0]
+                best = max(best, f1_at(r, np.array(sorted(est.get(LABELS_5[col], [])))))
+            agg.setdefault((beat, col), []).append((base, best))
+
+    print("\n\nheadroom by class and beater: default threshold against the best any "
+          "threshold reaches")
+    print(f"\n{'class':<10}" + "".join(f"{b:>22}" for b in
+                                       ("sticks", "rods", "brushes", "mallets")))
+    print("-" * 98)
+    for col in range(5):
+        line = f"{names[col]:<10}"
+        for b in ("sticks", "rods", "brushes", "mallets"):
+            sel = agg.get((b, col))
+            if not sel:
+                line += f"{'--':>22}"
+                continue
+            base = np.mean([s[0] for s in sel])
+            best = np.mean([s[1] for s in sel])
+            line += f"{base:>8.3f} ->{best:>7.3f} {best - base:>+6.3f}"
+        print(line)
+    print("\nIf toms stand alone the clamp is the fault. If every row gains as much on "
+          "soft\nbeaters, the fixed thresholds are, and no tom constant repairs that.")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -91,6 +139,9 @@ def main() -> int:
     ap.add_argument("--min-toms", type=int, default=10,
                     help="skip recordings with fewer annotated toms (default: 10)")
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--all-classes", action="store_true",
+                    help="sweep every class, not just toms -- answers whether the "
+                         "headroom is a tom-specific clamp or a thresholding problem")
     args = ap.parse_args()
 
     import drum2midi
@@ -112,6 +163,7 @@ def main() -> int:
 
     model = drum2midi._adtof_model(args.device)
     rows = []
+    rows_audio = []
     for b in ("sticks", "rods", "brushes", "mallets"):
         taken = 0
         for name, wav in picked.get(b, []):
@@ -151,6 +203,8 @@ def main() -> int:
             ours = f1_at(toms, np.array(sorted(est.get(tom_key, []))))
 
             rows.append((b, name, len(toms), at_tom, at_snare, ours, best, best_thr, pol))
+            if args.all_classes:
+                rows_audio.append((b, name, act, ref))
             print(f"  {b:<8} {name[:36]:<37} toms {len(toms):>4}  "
                   f"act {at_tom:.3f}  ours {ours:.3f}  oracle {best:.3f} @ {best_thr}")
 
@@ -194,6 +248,9 @@ def main() -> int:
         print("Soft beaters depress every activation -- see act@snare -- but the snare")
         print(f"threshold is {drum2midi.DEFAULT_THRESHOLDS[SNARE_COL]} and can follow them "
               f"down, while toms cannot go below {drum2midi.TOM_FLOOR}.")
+
+    if args.all_classes:
+        all_class_headroom(rows_audio, drum2midi, LABELS_5, PeakPicker)
     return 0
 
 
