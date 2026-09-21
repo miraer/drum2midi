@@ -14,7 +14,29 @@ in the repository at [`docs/pitch.mp4`](docs/pitch.mp4) for anyone reading this 
 GitHub. The drum track is from the Groove MIDI Dataset, Magenta / Google, CC BY 4.0.</sub>
 
 **Measured against [ReStem 2 Pro](https://restemapp.com/restem2)** — a $199 commercial
-product — on 23 hand-annotated recordings, **in its best mode**:
+product — on two hand-annotated corpora, in its best mode. **The answer depends on which
+corpus you ask:**
+
+| | MDB<br>23 recordings, 7 924 onsets<br>one production series | ENST-Drums<br>60 recordings, 18 814 onsets<br>3 drummers, 3 rooms |
+|---|---|---|
+| drum2midi | 0.882 | 0.837 |
+| ReStem 2 Pro | 0.834 | 0.835 |
+| **difference** | **+0.048** [+0.023, +0.083] | **+0.002** [−0.021, +0.027] |
+| | we are ahead | **indistinguishable** |
+
+On the smaller corpus we are ahead and the interval clears zero. On the larger one — two
+and a half times the onsets, three kits in three rooms rather than one production series —
+the two systems are **level**, and the honest word is indistinguishable rather than "ahead
+by 0.002", because that interval comfortably contains a real loss. Both figures were
+measured the same way, against the same mode, with the same scorer, so the disagreement is
+a property of the corpora and not of the method. Neither is quoted anywhere without the
+other.
+
+One class goes clearly to ReStem and survives both bootstraps: **toms on ENST, −0.128
+[−0.231, −0.011]** — our clearest measured weakness, and [described below](#the-same-comparison-on-a-larger-corpus-says-we-are-level)
+rather than buried.
+
+Per class on MDB, which is the corpus the rest of this section examines in detail:
 
 | | drum2midi | ReStem 2 Pro | 95% CI on the difference |
 |---|---|---|---|
@@ -43,6 +65,57 @@ product — on 23 hand-annotated recordings, **in its best mode**:
 *Drawn by `plot_comparison.py` from `significance.py`'s own output, so the picture cannot
 drift from the table. The last three rows have no interval and are not plotted.*
 
+### The same comparison on a larger corpus says we are level
+
+That table is MDB. On **ENST-Drums** — 60 recordings declared before anything was
+rendered, 3 drummers, 18 814 onsets against MDB's 23 recordings and 7 924 — the same
+competitor, in the same mode, scored by the same code, comes out **level**:
+
+| | MDB, 23 recordings | ENST, 60 recordings |
+|---|---|---|
+| onsets | 7 924 | **18 814** |
+| sources | one production series | 3 drummers, 3 rooms |
+| **MICRO, ours − theirs** | **+0.048** [+0.023, +0.083] | **+0.002** [−0.021, +0.027] |
+| hi-hat | +0.113 [+0.049, +0.216] | +0.015 [−0.015, +0.048] |
+| cymbals | +0.109 [+0.013, +0.382] | +0.056 [−0.018, +0.128] |
+| snare | −0.013 [−0.036, +0.010] | +0.007 [−0.025, +0.045] |
+| kick | +0.007 [−0.014, +0.037] | −0.029 [−0.079, +0.016] |
+| **toms** | −0.062 [−0.268, +0.193] | **−0.128 [−0.231, −0.011]** |
+
+**The honest word for the ENST column is "indistinguishable", not "ahead by 0.002".** The
+interval runs from −0.021 to +0.027 and comfortably contains a real loss. Nothing here
+retracts the MDB figure — both were measured correctly — but the two corpora disagree, and
+the one that disagrees is two and a half times larger, drawn from three kits in three rooms
+rather than one production series. A reader is entitled to know that the published headline
+depends on which corpus was chosen.
+
+**Toms are a real loss and the first difference on ENST that survives both bootstraps.**
+−0.128, clearing zero over recordings and over drummers. It is not a handful of bad tracks:
+of the 36 recordings carrying five or more annotated tom onsets, we lose on 23, win on 10
+and tie on 3. The worst are not close — `110_solo_brushes` has a hundred annotated tom
+onsets and scores 0.056 against ReStem's 0.779. Brush and mallet material is where our
+adaptive tom threshold meets an activation distribution it was not designed against, and
+that is upstream of any threshold tuning.
+
+**The tie is an average of three different answers**, which is the same trap as every other
+aggregate in this file:
+
+| drummer | recordings | ours | ReStem | |
+|---|---|---|---|---|
+| 1 | 24 | 0.703 | 0.754 | −0.051 |
+| 2 | 18 | 0.900 | 0.873 | +0.027 |
+| 3 | 18 | 0.897 | 0.878 | +0.019 |
+
+Ahead on two kits, behind on the hardest one. No cell there is individually resolved.
+
+Method: our side runs the shipped pipeline with separation; theirs is Best (Offline), the
+arm without Bleed Reduction. That option removes drummer 1's kick entirely on this corpus,
+so a comparison against it would be measuring that fault rather than the separator — it is
+written up for ReStem and will appear here once they have had it from us first.
+`score_enst_restem.py`; the declared sample is scored separately from anything else that
+finished, and both intervals are reported because the recording and the drummer are
+different units of variation.
+
 **Only three of those rows mean anything.** The intervals come from resampling the 23
 recordings 4000 times (`significance.py`), and every row whose interval contains zero is
 a difference this test set cannot resolve. The overall win is real, and it is carried
@@ -56,7 +129,8 @@ and unresolved margins, and the kick is a wash. A single aggregate figure invite
 reading that one system is better at drums; what these 23 recordings show is that one is
 better at cymbals and hi-hats on this material and the other is not worse anywhere it
 matters. The second machine, scoring the same renders with an independently written
-scorer, reached the same shape.
+scorer, reached the same shape. On ENST even that narrower claim weakens: the hi-hat and
+cymbal margins shrink to within noise and the tom margin hardens into a real loss.
 
 > **⚠ These are our measurements of someone else's product, and they may be wrong.**
 > ReStem's developers were not involved in any of this and have not reviewed it. We are
@@ -124,10 +198,13 @@ it. Nothing was extracted from its model files. Reproduce with
 [full methodology and where each side wins](#comparison-with-restem-2-pro).</sub>
 
 On a second, independent corpus — all 95 files of IDMT-SMT-Drums, 7927 onsets — the same
-settings score **0.935**, so this is not tuned to one dataset. That check covers our
-number only: ReStem has only ever been run on the 23 MDB recordings, so the *comparison*
-rests on 21.8 minutes of audio from a single production series. What that does and does
-not threaten is measured in `corpus_representativeness.py`.
+settings score **0.935**, so this is not tuned to one dataset. ReStem has since been run
+on ENST-Drums as well — 60 recordings declared before anything was rendered, three
+drummers, 18 814 onsets — so the *comparison* no longer rests on 21.8 minutes from a
+single production series. It rests on both, and the two disagree: the margin is +0.048 on
+MDB and +0.002 on ENST. What MDB alone does and does not threaten is measured in
+`corpus_representativeness.py`; what the two corpora together say is in the table at the
+top, and the larger one is the one that says we are level.
 
 Every number in this README comes from a script in this repo. Negative results are
 reported next to positive ones — a dozen ideas that sounded good were measured and
@@ -949,12 +1026,15 @@ people with an obvious stake in the answer. Eight specific reasons to hold it lo
   restated. Two of the differences this changes are worth naming: Bleed Reduction gains
   ReStem the snare (0.845 → 0.857) and the hi-hat (0.754 → 0.779) and costs it the toms
   (0.699 → 0.651).
-- **ReStem was never run on a second corpus.** Our own 0.935 on IDMT-SMT-Drums is a
-  second-corpus check on us alone; the comparison has none. Nor is MDB the largest real
-  corpus here — ENST-Drums holds 210 recordings, 106 minutes and 45,097 onsets of real
-  kits against MDB's 23, 21.8 and 7,924, with a tom share of 5.78% against 1.14%. The
-  comparison runs on the smallest of them only because that is the one ReStem was ever
-  pointed at. The trial that made it possible has days rather than weeks left.
+- **~~ReStem was never run on a second corpus.~~ It has been, and the second corpus
+  disagrees.** This was the largest open hole in the comparison and closing it cost the
+  headline. ReStem has now been rendered over 60 ENST-Drums recordings — declared before
+  anything was rendered, three drummers, three rooms, 18 814 onsets against MDB's 7 924 —
+  and the margin there is **+0.002 [−0.021, +0.027]**, level rather than ahead, with toms
+  going to ReStem by −0.128 [−0.231, −0.011]. Both corpora are reported at the top with
+  their sizes. What remains true is that ENST-Drums holds 210 recordings in total and the
+  comparison uses 60 of them, and that the trial which made any of this possible has days
+  rather than weeks left.
 - **Articulation thresholds were left at their defaults.** ReStem's hi-hat and tom
   classification boundaries are user-adjustable, and the vendor documents adjusting them
   when articulations land on the wrong note. We adjusted nothing, which is a fair
