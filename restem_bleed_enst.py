@@ -67,34 +67,56 @@ def report(names, on, off, drummers, order, pretty, rounds, seed):
     for n in names:
         by_drummer.setdefault(drummers[n], []).append(n)
     onsets = sum(on[n][k]["ref"] for n in names for k in order)
+    dr = sorted(by_drummer)
+    # Fewer than three clusters cannot be resampled into anything: with two kits the
+    # draw has four outcomes resting on three distinct values, so the bracket would
+    # carry the typography of evidence without any of the content. An earlier version
+    # printed it anyway and then explained in prose that it meant nothing, which let a
+    # reader keep whichever half suited them.
+    clustered = len(dr) >= 3
     print(f"\n{len(names)} recordings in both arms, "
-          f"{len(by_drummer)} drummer(s), {onsets} onsets")
-    print("positive means Bleed Reduction helps them\n")
-    print(f"{'class':<9}{'bleed on':>10}{'bleed off':>11}{'diff':>8}"
-          f"{'95% over recordings':>24}{'over drummers':>22}")
-    print("-" * 84)
+          f"{len(dr)} drummer(s), {onsets} onsets")
+    print("positive means Bleed Reduction helps them")
+    if not clustered:
+        print(f"no cluster-level interval: {len(dr)} kits cannot be resampled")
+    print()
+    head = f"{'class':<9}{'bleed on':>10}{'bleed off':>11}{'diff':>8}{'95% over recordings':>24}"
+    print(head + (f"{'over drummers':>22}" if clustered else ""))
+    print("-" * (len(head) + (22 if clustered else 0)))
 
     rng = random.Random(seed)
-    dr = sorted(by_drummer)
+    micro_half = None
     for cls in [None] + list(order):
         a, b = f1(on, names, order, cls), f1(off, names, order, cls)
         flat, clus = [], []
         for _ in range(rounds):
             s = [rng.choice(names) for _ in names]
             flat.append(f1(on, s, order, cls) - f1(off, s, order, cls))
-            pool = []
-            for _ in range(len(dr)):
-                pool.extend(by_drummer[rng.choice(dr)])
-            s2 = [rng.choice(pool) for _ in names]
-            clus.append(f1(on, s2, order, cls) - f1(off, s2, order, cls))
+            if clustered:
+                pool = []
+                for _ in range(len(dr)):
+                    pool.extend(by_drummer[rng.choice(dr)])
+                s2 = [rng.choice(pool) for _ in names]
+                clus.append(f1(on, s2, order, cls) - f1(off, s2, order, cls))
         lo, hi = interval(flat)
-        clo, chi = interval(clus)
+        if cls is None:
+            micro_half = max(abs(lo), abs(hi))
         label = "MICRO" if cls is None else pretty.get(cls, cls)
-        mark = " *" if lo > 0 or hi < 0 else "  "
-        cmark = " *" if clo > 0 or chi < 0 else "  "
-        print(f"{label:<9}{a:>10.3f}{b:>11.3f}{a - b:>+8.3f}"
-              f"{f'[{lo:+.3f}, {hi:+.3f}]':>22}{mark}"
-              f"{f'[{clo:+.3f}, {chi:+.3f}]':>20}{cmark}")
+        # A star is withheld when a bound rounds to zero at the precision printed: a
+        # bracket that reads [+0.000, ...] beside a mark claiming it excludes zero
+        # asks the reader to believe the mark over the number.
+        visible = min(abs(lo), abs(hi)) >= 0.0005
+        mark = " *" if (lo > 0 or hi < 0) and visible else "  "
+        line = (f"{label:<9}{a:>10.3f}{b:>11.3f}{a - b:>+8.3f}"
+                f"{f'[{lo:+.3f}, {hi:+.3f}]':>22}{mark}")
+        if clustered:
+            clo, chi = interval(clus)
+            line += (f"{f'[{clo:+.3f}, {chi:+.3f}]':>20}"
+                     + (" *" if clo > 0 or chi < 0 else "  "))
+        print(line)
+        if cls is not None and micro_half and 0 < abs(a - b) < micro_half:
+            print(f"{'':<9}{'':>10}{'':>11}{'':>8}"
+                  f"{'smaller than the MICRO interval above it':>44}")
 
     print("\nper drummer, MICRO only -- the aggregate hides a per-kit failure and this "
           "audit exists because one was found:")
