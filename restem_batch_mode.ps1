@@ -123,7 +123,7 @@ function Settled-Mode {
         if ($now) {
             if (-not $Want -or $now -eq $Want) { return $now }
             if (-not $announced -or $now -ne $last) {
-                Say "mode reads '$now', waiting for '$Want' in case the label is behind"
+                Say "mode reads '$now', waiting for '$Want' in case the label is behind" | Out-Host
                 $announced = $true
             }
             $last = $now
@@ -131,7 +131,7 @@ function Settled-Mode {
         if ((Get-Date) -ge $deadline) { break }
         Start-Sleep -Seconds 3
     }
-    if ($last) { Say "mode stayed '$last' for ${Seconds}s" }
+    if ($last) { Say "mode stayed '$last' for ${Seconds}s" | Out-Host }
     return $last
 }
 
