@@ -1499,8 +1499,8 @@ the annotation carries 1847 closed, 269 open and 523 pedal onsets. A reader took
 for a reference count, so it is worth stating.
 
 Both fail on pedal. Our own measurement independently agrees, and on a different corpus:
-across 1102 annotated hi-hat hits in Groove MIDI — not MDB — the pedal chick is not
-separable from a closed hat in the stem (peak 0.0457 vs 0.0466, centroid 11993 vs 12454,
+across the 1102 hi-hat hits in eight Groove MIDI recordings — not MDB — the pedal chick is
+not separable from a closed hat in the stem (peak 0.0457 vs 0.0466, centroid 11993 vs 12454,
 d' between 0.01 and 0.48). `analyze_pedal.py`.
 
 **And decay does not separate open from closed either — a withdrawn claim.** An earlier

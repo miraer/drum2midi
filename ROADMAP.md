@@ -49,8 +49,8 @@ stage, not the broken one.
 each system's own pedal output rather than the reference, which carries 523 pedal onsets —
 a reader took them for reference counts, so they are spelled out here. A separate
 measurement on a different corpus suggests it may not be there
-to find: across 1102 annotated hi-hat hits in Groove MIDI the pedal chick and the closed
-hat differ by peak
+to find: across the 1102 hi-hat hits in eight Groove MIDI recordings the pedal chick and the
+closed hat differ by peak
 0.0457 against 0.0466 and centroid 11993 against 12454, with d′ between 0.01 and 0.48.
 Published as a probable limit of the signal rather than a defect, but it has not been
 proven impossible.
