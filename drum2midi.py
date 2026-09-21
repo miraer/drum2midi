@@ -78,6 +78,10 @@ GM_NAMES = {
 # handled separately below.
 DEFAULT_THRESHOLDS = [0.22, 0.14, 0.32, 0.22, 0.30]
 
+# Peak activation per class from the last transcribe() call, so a run that detects
+# nothing can say whether the threshold or the model is the limit.
+_LAST_PEAKS: List[float] = []
+
 # Toms are sparse and their density swings wildly between tracks, so no fixed value
 # fits. Taking a high percentile of each track's own tom activations lifts held-out
 # tom F1 from 0.322 to 0.472, and MICRO from 0.850 to 0.858.
@@ -176,6 +180,13 @@ def transcribe(audio_path: Path, device: str, thresholds: Optional[Sequence[floa
                      TOM_CEILING)
 
     picker = PeakPicker(thresholds=thr, fps=fps)
+    # Recorded so a failure can say whether lowering the threshold could possibly help.
+    # On quiet mallet material the model produces almost no activation at all, and the
+    # old advice to lower --thresholds sent people down a road that ends at 0.05 with
+    # still nothing picked.
+    global _LAST_PEAKS
+    _LAST_PEAKS = [float(activations[0][:, i].max())
+                   for i in range(activations[0].shape[1])]
     return picker.pick(activations, labels=LABELS_5, label_offset=0)[0]
 
 
@@ -1247,7 +1258,33 @@ def convert_one(args, src: Path, out_path: Path) -> int:
                         adaptive_toms=not args.fixed_tom_threshold)
     total_hits = sum(len(v) for v in onsets.values())
     if total_hits == 0:
-        log("ERROR: no drum hits detected. Try lowering --thresholds.")
+        peak = max(_LAST_PEAKS) if _LAST_PEAKS else None
+        lowest = min(thresholds) if thresholds else min(DEFAULT_THRESHOLDS)
+        if peak is None:
+            log("ERROR: no drum hits detected. Try lowering --thresholds.")
+        elif peak < 0.05:
+            # Not a threshold problem in any useful sense. A threshold below this would
+            # be picking noise, and saying "lower it" invites exactly that: on soft
+            # mallet material the model peaks around 0.008 and 0.05 still finds nothing.
+            log(f"ERROR: no drum hits detected. The model's strongest response anywhere "
+                f"in this file is {peak:.3f}, which is essentially nothing -- it does "
+                f"not recognise this as drums at all, and a threshold low enough to "
+                f"pick it up would be picking noise. Soft mallet or brush material is "
+                f"the usual cause.")
+        elif peak < lowest:
+            log(f"ERROR: no drum hits detected. The model's strongest response anywhere "
+                f"in this file is {peak:.3f}, below the lowest threshold in use "
+                f"({lowest:.2f}), so lowering them to about {peak * 0.8:.3f} is worth "
+                f"one try.")
+        else:
+            # Peak clears the threshold and nothing was still picked, so the limit is
+            # peak-picking rather than the threshold, and telling someone to lower it
+            # sends them to 0.05 and still nothing -- which is what this file does.
+            log(f"ERROR: no drum hits detected. The model's strongest response is "
+                f"{peak:.3f}, which already clears the threshold ({lowest:.2f}), so "
+                f"lowering it will not help: nothing in this recording looks like a "
+                f"drum onset to the model. Soft mallet or brush material is the usual "
+                f"cause.")
         return 1
     log(f"      {total_hits} hits detected")
     # The classes are known the moment ADTOF returns, minutes before separation

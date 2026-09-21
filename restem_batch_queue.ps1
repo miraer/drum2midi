@@ -147,6 +147,7 @@ $t0 = Get-Date
 $deadline = $t0.AddMinutes($TimeoutMinutes)
 $seen = 0
 $quiet = 0
+$stuckFor = 0
 $lastCpu = $null
 # The dialog closes when the batch STARTS, not when it ends -- an earlier version read
 # that as completion and reported the run finished after 16 seconds. Completion is
@@ -163,6 +164,11 @@ function Renderer-Cpu {
     if (-not $p.Count) { return $null }
     ($p | Measure-Object -Property CPU -Sum).Sum
 }
+# A busy renderer resets the wait, but not forever. ReStem hangs reproducibly on at
+# least one ENST recording -- 100% of a core, nothing written, for as long as it is
+# left alone -- and with the reset alone that burned 48 minutes before a human stopped
+# it. Silence this long means stuck whatever the CPU says.
+$hardQuiet = 50   # 25 minutes at 30 s a turn
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
     $now = @(Get-ChildItem $watch -Recurse -Filter "*_midi.mid" -File -ErrorAction SilentlyContinue |
@@ -170,11 +176,18 @@ while ((Get-Date) -lt $deadline) {
     if ($now.Count -ne $seen) {
         $seen = $now.Count
         $quiet = 0
+        $stuckFor = 0
         Say ("{0} of {1} done after {2:N1} min" -f $seen, $Tracks.Count,
              ((Get-Date) - $t0).TotalMinutes)
         if ($seen -ge $Tracks.Count) { break }
     } else {
         $cpu = Renderer-Cpu
+        $stuckFor++
+        if ($stuckFor -ge $hardQuiet) {
+            Say ("nothing written for {0:N0} minutes though the renderer is busy - " +
+                 "this is the hang, not a long track; stopping" -f ($stuckFor * 0.5))
+            break
+        }
         if ($null -ne $cpu -and $null -ne $lastCpu -and ($cpu - $lastCpu) -gt 1) {
             if ($quiet -ge 4) {
                 Say ("still rendering: restem_offline took {0:N0}s of CPU in the last " +
