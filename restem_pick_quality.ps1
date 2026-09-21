@@ -1,5 +1,30 @@
 # Changes ReStem's quality mode with the keyboard, verifying the label after every step.
 #
+# DO NOT SPEND MORE TIME ON THIS. The mode cannot be set from a script on this machine,
+# and that is now established four independent ways rather than assumed from one failure:
+#
+#   1. the environment will not give ReStem the foreground. SetForegroundWindow reports
+#      success and GetForegroundWindow still returns another window, so SendKeys goes
+#      somewhere else and this script refuses to press anything -- which is the only
+#      reason it has never typed into an unrelated application.
+#   2. the list items are drawn, not controls. With the list open, a full UI Automation
+#      sweep of the window finds nothing inside it to invoke.
+#   3. the mode label is a Text element carrying a ValuePattern, which looks promising
+#      until you read it: IsReadOnly is True, so SetValue is refused. That is fortunate
+#      as well as final -- a writable label would have let a script change the text
+#      without changing the mode, and every guard we have reads that text to confirm
+#      which arm a render belongs to.
+#   4. the dropdown is not a separate top-level window either. Invoking the selector
+#      adds no window to the desktop root, so there is no popup to search.
+#
+# What remains is a human clicking it. The launcher and the batch queue both read the
+# label and refuse to start when it does not match what was asked for, so a wrong mode
+# cannot silently produce renders filed under the wrong arm.
+#
+# Kept rather than deleted because the keyboard approach is sound and would work in a
+# session that can focus the window -- and because a script that records why it cannot
+# work is worth more than its absence, which invites someone to write it again.
+#
 # The selector is drawn: UI Automation exposes its current label and nothing else, so the
 # list items cannot be found and clicked. restem_set_quality.ps1 tried the Expand pattern
 # and stranded the application; restem_click_quality.ps1 opens the list but finds nothing
