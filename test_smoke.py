@@ -1104,6 +1104,38 @@ def test_separator_declares_the_programs_it_runs():
         f"the reason does not say what is wrong: {why}")
 
 
+@test
+def test_advertised_separator_flags_exist():
+    """Any `--separator X` this project prints or documents must be a real choice.
+
+    The message shown when ffmpeg is missing offered `--separator none` as the way
+    out. There is no such choice -- argparse answers "invalid choice: 'none' (choose
+    from 'larsnet', 'drumsep', 'uvr', 'hybrid')" -- so the remedy handed to someone
+    who had just hit a wall was another wall. The flag for that is --no-separate.
+    """
+    import re
+
+    import drum2midi
+
+    parser = drum2midi.build_parser() if hasattr(drum2midi, "build_parser") else None
+    if parser is None:
+        src = (ROOT / "drum2midi.py").read_text(encoding="utf-8")
+        m = re.search(r'"--separator",[^)]*?choices=\[([^\]]*)\]', src, re.S)
+        assert m, "could not find the --separator choices"
+        valid = set(re.findall(r'"([^"]+)"', m.group(1)))
+    else:
+        valid = set(parser._option_string_actions["--separator"].choices)
+
+    bad = []
+    for name in ("drum2midi.py", "README.md"):
+        for i, line in enumerate((ROOT / name).read_text(encoding="utf-8").splitlines(), 1):
+            for word in re.findall(r"--separator[ =]+([a-zA-Z_][\w-]*)", line):
+                if word not in valid and word not in {"X", "SEPARATOR"}:
+                    bad.append(f"{name}:{i} offers --separator {word}")
+    assert not bad, ("these name a separator that does not exist, valid are "
+                     f"{sorted(valid)}: {bad}")
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
