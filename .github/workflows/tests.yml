@@ -6,9 +6,30 @@ on:
   pull_request:
   workflow_dispatch:
 
+# A push that supersedes another cancels it: the queue used to hold runs for
+# commits nobody was waiting on any more.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  privacy:
+    # Stdlib only, so it answers in seconds rather than waiting behind a torch
+    # install. It is also the check whose failure matters most: everything else
+    # can be fixed after the fact, a leaked path cannot be unpublished.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: No machine paths, account names, drafts or credentials
+        run: python check_privacy.py --all
+
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +54,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
