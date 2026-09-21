@@ -781,8 +781,8 @@ find 46% of the toms in this corpus and they find 88%.
 Their false toms carry the same membrane bias ours do — 1.54× against 1.39× — so the
 confusion described above is not something they solved and we did not. What separates the
 two systems on this class is that they emit toms and we do not: more than twice as many
-events, at a precision we cannot show is better than theirs. MDB is no help here and says
-so loudly; that is [taken up below](#the-four-kinds-of-recording-are-not-the-same-material).
+events, at a precision we cannot show is better than theirs. MDB cannot resolve any of
+this, for reasons set out a few paragraphs below.
 
 One sub-case is visible on MDB, which ships articulation labels: **ghost notes become toms
 at 12%, against 3% for plain snare strokes**. A ghost note is a very quiet stroke with
