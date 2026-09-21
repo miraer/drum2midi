@@ -26,7 +26,24 @@ either way. Pass `--drummers 1,2,3` to see the confounded version.
     python restem_bleed_enst.py --drummers 1,2,3      # the confounded comparison
 
 Both intervals are reported, over recordings and over drummers, because a per-kit effect
-is precisely what is suspected here and resampling recordings alone would hide it.
+is precisely what is suspected here and resampling recordings alone would hide it. Where
+there are fewer than three kits the cluster column is dropped rather than printed: with two
+it can draw only four outcomes over three distinct values, which has the typography of
+evidence and none of the content.
+
+Two reporting rules here are deliberate and both are easy to "fix" into nonsense later.
+
+A star is withheld when a bound rounds to zero at the precision printed. That makes
+starring depend on display precision, which is odd as a statistical rule and is not meant
+as one: it is a communication rule. An interval reading [+0.000, +0.006] beside a mark
+claiming it excludes zero asks the reader to believe the mark over the number, and the
+honest reply to "it clears at the fourth decimal" is that needing a fourth decimal is
+itself the answer. Adding a decimal to restore the star would defeat the point.
+
+A class row smaller than the interval on the MICRO figure is annotated as such. Note what
+that rule does as the corpus gets noisier: a wide headline interval swallows more rows, so
+on noisy material it would dismiss effects that matter. It is safe here because MICRO is
+tight, plus or minus 0.004. It is a prompt to think, not a verdict.
 """
 
 from __future__ import annotations
