@@ -91,8 +91,52 @@ function Current-Mode {
     return $null
 }
 
-$mode = Current-Mode
-if (-not $mode) { Close-StaleDialog; $mode = Current-Mode }
+function Settled-Mode {
+    # Current-Mode returns the first value it can read. That is not enough to act on,
+    # for two reasons measured on this machine, and they need different treatment.
+    #
+    # While a render runs the selector leaves the accessibility tree altogether: a probe
+    # caught it reading nothing at the moment a render began, with the neighbouring
+    # controls going disabled at the same time. The in-loop guard read that as "the mode
+    # is unreadable" and stopped the batch. It has never fired in practice only because
+    # the loop happens to check between tracks rather than during one, which is safety by
+    # accident. Polling through the gap fixes that one.
+    #
+    # The label also lags a human changing the selector by a few seconds, so a read taken
+    # just after a change returns the previous mode. That produced one false refusal. Two
+    # agreeing reads do NOT fix it -- a stale label read twice agrees with itself, which
+    # is what the first version of this function got wrong, and a test caught it before a
+    # batch did.
+    #
+    # So the wait is asymmetric, which is the point: a read matching what was asked for is
+    # acted on at once, because a lagging label cannot fabricate agreement it has not seen
+    # yet. Anything else is given the whole window to become the expected value before it
+    # is reported as a disagreement. The cost of waiting falls on the refusal, where a
+    # wrong answer loses a night, rather than on the happy path.
+    param([string]$Want, [int]$Seconds = 45)
+
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    $last = $null
+    $announced = $false
+    while ($true) {
+        $now = Current-Mode
+        if ($now) {
+            if (-not $Want -or $now -eq $Want) { return $now }
+            if (-not $announced -or $now -ne $last) {
+                Say "mode reads '$now', waiting for '$Want' in case the label is behind"
+                $announced = $true
+            }
+            $last = $now
+        }
+        if ((Get-Date) -ge $deadline) { break }
+        Start-Sleep -Seconds 3
+    }
+    if ($last) { Say "mode stayed '$last' for ${Seconds}s" }
+    return $last
+}
+
+$mode = Settled-Mode -Want $Expect
+if (-not $mode) { Close-StaleDialog; $mode = Settled-Mode -Want $Expect }
 if (-not $mode) { Say "ReStem is not running or its window is unreadable"; exit 1 }
 if ($mode -ne $Expect) {
     Say "mode is '$mode' but '$Expect' was expected - refusing to run"
@@ -109,8 +153,8 @@ foreach ($track in $Tracks) {
     if (Test-Path $dest) { Say "already have $track"; $done++; continue }
 
     # re-check every time: a crash and restart could reset the selector
-    $now = Current-Mode
-    if (-not $now) { Close-StaleDialog; $now = Current-Mode }
+    $now = Settled-Mode -Want $Expect
+    if (-not $now) { Close-StaleDialog; $now = Settled-Mode -Want $Expect }
     if (-not $now) { Say "mode unreadable after retries - stopping"; break }
     if ($now -ne $Expect) { Say "mode changed to '$now' - stopping"; break }
 
