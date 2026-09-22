@@ -1341,6 +1341,69 @@ def test_unreadable_is_not_reported_as_binary():
     assert res.returncode != 0, (
         f"three files nothing could open still reported a clean bill:\n{out[:600]}")
 
+
+@test
+def test_the_unaccounted_remainder_is_fatal():
+    """The remainder printed the truth and exited 0, which is how the other four survived.
+
+    `return 1` was guarded by `missing or unreadable`; the remainder only appended a word to
+    the summary. So a file in no category at all printed `1 unaccounted` and then "no machine
+    paths, personal names, private drafts or credentials found", and exited 0. Every instance
+    of this bug so far printed something true and exited 0, and each was fixed only once a
+    person happened to read the line. Printing is not failing.
+
+    This is the path that survives all four earlier fixes, because `can_read()` narrows the
+    window between asking and reading and cannot close it: a file readable when asked and
+    locked when `scan()` reaches it is not missing, not unreadable, not binary, not exempt
+    and not read. It lands in the remainder, which is precisely the category that exited 0.
+
+    The race is made deterministic by pinning `can_read` to True in a copy of the gate --
+    standing in for the window, not asserting that can_read is wrong. `read == len(paths)`
+    cannot coexist with a non-empty category, because scan() increments `read` only after
+    every `continue`, so hoisting the subtraction out of the summary cannot make it negative.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    repo = _tmp / "unaccounted_repo"
+    repo.mkdir()
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e"}
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=str(repo), env=env, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
+
+    git("init", "-q")
+    (repo / "ordinary.md").write_text("nothing to see\n", encoding="utf-8")
+    (repo / "vanishes.md").write_text("placeholder\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "fixture")
+
+    source = (ROOT / "check_privacy.py").read_text(encoding="utf-8")
+    marker = "def can_read(path: Path) -> bool:"
+    assert marker in source, "can_read has been renamed; this guard pins it by signature"
+    pinned = source.replace(marker, marker + "\n    return True  # pinned for this test", 1)
+    (repo / "check_privacy.py").write_text(pinned, encoding="utf-8")
+
+    # readable when asked, unopenable when scan() gets there
+    (repo / "vanishes.md").unlink()
+    (repo / "vanishes.md").mkdir()
+
+    res = subprocess.run([PY, str(repo / "check_privacy.py"), "--all"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(repo), env=env)
+    out = res.stdout + res.stderr
+
+    assert "unaccounted" in out, (
+        f"the fixture did not produce a remainder, so this guards nothing:\n{out[:600]}")
+    assert "no machine paths" not in out, (
+        f"a clean bill was issued over a file in no category:\n{out[:600]}")
+    assert res.returncode != 0, (
+        f"the remainder printed and the run still exited 0:\n{out[:600]}")
+    shutil.rmtree(repo, ignore_errors=True)
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

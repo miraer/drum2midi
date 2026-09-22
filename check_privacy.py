@@ -451,6 +451,8 @@ def main() -> int:
                   and not can_read(p)]
     # "checked N" used to count files the scanner had only looked at the name of, so a
     # skipped file read as an inspected one. Say how many were actually opened.
+    unaccounted = (len(paths) - read - len(skipped) - len(exempt)
+                   - len(missing) - len(unreadable))
     if read == len(paths):
         print(f"checked {len(paths)} file(s)")
     else:
@@ -463,8 +465,6 @@ def main() -> int:
             parts.append(f"{len(missing)} NOT FOUND")
         if unreadable:
             parts.append(f"{len(unreadable)} UNREADABLE")
-        unaccounted = (len(paths) - read - len(skipped) - len(exempt)
-                       - len(missing) - len(unreadable))
         if unaccounted:
             parts.append(f"{unaccounted} unaccounted")
         print(f"checked {len(paths)} file(s), " + ", ".join(parts))
@@ -480,6 +480,18 @@ def main() -> int:
               f"them:")
         for p in blind[:10]:
             print(f"  {p}")
+        print("\nA check that could not run is not a check that passed.")
+        return 1
+    # The remainder is the only check here that does not need to know what went wrong.
+    # Every instance of this bug so far -- missing filed as "not a text type", unreadable
+    # filed as `unaccounted`, unreadable without a text name filed as "binary" -- printed
+    # something true and exited 0, and each was fixed only after a person noticed the
+    # line. Printing is not failing. A remainder means the categories do not describe
+    # what happened to the files, which is the same "nothing is known about them" as a
+    # path that will not open, and it stays true for a category nobody has added yet.
+    if unaccounted:
+        print(f"\n{unaccounted} file(s) are not accounted for by any category, so it is "
+              f"not known whether they were examined.")
         print("\nA check that could not run is not a check that passed.")
         return 1
 
