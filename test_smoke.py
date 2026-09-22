@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 from pathlib import Path
 
@@ -452,6 +453,85 @@ def _grab_pixels(widget):
     raw = np.frombuffer(img.constBits(), np.uint8)
     raw = raw[:img.bytesPerLine() * img.height()].reshape(img.height(), -1)
     return raw[:, :img.width() * 4].reshape(img.height(), img.width(), 4).astype(int)
+
+
+@test
+def test_gui_reads_a_run_back_with_the_mapping_it_ran_with():
+    """A note changed during a conversion must not erase that drum from the result.
+
+    The summary and the MIDI were read back with the pickers' values when the run
+    ended. A run takes minutes; with the snare's note changed meanwhile, the read-back
+    decided note 38 no longer meant the snare, and all 318 of a real track's snares
+    vanished from the lane and from the note count (1,154 shown as 836).
+    """
+    from PySide6.QtWidgets import QApplication
+    gui, win = gui_window()
+    win.c.input = str(make_fixture())
+    win.c.output = str(_tmp / "mid_run_edit.mid")
+    win.c.separator = "none"
+    win._sync()
+    win._start()
+    try:
+        win.map_rows[38].note.setCurrentIndex(41)     # changed while it runs
+        deadline = time.time() + 240
+        while win.phase == "converting" and time.time() < deadline:
+            QApplication.processEvents()
+            time.sleep(0.05)
+        assert win.phase == "done", f"the fixture did not convert: {win.status.text()}"
+        assert 38 in win.results, f"the snare row was dropped: {win.results}"
+        snares = sum(1 for lane, _, _ in win.timeline.hits if lane == 1)
+        assert snares == win.results[38][0], (
+            f"{snares} snares on the lane, {win.results[38][0]} in the summary")
+    finally:
+        if win.proc and win.proc.poll() is None:
+            win.proc.terminate()
+        win.close()
+        # the run and the close both saved the moved snare; the next window must
+        # not start from it
+        gui.SETTINGS.unlink(missing_ok=True)
+
+
+@test
+def test_gui_scrolling_past_a_picker_does_not_change_it():
+    """The mouse wheel over an unclicked note or channel picker scrolls, nothing else.
+
+    Qt's combo box takes the wheel on hover. The sidebar holds twenty of them, so
+    scrolling it moved whichever passed under the pointer: three notches turned the
+    snare from 38 into 41 with no click, and nothing on screen said so.
+    """
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtWidgets import QApplication
+    gui, win = gui_window()
+    win.resize(1320, 860)
+    win.show()
+    QApplication.processEvents()
+
+    def wheel(box, notches):
+        for _ in range(notches):
+            QApplication.sendEvent(box, QWheelEvent(
+                QPointF(10, 10), QPointF(box.mapToGlobal(QPoint(10, 10))),
+                QPoint(0, 0), QPoint(0, -120), Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False))
+
+    try:
+        for box in (win.map_rows[38].note, win.map_rows[38].chan, win.rows[38].note):
+            before = box.currentIndex()
+            wheel(box, 3)
+            assert box.currentIndex() == before, (
+                f"scrolling past a picker changed it from {before} to "
+                f"{box.currentIndex()}")
+        assert win.c.notes[38] == 38 and win.c.channels[38] == gui.DRUM_CHANNEL
+
+        # once clicked, the wheel is a deliberate way to step through values
+        box = win.map_rows[38].note
+        box.setFocus()
+        QApplication.processEvents()
+        if box.hasFocus():            # offscreen focus can depend on the platform
+            wheel(box, 1)
+            assert box.currentIndex() != 38, "a focused picker ignored the wheel"
+    finally:
+        win.close()
 
 
 @test
