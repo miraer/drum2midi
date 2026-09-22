@@ -1203,6 +1203,46 @@ def test_the_gate_answers_about_itself_under_a_hook():
         "the gate flags this project's own URL when GIT_DIR points elsewhere, which is "
         f"how every hook invokes it:\n{under_hook.stdout}{under_hook.stderr}")
 
+@test
+def test_the_summary_says_why_a_file_was_skipped_and_adds_up():
+    """The gate's own accounting has to be checkable, which is what it asks of everyone else.
+
+    A commit staging two text files reported "1 read for content, 1 not a text type". The
+    second was check_privacy.py, which the scanner exempts by exact name because it defines
+    the patterns it looks for -- a deliberate decision reported as an accident of file
+    format. It was unreproducible for ten minutes because the summary said how many were
+    skipped and never which.
+
+    So: a skipped file is named, the self-exemption is its own category, and the numbers
+    reconcile. Run over the whole tree rather than an explicit list, because naming a file
+    on the command line forces it to be read and the skip path never runs -- the first
+    version of this test made exactly that mistake and passed while guarding nothing.
+    """
+    import re
+    import subprocess
+
+    res = subprocess.run([PY, str(ROOT / "check_privacy.py"), "--all"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(ROOT))
+    out = res.stdout + res.stderr
+
+    line = next((l for l in out.splitlines() if l.startswith("checked ")), "")
+    assert line, f"no summary line:\n{out[:400]}"
+    assert "self-exempt" in line, (
+        f"the gate's own exemption is not its own category:\n{line}")
+    assert "skipped as binary:" in out, (
+        "skipped files are counted but not named, which is what made the original "
+        f"report impossible to investigate:\n{out[:400]}")
+
+    total = int(re.search(r"checked (\d+) file", line).group(1))
+    counted = [int(n) for n, _ in re.findall(
+        r"(\d+) (read for content|not a text type|self-exempt|NOT FOUND|unaccounted)",
+        line)]
+    assert "unaccounted" not in line, f"the categories do not reconcile:\n{line}"
+    assert sum(counted) == total, (
+        f"{sum(counted)} accounted for against {total} checked:\n{line}")
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
