@@ -1471,6 +1471,88 @@ def test_a_file_that_was_read_is_never_called_unreadable():
         f"a clean readable file was refused, which is how a gate gets bypassed:\n{out[:600]}")
     shutil.rmtree(repo, ignore_errors=True)
 
+
+@test
+def test_a_read_that_fails_mid_scan_cannot_be_quiet():
+    """The real shape of the race, with nothing pinned.
+
+    Both other guards in this area pin `can_read` to a constant, which is honest about being
+    a stand-in but means neither of them exercises the predicates as they actually behave.
+    This one leaves `can_read` and `looks_textual` alone and breaks the thing that really
+    breaks: the read inside `scan()`, which is where a lock taken for the duration of a read
+    lands. `scan()` swallows it in `except OSError: continue`, and every defect in this area
+    began there.
+
+    Two outcomes, and the second is why this is a test and not an assertion that everything
+    is fatal:
+
+      a textual file whose read failed   -> remainder, exit 1
+      a genuinely binary file            -> "not a text type", exit 0
+
+    The second is quiet and correct. `looks_textual` returns False for it on its own merits,
+    so the label describes the file rather than guessing about it, and a binary file is
+    skipped by design. The property worth having is not "every unopened file is fatal" -- it
+    is that a category can no longer be *wrong and quiet at the same time*.
+
+    This was traced by the second machine as an argument about the code, and flagged by them
+    as reasoning rather than measurement, on the grounds that my last such argument was
+    wrong. Both branches are measured here so the property is not resting on either of us
+    reading the control flow correctly.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    def run(content: bytes, name: str) -> tuple[int, str]:
+        repo = _tmp / f"midscan_{name.replace('.', '_')}"
+        repo.mkdir()
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
+               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e",
+               "D2M_FAIL_READ": name}
+
+        def git(*a):
+            return subprocess.run(["git", *a], cwd=str(repo), env=env, capture_output=True,
+                                  text=True, encoding="utf-8", errors="replace")
+
+        git("init", "-q")
+        (repo / "ordinary.md").write_text("ordinary\n", encoding="utf-8")
+        (repo / name).write_bytes(content)
+        git("add", "-A")
+        git("commit", "-qm", "fixture")
+
+        source = (ROOT / "check_privacy.py").read_text(encoding="utf-8")
+        read_line = ('            lines = path.read_text(encoding="utf-8", '
+                     'errors="replace").splitlines()')
+        assert read_line in source, "the read inside scan() has moved; this guard targets it"
+        injected = ('            if path.name == os.environ.get("D2M_FAIL_READ", ""):\n'
+                    '                raise OSError("simulated lock during scan")\n') + read_line
+        (repo / "check_privacy.py").write_text(source.replace(read_line, injected, 1),
+                                               encoding="utf-8")
+
+        res = subprocess.run([PY, str(repo / "check_privacy.py"), "--all"],
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", cwd=str(repo), env=env)
+        out = res.stdout + res.stderr
+        shutil.rmtree(repo, ignore_errors=True)
+        return res.returncode, out
+
+    # Deliberately ordinary content: the file is never read, so nothing in it could be
+    # detected. The run has to fail because the gate cannot account for the file, not
+    # because of anything it contains.
+    code, out = run(b"nothing unusual in here at all\n", "textual.md")
+    assert "not accounted for by any category" in out, (
+        f"the run did not fail on the remainder, so this guards something else:\n{out[:600]}")
+    assert "no machine paths" not in out, (
+        f"a file whose read failed was waved through with honest predicates:\n{out[:600]}")
+    assert code != 0, (
+        f"a textual file the scanner could not read exited 0:\n{out[:600]}")
+
+    code, out = run(b"\x00\x01binary\x00\x02", "opaque.dat")
+    assert "not a text type" in out, (
+        f"a genuinely binary file is no longer described as binary:\n{out[:600]}")
+    assert code == 0, (
+        f"a binary file, correctly labelled, should not fail the run:\n{out[:600]}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
