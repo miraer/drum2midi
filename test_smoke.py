@@ -34,6 +34,23 @@ _tmp: Path | None = None
 _fixture: Path | None = None
 PASSED: list[str] = []
 FAILED: list[tuple[str, str]] = []
+SKIPPED: list[tuple[str, str]] = []
+
+
+class Skip(Exception):
+    """Raised by a test that cannot run here, as distinct from one that passed.
+
+    Added when a guard for a PowerShell script reached CI, which is Linux, and died on a
+    missing `powershell`. The tempting repair is to return early when the tool is absent --
+    and that produces a test which reports PASS while executing nothing, which is the exact
+    defect this suite spent a week finding in `check_privacy.py`. A skip is not a pass; it
+    is a check that did not run, and it has to be reported as its own category and counted
+    so the totals reconcile.
+    """
+
+
+def skip(why: str):
+    raise Skip(why)
 
 
 def test(fn):
@@ -44,6 +61,9 @@ def test(fn):
             fn()
             PASSED.append(name)
             print(f"  PASS  {name}")
+        except Skip as exc:
+            SKIPPED.append((name, str(exc)))
+            print(f"  SKIP  {name}: {exc}")
         except AssertionError as exc:
             FAILED.append((name, str(exc)))
             print(f"  FAIL  {name}: {exc}")
@@ -1731,7 +1751,13 @@ def test_restem_mode_guard_settles_before_it_refuses():
     comment; there was no test in the repository. `-DefineOnly` loads the functions without
     running the batch, so a stubbed Current-Mode can drive it with no ReStem present.
     """
+    import shutil as _shutil
     import subprocess
+
+    if _shutil.which("powershell") is None and _shutil.which("pwsh") is None:
+        skip("no PowerShell on this machine, so the guard cannot run here "
+             "(CI is Linux; this one is checked on the Windows machine that owns ReStem)")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
 
     harness = _tmp / "mode_harness.ps1"
     harness.write_text(r"""
@@ -1758,7 +1784,7 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
 }
 """ % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
 
-    res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
                           "-File", str(harness)],
                          capture_output=True, text=True, encoding="utf-8",
                          errors="replace", timeout=300)
@@ -1807,7 +1833,17 @@ def main() -> int:
     finally:
         shutil.rmtree(_tmp, ignore_errors=True)
 
-    print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
+    total = len(PASSED) + len(FAILED) + len(SKIPPED)
+    line = f"\n{len(PASSED)} passed, {len(FAILED)} failed"
+    if SKIPPED:
+        line += f", {len(SKIPPED)} skipped"
+    print(f"{line}  ({total} tests)")
+    if SKIPPED:
+        # Named, not just counted. A count cannot be investigated and a skip that is
+        # invisible is a test nobody notices has stopped running.
+        print("\nskipped, so these were not checked here:")
+        for name, why in SKIPPED:
+            print(f"  {name}: {why}")
     if FAILED:
         print("\nfailures:")
         for name, why in FAILED:
