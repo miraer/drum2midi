@@ -1754,10 +1754,18 @@ def test_restem_mode_guard_settles_before_it_refuses():
     import shutil as _shutil
     import subprocess
 
-    if _shutil.which("powershell") is None and _shutil.which("pwsh") is None:
-        skip("no PowerShell on this machine, so the guard cannot run here "
-             "(CI is Linux; this one is checked on the Windows machine that owns ReStem)")
+    # Windows only, and measured on CI rather than assumed. My first attempt accepted
+    # `pwsh` on the grounds that any PowerShell would do; the Ubuntu runner has pwsh, so
+    # the skip never fired and the harness ran and failed. mykolad diagnosed it in #3:
+    # restem_batch_mode.ps1 sources restem_ui.ps1, which calls
+    # `Add-Type -AssemblyName UIAutomationClient` at the top level -- before `-DefineOnly`
+    # is ever reached. That assembly is Windows-only, so there is no other platform for
+    # this guard to run on. ReStem is a Windows application; that is the whole reason.
+    if sys.platform != "win32":
+        skip("ReStem and UIAutomationClient are Windows-only, so this guard cannot run "
+             "here (CI is Linux; it is exercised on the Windows machine that owns ReStem)")
     shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the guard was not exercised"
 
     harness = _tmp / "mode_harness.ps1"
     harness.write_text(r"""
