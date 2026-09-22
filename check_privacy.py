@@ -435,8 +435,16 @@ def main() -> int:
         return str(p)
 
     exempt = [p for p in paths if p.exists() and rel_of(p) == "check_privacy.py"]
+    # `can_read` before `looks_textual`, because looks_textual returns False both when it
+    # read the file and found NUL bytes and when it could not read the file at all. The
+    # second is not a claim about the content, and filing it under "not a text type"
+    # reported a file nothing had opened as a file known to be binary -- exit 0 again,
+    # one label further on. It only surfaced for names outside the TEXT list: a directory
+    # called `x.md` reached UNREADABLE, `x.dat` and an extensionless one did not, so the
+    # category was reachable exactly for the shape the guard happened to use. Extensionless
+    # hooks and the .diff artefacts are the files this matters for.
     skipped = [p for p in paths
-               if p.exists() and not args.files and not looks_textual(p)
+               if p.exists() and not args.files and can_read(p) and not looks_textual(p)
                and p not in exempt]
     unreadable = [p for p in paths
                   if p.exists() and p not in exempt and p not in skipped

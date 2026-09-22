@@ -1275,6 +1275,72 @@ def test_a_file_that_cannot_be_opened_is_not_a_pass():
     assert "could not be read" in out or "UNREADABLE" in out, (
         f"the report does not say the file was unreadable:\n{out}")
 
+
+@test
+def test_unreadable_is_not_reported_as_binary():
+    """The same file, one label further on, still exiting 0.
+
+    `looks_textual` returns False for two unrelated reasons: it read the file and found NUL
+    bytes, or it could not read the file at all. The binary category was derived from it
+    alone, so an unopenable file whose name is not in TEXT was announced as "not a text
+    type" -- a claim about content, about a file nothing had opened -- and skipped. Exit 0.
+
+    Two things hid it. The category is only consulted when the file list is not explicit,
+    and naming a file on the command line forces it to be read, so the guard for the
+    previous fix could not reach this branch however it was mutated: it passed with the
+    bug present. And the one fixture was called .md, which is in TEXT, so it fell through
+    to UNREADABLE by luck of the extension. `.dat` and an extensionless file did not. The
+    files that motivated this are hooks/pre-commit, which has no extension, and the .diff
+    artefacts, which are not in TEXT -- both real contents of the coordination repository.
+
+    So this runs --all inside a throwaway repository: tracked, unreadable, not explicit.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    repo = _tmp / "unreadable_repo"
+    repo.mkdir()
+    env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e"}
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=str(repo), env=env, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
+
+    git("init", "-q")
+    names = ["looks_like_text.md", "looks_like_data.dat", "no_extension"]
+    (repo / "ordinary.md").write_text("nothing to see\n", encoding="utf-8")
+    for name in names:
+        (repo / name).write_text("placeholder\n", encoding="utf-8")
+    git("add", "-A")
+    committed = git("commit", "-qm", "fixture")
+    assert (repo / ".git").exists(), f"no repository to test in: {committed.stderr}"
+
+    # Tracked in the index, a directory on disk: present, listed by ls-files, unopenable.
+    for name in names:
+        (repo / name).unlink()
+        (repo / name).mkdir()
+
+    listed = git("ls-files").stdout.split()
+    for name in names:
+        assert name in listed, (
+            f"{name} is not tracked, so --all would never reach it: {listed}")
+
+    shutil.copy2(ROOT / "check_privacy.py", repo / "check_privacy.py")
+    res = subprocess.run([PY, str(repo / "check_privacy.py"), "--all"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(repo), env=env)
+    out = res.stdout + res.stderr
+
+    assert "not a text type" not in out, (
+        "an unopened file is being announced as a known file format:\n" + out[:600])
+    assert "UNREADABLE" in out, (
+        f"the three unreadable files are not reported as unreadable:\n{out[:600]}")
+    assert res.returncode != 0, (
+        f"three files nothing could open still reported a clean bill:\n{out[:600]}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
