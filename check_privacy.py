@@ -379,18 +379,46 @@ def main() -> int:
     # wrong directory, produced a clean bill for a check that never happened. Green has
     # to mean "looked and found nothing"; it cannot also mean "could not look".
     missing = [p for p in paths if not p.exists()]
+    # Naming the skipped files rather than counting them. A commit reported "1 not a
+    # text type" over two staged .py files and the run could not be reproduced
+    # afterwards, because the summary said how many were skipped and never which. A
+    # count cannot be investigated; a name can. It turned out to be this file: the
+    # scanner exempts itself by exact name, and the summary filed that under "binary",
+    # which is a different claim about a different reason.
+    def rel_of(p: Path) -> str:
+        if p.is_absolute():
+            try:
+                return p.relative_to(ROOT).as_posix()
+            except ValueError:
+                return p.as_posix()
+        return str(p)
+
+    exempt = [p for p in paths if p.exists() and rel_of(p) == "check_privacy.py"]
+    skipped = [p for p in paths
+               if p.exists() and not args.files and not looks_textual(p)
+               and p not in exempt]
     # "checked N" used to count files the scanner had only looked at the name of, so a
     # skipped file read as an inspected one. Say how many were actually opened.
     if read == len(paths):
         print(f"checked {len(paths)} file(s)")
     else:
-        binary = len(paths) - read - len(missing)
         parts = [f"{read} read for content"]
-        if binary:
-            parts.append(f"{binary} not a text type")
+        if skipped:
+            parts.append(f"{len(skipped)} not a text type")
+        if exempt:
+            parts.append(f"{len(exempt)} self-exempt")
         if missing:
             parts.append(f"{len(missing)} NOT FOUND")
+        unaccounted = len(paths) - read - len(skipped) - len(exempt) - len(missing)
+        if unaccounted:
+            parts.append(f"{unaccounted} unaccounted")
         print(f"checked {len(paths)} file(s), " + ", ".join(parts))
+        for p in skipped[:10]:
+            try:
+                size = p.stat().st_size
+            except OSError:
+                size = -1
+            print(f"  skipped as binary: {p} ({size} bytes)")
     if missing:
         print(f"\n{len(missing)} path(s) could not be read, so nothing is known about "
               f"them:")
