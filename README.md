@@ -1945,13 +1945,19 @@ Across all 23 MDB tracks (`blind_spots_mdb.py`):
 | tracks at exactly zero | **15 of 23** |
 | concentration | 95 of the 101 sit in three tracks |
 | worst track | SwingJazz 19.3%, above the 18.2% of the real song |
-| correlation with per-track F1 | −0.288, 95% CI **[−0.605, +0.143]** |
+| correlation with per-track F1 | −0.283, 95% CI **[−0.601, +0.147]** |
+
+Scored against the shipped export (`bench/ceiling`). The figure first published here was
+−0.288 from `bench/note36`, which predates `TOM_CEILING`; re-scoring moved one track of 23
+(Beatles, 0.826 → 0.805) and the correlation with it. Everything else in this section is
+identical under both exports, because the blind share is measured from the activations and
+does not depend on what we transcribe.
 
 **The correlation decided nothing, and should not have been asked to.** With 15 tracks
 pinned at zero there is no gradient for it to read — three tracks against twenty, with
 single-event noise between. The criteria for this experiment were written as though a
 correlation would come out decisive; that was a mistake in the experimental design, and
-reporting −0.288 as "near zero, idea dropped" would have been choosing the reading after
+reporting −0.283 as "near zero, idea dropped" would have been choosing the reading after
 seeing the number.
 
 **What decides it is where the failures actually are.** The worst-scoring tracks are not
