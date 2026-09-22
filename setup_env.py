@@ -1,11 +1,11 @@
 """One-shot setup: installs dependencies, fetches models, verifies the result.
 
-Replaces the wall of copy-paste commands in the README. Everything is optional except
-the core pipeline, so a minimal install stays small.
+Replaces the wall of copy-paste commands in the README. The core pipeline and the
+renderer the window plays MIDI through are installed by default; the rest is opt-in.
 
-    python setup_env.py                 # core pipeline (MDX23C separator)
+    python setup_env.py                 # core pipeline + FluidSynth and soundfont
+    python setup_env.py --no-render     # core pipeline only, ~40 MB smaller
     python setup_env.py --with-larsnet  # also the fast LarsNet separator
-    python setup_env.py --with-render   # also FluidSynth + soundfont for A/B audio
     python setup_env.py --check         # verify an existing install, change nothing
 """
 
@@ -292,7 +292,8 @@ def check(install_failed: bool = False) -> int:
                              ("onnxruntime", "required for the default separator", True),
                              ("mir_eval", "benchmarks only", False),
                              ("sklearn", "learned velocity models only", False),
-                             ("PIL", "GUI icons and make_logo.py only", False),
+                             ("PySide6", "the window only; the CLI runs without", False),
+                             ("PIL", "make_logo.py and drum_icons.py only", False),
                              ("tqdm", "benchmark and training scripts only", False),
                              ("yaml", "LarsNet only", False)):
         ok = have(mod)
@@ -356,9 +357,10 @@ def check(install_failed: bool = False) -> int:
     fs = (shutil.which("fluidsynth")
           or (list((ROOT / "tools").glob("fluidsynth/**/fluidsynth*"))
               if (ROOT / "tools").exists() else []))
-    print(f"{OK}FluidSynth" if fs else f"{WARN}FluidSynth  (render_midi.py only)")
+    why = "MIDI and A/B playback in the window, render_midi.py"
+    print(f"{OK}FluidSynth" if fs else f"{WARN}FluidSynth  ({why})")
     sf = ROOT / "tools" / "MuseScore_General.sf3"
-    print(f"{OK}soundfont" if sf.exists() else f"{WARN}soundfont  (render_midi.py only)")
+    print(f"{OK}soundfont" if sf.exists() else f"{WARN}soundfont  ({why})")
 
     print("\n  Hardware")
     try:
@@ -411,8 +413,16 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="verify only, install nothing")
     ap.add_argument("--with-larsnet", action="store_true",
                     help="also install the fast LarsNet separator and its weights")
-    ap.add_argument("--with-render", action="store_true",
-                    help="also install FluidSynth and a General MIDI soundfont")
+    # The renderer used to be opt-in, when render_midi.py was a tool run by hand after
+    # a conversion. The window now plays the MIDI and an A/B mix from its main screen,
+    # and an opt-in step meant a fresh install showed two controls that could not work
+    # until someone found this flag. It is ~40 MB, and on Linux and macOS only the
+    # soundfont is downloaded; FluidSynth itself is left to the system package manager.
+    ap.add_argument("--no-render", action="store_true",
+                    help="skip FluidSynth and the General MIDI soundfont (~40 MB) that "
+                         "the window needs to play the MIDI back")
+    # kept so that older instructions, and render_midi's own advice, still work
+    ap.add_argument("--with-render", action="store_true", help=argparse.SUPPRESS)
     ap.add_argument("--with-intel-gpu", action="store_true",
                     help="replace torch with the Intel GPU (XPU) build; separation "
                          "measured 12x faster")
@@ -428,7 +438,7 @@ def main() -> int:
     core_ok = install_core()
     if args.with_larsnet:
         install_larsnet()
-    if args.with_render:
+    if args.with_render or not args.no_render:
         install_render()
     if args.with_intel_gpu:
         install_xpu()

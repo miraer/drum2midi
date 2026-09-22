@@ -51,9 +51,28 @@ def find_fluidsynth() -> Path:
         "On Debian/Ubuntu: apt install fluidsynth.")
 
 
+def missing() -> str | None:
+    """Why rendering cannot run on this machine, or None when it can.
+
+    Both halves are separate installs that a working conversion never needs, so an
+    otherwise healthy setup routinely lacks them. Asked before a render rather than
+    discovered by one, so the caller can say what to install instead of showing a
+    traceback.
+    """
+    try:
+        find_fluidsynth()
+    except FileNotFoundError as exc:
+        return str(exc)
+    if not SOUNDFONT.exists():
+        return (f"Soundfont missing: {SOUNDFONT}. Run setup_env.py --with-render, "
+                "which downloads it into tools/.")
+    return None
+
+
 def render(midi: Path, out_wav: Path, gain: float = 0.8) -> Path:
     if not SOUNDFONT.exists():
-        raise FileNotFoundError(f"Soundfont missing: {SOUNDFONT}")
+        raise FileNotFoundError(f"Soundfont missing: {SOUNDFONT}. Run setup_env.py "
+                                "--with-render, which downloads it into tools/.")
     exe = find_fluidsynth()
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     res = subprocess.run(
@@ -94,6 +113,10 @@ def main() -> int:
         print(f"not found: {midi}")
         return 1
     out = (args.out or midi.with_suffix(".wav")).resolve()
+    why = missing()
+    if why:
+        print(f"cannot render: {why}")
+        return 1
 
     if args.against is None:
         render(midi, out, args.gain)

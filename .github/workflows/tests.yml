@@ -40,6 +40,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Qt's offscreen platform, which the GUI tests use, still links libEGL and
+          # reads fonts through fontconfig
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl1 libfontconfig1 libxkbcommon0
           python -m pip install --upgrade pip
           python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -r requirements.txt
