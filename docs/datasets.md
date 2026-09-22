@@ -90,20 +90,50 @@ note-ons**, and every published figure matched to the digit:
 E-GMD's 45,537 clips are 1,059 performances — keyed by `(drummer, session, id)` — each
 re-recorded on exactly 43 kits, with no exceptions: 444.5 hours of audio over **10.3 hours of
 distinct playing**. Parsing one rendering of each performance gives **25,524 distinct tom
-onsets**, and 25,524 × 43 = 1,097,532, which is the table above to within the handful of
-files the two passes count differently.
+onsets**.
 
-Both numbers are true and they answer different questions. 1,074,753 is how many tom onsets a
-training run sees; 25,524 is how much distinct drumming exists to learn from, and the other
-43/44ths are timbral augmentation across kits. For a model that has to survive a separator's
-artefacts that augmentation may be exactly what is wanted — but it is not more music, and
-quoting the larger figure as "how much tom data E-GMD has" overstates the corpus by two orders
-of magnitude.
+**Publish 25,524.** The 1,074,753 above is what a training run sees if it takes every
+rendering, and it is reproduced here only in the sense that it is the same order of magnitude:
+1,074,753 ÷ 43 = 24,994.25, so it is not 43 × any integer, and 25,524 × 43 = 1,097,532 misses
+it by 22,779 — about 0.89 of one full rendering. That gap is too large to wave at. Either the
+original survey dropped files without reporting it, or the 43 renderings do not carry
+identical note counts, which would be worth knowing on its own. **The provenance of the older
+figure does not reproduce, and it is recorded here as unexplained rather than given a reason
+that merely sounds plausible.**
+
+The distinction matters beyond bookkeeping. The other 42/43rds are timbral augmentation across
+kits — valuable for a model that has to survive a separator's artefacts, and not more music.
+Quoting the larger figure as "how much tom data E-GMD has" overstates the corpus by a factor
+of 43.
 
 Toms break down as 424,582 on tom 3 head, 386,871 on tom 1, 130,591 on tom 2, plus
 132,709 across the three rims. Velocity spans **4–127**, mean 66.5, 124 distinct values,
 with **48.54% of onsets below 60 and 25.04% below 40** — which is the ghost-note material
 MDB labels but cannot quantify, since its annotations carry no velocity.
+
+### Where the tom material actually is
+
+Measured over the distinct performances, one rendering each:
+
+| clip length | performances | distinct hours | distinct toms | toms per distinct hour |
+|---|---|---|---|---|
+| 0–5 s | 603 | 0.41 | 2,845 (11.1%) | **6,869** |
+| 5–15 s | 117 | 0.25 | 1,130 (4.4%) | 4,542 |
+| 15–30 s | 53 | 0.34 | 743 (2.9%) | 2,170 |
+| 30–90 s | 134 | 1.91 | 2,751 (10.8%) | 1,438 |
+| **over 90 s** | 152 | 7.42 | **18,055 (70.7%)** | 2,434 |
+
+**70.7% of the distinct tom material is in clips longer than 90 seconds.** A 5–90 s window —
+the obvious first filter, and the one we started with — keeps 18.1% of the toms. The two ends
+are not symmetric: the cap discards the bulk, while the 5-second floor discards 11.1% of the
+toms for 24 minutes of audio, which is the densest material in the corpus and nearly free to
+process.
+
+The useful consequence is about budget rather than filtering. At a fixed separation cost, the
+window's 13,046 clips over 43 kits buy 4,624 distinct tom onsets in 107.7 hours; every
+performance at **10** kits buys all 25,524 in 103.4 hours — 5.5× the distinct material for the
+same CPU, and at 4 kits still 5.5× for 38% of it. A duration filter inherited from a corpus
+with one rendering per performance does not transfer to one with 43.
 
 Roland TD kits deviate from General MIDI, so those figures depend on the mapping in
 `fetch_egmd.py`; it is the one published with GMD.
