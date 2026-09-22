@@ -1770,6 +1770,25 @@ def test_restem_mode_guard_settles_before_it_refuses():
     harness = _tmp / "mode_harness.ps1"
     harness.write_text(r"""
 . "%s" -DefineOnly
+
+# Deliberately hostile locale on every run, not only on a machine that happens to have
+# one. The second machine's decimal separator is a comma, so `-f`, which formats in the
+# current culture, emitted SECS=9,1 and float() rejected it -- the verdict depending on
+# the operator's locale rather than on the code under test. It passed here only because
+# the elapsed times happened to round to whole numbers; the flaw was latent, not absent.
+[System.Threading.Thread]::CurrentThread.CurrentCulture =
+    [System.Globalization.CultureInfo]::GetCultureInfo("de-DE")
+
+function Wire([double]$n) {
+    # This line is a protocol between two programs, not something a person reads.
+    return "$n"   # current culture, the bug
+}
+
+# A constant with a fractional part, so the locale is tested on every run instead of
+# whenever the timing happens to produce one. Timing-dependent coverage is how this got
+# through in the first place.
+Write-Output ("PROBE={0}" -f (Wire 1.5))
+
 $script:calls = 0
 $script:case  = ""
 function Current-Mode {
@@ -1788,7 +1807,7 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
     $t0 = Get-Date
     $r = Settled-Mode -Want "Best (Offline) +" -Seconds 9
     $el = ((Get-Date) - $t0).TotalSeconds
-    Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, [math]::Round($el,1))
+    Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, (Wire ([math]::Round($el,1))))
 }
 """ % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
 
@@ -1798,10 +1817,21 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
                          errors="replace", timeout=300)
     out = res.stdout + res.stderr
     got = {}
+    probe = None
     for line in out.splitlines():
+        if line.startswith("PROBE="):
+            probe = line.split("=", 1)[1].strip()
         if line.startswith("CASE="):
             parts = dict(kv.split("=", 1) for kv in line.strip().split("|"))
             got[parts["CASE"]] = (parts["RESULT"], float(parts["SECS"]))
+
+    # The harness runs under a comma-decimal culture on purpose, so this is the assertion
+    # that the wire format does not follow it. Checked before the cases, because when this
+    # is wrong every float() below raises and the failure reads as something else entirely.
+    assert probe is not None, f"the harness emitted no locale probe:\n{out[:800]}"
+    assert probe == "1.5", (
+        f"the harness formatted 1.5 as {probe!r} under a comma-decimal culture, so the "
+        "numbers on this wire follow the operator's locale rather than the protocol")
     assert len(got) == 5, f"harness did not report all five cases:\n{out[:800]}"
 
     want = "Best (Offline) +"
