@@ -1666,6 +1666,47 @@ def test_egmd_redundancy_is_reported_not_left_to_prose():
     assert "renderings" in out, (
         f"the summary does not say the per-family counts are renderings:\n{out}")
 
+
+@test
+def test_larsnet_weights_check_looks_inside_the_folder():
+    """Upstream ships the weights folder empty, so its existence proved nothing.
+
+    `install_larsnet` tested `pretrained_larsnet_models.exists()` and returned early with
+    "weights already present". The LarsNet repository ships that directory containing a
+    `.gitkeep` and five empty per-stem subfolders, so a `git clone` creates it before any
+    weight is downloaded and the documented install -- `setup_env.py --with-larsnet` --
+    printed success while fetching none of the 563 MB. `--verify` then printed a tick using
+    the same test, so the check that exists to catch a broken install confirmed it.
+
+    The obvious repair is wrong in the other direction and this guard covers both. The
+    `.pth` files live in per-stem subdirectories with none at the top level, so a
+    non-recursive `glob("*.pth")` never sees an installed set and re-downloads 563 MB every
+    run -- a false failure rather than a false pass, which is cheaper and still incorrect.
+    """
+    import setup_env
+
+    fresh = _tmp / "larsnet_fresh"
+    (fresh / "larsnet" / "pretrained_larsnet_models").mkdir(parents=True)
+    weights = fresh / "larsnet" / "pretrained_larsnet_models"
+    (weights / ".gitkeep").write_text("", encoding="utf-8")
+    for stem in ("kick", "snare", "toms", "hihat", "cymbals"):
+        (weights / stem).mkdir()
+    assert not setup_env.larsnet_weights_present(fresh), (
+        "a clone with the folder and five empty stem subdirectories, which is what upstream "
+        "ships, is being reported as an installed set")
+
+    # and the real layout, which is nested -- not top-level, which is what a naive fix assumes
+    for stem in ("kick", "snare", "toms", "hihat", "cymbals"):
+        (weights / stem / f"pretrained_{stem}_unet.pth").write_bytes(b"\x00")
+    assert setup_env.larsnet_weights_present(fresh), (
+        "weights in per-stem subdirectories are not being found, so a correct install would "
+        "be re-downloaded on every run")
+
+    # a partial extract is not an install
+    (weights / "kick" / "pretrained_kick_unet.pth").unlink()
+    assert not setup_env.larsnet_weights_present(fresh), (
+        "four stems of five is being accepted as a complete set")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

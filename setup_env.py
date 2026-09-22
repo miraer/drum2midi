@@ -135,6 +135,27 @@ def install_core() -> bool:
     return ok
 
 
+def larsnet_weights_present(root: Path = ROOT) -> bool:
+    r"""Whether the LarsNet weights are actually on disk, not whether a folder exists.
+
+    `install_larsnet` used to test `pretrained_larsnet_models.exists()` and return early
+    with "weights already present". Upstream ships that directory containing a `.gitkeep`
+    and five empty per-stem subfolders, so a fresh clone creates it every time and the test
+    is true before anything has been downloaded. The documented install therefore printed
+    success, fetched none of the 563 MB, and the failure surfaced much later as a separator
+    that would not load. The same test was also the one `--verify` used to print a tick.
+
+    Checked rather than assumed, because the obvious repair is wrong too: the `.pth` files
+    live in per-stem subdirectories -- `pretrained_larsnet_models/kick/pretrained_kick_unet.pth`
+    -- and there are none at the top level, so a non-recursive `glob("*.pth")` never sees an
+    installed set and re-downloads 563 MB on every run. That turns a false pass into a false
+    failure, which is cheaper but not correct. Recursive, and it counts, because five stems
+    are what the separator needs and a partial extract is not an install.
+    """
+    weights = root / "larsnet" / "pretrained_larsnet_models"
+    return len(list(weights.rglob("*.pth"))) >= 5
+
+
 def install_larsnet() -> None:
     print("\n[extra] LarsNet")
     target = ROOT / "larsnet"
@@ -144,7 +165,7 @@ def install_larsnet() -> None:
     if not target.exists():
         print("    clone failed, skipping weights")
         return
-    if (target / "pretrained_larsnet_models").exists():
+    if larsnet_weights_present():
         print("    weights already present")
         return
     pip("gdown", "torchaudio")
@@ -325,8 +346,8 @@ def check(install_failed: bool = False) -> int:
     print(f"{OK}MDX23C separator" if mdx.exists()
           else f"{WARN}MDX23C separator  (downloads on first run)")
 
-    lars = ROOT / "larsnet" / "pretrained_larsnet_models"
-    print(f"{OK}LarsNet weights" if lars.exists()
+    lars = larsnet_weights_present()
+    print(f"{OK}LarsNet weights" if lars
           else f"{WARN}LarsNet weights  (only needed for --separator larsnet)")
 
     # ffmpeg is checked with the packages above rather than here: it is required
