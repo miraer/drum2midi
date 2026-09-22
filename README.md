@@ -195,13 +195,14 @@ cymbal margins shrink to within noise and the tom margin hardens into a real los
 > The earlier published figure of 0.820 was its weaker configuration and has been
 > restated rather than quietly replaced.
 >
-> The ReStem team have not been written to yet. The letter is written and not sent, and
-> publication was deliberately not made to wait on it — which means that as things stand
-> they are learning about this here or not at all. That is a choice with a cost and it is
-> ours. When it goes, it tells them plainly that this is public. If they say the product
-> was used incorrectly, these numbers get rerun and corrected here, and the correction
-> gets stated plainly rather than quietly edited in. That has already happened repeatedly
-> with our own claims — six times in this very section.
+> The ReStem team were written to on **22 September 2026** — after this was already public.
+> Publication was deliberately not made to wait on the letter, so they heard about it from
+> here first and from us second. That is a choice with a cost and it was ours. The letter
+> states plainly that this is public, gives every result with its interval, and says which
+> of them are significant and which are not. No reply yet. If they say the product was used
+> incorrectly, these numbers get rerun and corrected here, and the correction gets stated
+> plainly rather than quietly edited in. That has already happened repeatedly with our own
+> claims — six times in this very section.
 
 <sub>Same 23 MDB Drums tracks, same `mir_eval` code, same 50 ms MIREX tolerance, both
 given the isolated drum recording. ReStem was driven through its own interface
@@ -1292,9 +1293,10 @@ people with an obvious stake in the answer. Eight specific reasons to hold it lo
   no timing figure from here is quoted as a comparison.
 
 What can be stated without qualification: nothing was extracted from their model files,
-and nothing of theirs is redistributed. The ReStem team have **not** been contacted yet —
-a letter is written and unsent, and publication deliberately did not wait for it. Any
-correction they send gets applied here and labelled as a correction.
+and nothing of theirs is redistributed. The ReStem team were contacted on **22 September
+2026**; publication deliberately did not wait for it, so the letter followed the
+publication rather than preceding it. Any correction they send gets applied here and
+labelled as a correction.
 
 Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
