@@ -674,15 +674,16 @@ def test_gui_children_run_under_a_console_interpreter():
     for new top-level windows during a run started from the window under pythonw.
     """
     if sys.platform != "win32":
-        return          # the console subsystem split only exists on Windows
+        skip("the console/GUI subsystem split exists only on Windows")
     gui = load_gui()
     scripts = Path(sys.executable).parent
+    if not (scripts / "python.exe").exists():
+        skip(f"no python.exe beside {Path(sys.executable).name} to fall back to")
     for windowless in ("pythonw.exe", "drum2midi.exe"):
-        if (scripts / "python.exe").exists():
-            got = gui._console_python(scripts / windowless)
-            assert got.name.lower() == "python.exe", (
-                f"{windowless} runs child scripts as {got.name}; their console "
-                "programs will open windows")
+        got = gui._console_python(scripts / windowless)
+        assert got.name.lower() == "python.exe", (
+            f"{windowless} runs child scripts as {got.name}; their console "
+            "programs will open windows")
 
 
 @test
