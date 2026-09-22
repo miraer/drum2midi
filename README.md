@@ -415,10 +415,16 @@ Optional extras:
 
 ```powershell
 .\.venv\Scripts\python.exe setup_env.py --with-larsnet   # the fast separator + weights
-.\.venv\Scripts\python.exe setup_env.py --with-render    # FluidSynth + GM soundfont
 .\.venv\Scripts\python.exe setup_env.py --with-intel-gpu # Intel GPU: separation 12x faster
+.\.venv\Scripts\python.exe setup_env.py --no-render      # skip FluidSynth + soundfont
 .\.venv\Scripts\python.exe setup_env.py --check          # verify, install nothing
 ```
+
+FluidSynth and a General MIDI soundfont (~40 MB) are installed by default, because the
+window plays the MIDI and an A / B mix through them. On Windows both are downloaded
+into `tools/`. On macOS and Linux only the soundfont is; FluidSynth comes from
+`brew install fluid-synth` or `sudo apt install fluidsynth`, which setup prints rather
+than runs. `--no-render` skips both when you will only use the command line.
 
 `--check` reports which device each stage will use. If an Intel GPU is present but torch
 cannot see it, the installer says so instead of silently running on the CPU.
@@ -528,7 +534,7 @@ When a run finishes, the timeline shows every note that was written, read back f
 the MIDI file itself. Click it to seek, and use **Original / MIDI / A / B** to listen.
 A / B puts the recording in the left ear and the rendered MIDI in the right, which
 makes timing drift and wrong drums obvious on headphones. MIDI and A / B are rendered
-by `render_midi.py` and need FluidSynth (`setup_env.py --with-render`).
+by `render_midi.py` through FluidSynth, which `setup_env.py` installs by default.
 
 The result table doubles as the channel and note map. Click a note or a channel to
 send that drum somewhere other than General MIDI (channel 10). The change is passed as
