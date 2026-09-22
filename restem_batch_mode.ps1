@@ -12,10 +12,11 @@
 #   powershell -File restem_batch_mode.ps1 -Expect "Best (Offline) +" -Label best-plus -Tracks a,b
 
 param(
-    [Parameter(Mandatory = $true)][string] $Expect,
-    [Parameter(Mandatory = $true)][string] $Label,
+    [string] $Expect,
+    [string] $Label,
     [string[]] $Tracks,
-    [int] $TimeoutMinutes = 90
+    [int] $TimeoutMinutes = 90,
+    [switch] $DefineOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -133,6 +134,20 @@ function Settled-Mode {
     }
     if ($last) { Say "mode stayed '$last' for ${Seconds}s" | Out-Host }
     return $last
+}
+
+# -DefineOnly loads the functions above and stops, so Settled-Mode can be exercised with a
+# stubbed Current-Mode instead of a running ReStem. Its asymmetry is the kind of logic that
+# regresses silently, and until now the only claim it was tested was a sentence in its own
+# comment. Nothing below this line runs under the switch, so the batch path is unchanged.
+if ($DefineOnly) { return }
+
+# Checked here rather than by [Parameter(Mandatory)]. A mandatory parameter makes
+# `powershell -File` stop and read from stdin when it is missing, which in an overnight run
+# is not a prompt but a hang that looks exactly like a long render.
+if (-not $Expect -or -not $Label) {
+    Say "both -Expect and -Label are required"
+    exit 2
 }
 
 $mode = Settled-Mode -Want $Expect

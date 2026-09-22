@@ -1707,6 +1707,95 @@ def test_larsnet_weights_check_looks_inside_the_folder():
     assert not setup_env.larsnet_weights_present(fresh), (
         "four stems of five is being accepted as a complete set")
 
+
+@test
+def test_restem_mode_guard_settles_before_it_refuses():
+    """The guard that decides whether an overnight ReStem batch may start.
+
+    Two measured failures, needing opposite treatment, which is why the wait is asymmetric:
+
+    * while a render runs the mode selector leaves the accessibility tree entirely, and a
+      read taken then returns nothing. Treated as "unreadable", that stops the batch. It has
+      never fired only because the loop happens to check between tracks -- safety by
+      accident.
+    * the label lags a human moving the selector by a few seconds, so a read taken just
+      after a change returns the *previous* mode. That produced one false refusal.
+
+    Two agreeing reads do not fix the second: a stale label read twice agrees with itself.
+    So a read matching what was asked for is acted on at once -- a lagging label cannot
+    fabricate agreement it has not seen yet -- and anything else is given the whole window
+    to become the expected value before it is reported as a disagreement. The cost of
+    waiting falls on the refusal, where a wrong answer loses a night.
+
+    Until now the only evidence any of that was tested was a sentence in the function's own
+    comment; there was no test in the repository. `-DefineOnly` loads the functions without
+    running the batch, so a stubbed Current-Mode can drive it with no ReStem present.
+    """
+    import subprocess
+
+    harness = _tmp / "mode_harness.ps1"
+    harness.write_text(r"""
+. "%s" -DefineOnly
+$script:calls = 0
+$script:case  = ""
+function Current-Mode {
+    $script:calls++
+    switch ($script:case) {
+        "match"     { return "Best (Offline) +" }
+        "lagging"   { if ($script:calls -le 2) { return "Better" } else { return "Best (Offline) +" } }
+        "disagree"  { return "Better" }
+        "transient" { if ($script:calls -le 2) { return $null } else { return "Best (Offline) +" } }
+        "absent"    { return $null }
+    }
+}
+foreach ($c in @("match","lagging","disagree","transient","absent")) {
+    $script:case = $c
+    $script:calls = 0
+    $t0 = Get-Date
+    $r = Settled-Mode -Want "Best (Offline) +" -Seconds 9
+    $el = ((Get-Date) - $t0).TotalSeconds
+    Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, [math]::Round($el,1))
+}
+""" % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
+
+    res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(harness)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    got = {}
+    for line in out.splitlines():
+        if line.startswith("CASE="):
+            parts = dict(kv.split("=", 1) for kv in line.strip().split("|"))
+            got[parts["CASE"]] = (parts["RESULT"], float(parts["SECS"]))
+    assert len(got) == 5, f"harness did not report all five cases:\n{out[:800]}"
+
+    want = "Best (Offline) +"
+
+    # the happy path pays nothing: a matching read is acted on at once
+    assert got["match"][0] == want, f"a matching read was not returned: {got['match']}"
+    assert got["match"][1] < 3, (
+        f"the happy path waited {got['match'][1]}s; the asymmetry is the point")
+
+    # THE bug: a stale label read twice agrees with itself
+    assert got["lagging"][0] == want, (
+        f"a lagging label was reported as a disagreement: {got['lagging']} -- this refuses "
+        "a batch that should have run")
+
+    # a genuine disagreement is still a disagreement, after the whole window
+    assert got["disagree"][0] == "Better", (
+        f"a real mode mismatch was not reported: {got['disagree']}")
+    assert got["disagree"][1] >= 6, (
+        f"the refusal was decided in {got['disagree'][1]}s without waiting out the lag")
+
+    # the selector leaving the tree mid-render is polled through, not treated as failure
+    assert got["transient"][0] == want, (
+        f"a transient absence stopped the batch: {got['transient']}")
+
+    # but a selector that never appears must not be reported as agreement
+    assert got["absent"][0] == "", (
+        f"an unreadable selector returned a mode: {got['absent']}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
