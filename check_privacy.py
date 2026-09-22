@@ -329,9 +329,21 @@ def tracked_files() -> list[Path]:
     return [ROOT / line.strip() for line in out.stdout.splitlines() if line.strip()]
 
 
-def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, int]:
+def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, set]:
+    r"""Check each path, and report which ones were actually opened.
+
+    The third return value used to be a count. Five bugs in two days had one shape: a
+    file the scanner never opened was described by a category derived from the path list
+    -- filed as "not a text type", as the remainder, as "binary", or not reported at all
+    -- and the run exited 0. A count cannot prevent that, because it balances whenever
+    the totals agree, whatever the totals are about.
+
+    Returning the set moves every category from a prediction about what scan() would do
+    to a subtraction from what it did. A file this function opened can no longer be
+    counted as skipped, and one it skipped can no longer be absent from the arithmetic.
+    """
     fatal, warn = [], []
-    read = 0
+    opened: set = set()
 
     for path in paths:
         # A file outside the repository is a normal thing to check -- a draft held
@@ -373,7 +385,7 @@ def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, int]:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
-        read += 1
+        opened.add(path)
 
         for n, line in enumerate(lines, 1):
             if ALLOW.search(line):
@@ -393,7 +405,7 @@ def scan(paths: list[Path], explicit: bool = False) -> tuple[list, list, int]:
                     fatal.append((rel, n, f"machine or account name '{name}'",
                                   line.strip()[:70]))
                     break
-    return fatal, warn, read
+    return fatal, warn, opened
 
 
 def main() -> int:
@@ -414,12 +426,21 @@ def main() -> int:
         print("nothing to check")
         return 0
 
-    fatal, warn, read = scan(paths, explicit=bool(args.files))
+    fatal, warn, opened = scan(paths, explicit=bool(args.files))
+    # Every category below is a partition of the files scan() did *not* open, rather than
+    # a predicate over the whole list that has to agree with what scan() did. The five
+    # bugs in this area were all the same disagreement: a file nothing opened, described
+    # by a category that had guessed right about a different file. Subtracting from the
+    # opened set makes the guess impossible -- a file that was read cannot also be
+    # reported as skipped, and one that was not read has to land somewhere or show up in
+    # the remainder.
+    unopened = [p for p in paths if p not in opened]
+    read = len(paths) - len(unopened)
     # A path that is not there was folded into "not a text type" and the run still
     # exited 0, so asking about a file that had moved, or passing one relative to the
     # wrong directory, produced a clean bill for a check that never happened. Green has
     # to mean "looked and found nothing"; it cannot also mean "could not look".
-    missing = [p for p in paths if not p.exists()]
+    missing = [p for p in unopened if not p.exists()]
     # Naming the skipped files rather than counting them. A commit reported "1 not a
     # text type" over two staged .py files and the run could not be reproduced
     # afterwards, because the summary said how many were skipped and never which. A
@@ -434,7 +455,7 @@ def main() -> int:
                 return p.as_posix()
         return str(p)
 
-    exempt = [p for p in paths if p.exists() and rel_of(p) == "check_privacy.py"]
+    exempt = [p for p in unopened if p.exists() and rel_of(p) == "check_privacy.py"]
     # `can_read` before `looks_textual`, because looks_textual returns False both when it
     # read the file and found NUL bytes and when it could not read the file at all. The
     # second is not a claim about the content, and filing it under "not a text type"
@@ -443,15 +464,15 @@ def main() -> int:
     # called `x.md` reached UNREADABLE, `x.dat` and an extensionless one did not, so the
     # category was reachable exactly for the shape the guard happened to use. Extensionless
     # hooks and the .diff artefacts are the files this matters for.
-    skipped = [p for p in paths
+    skipped = [p for p in unopened
                if p.exists() and not args.files and can_read(p) and not looks_textual(p)
                and p not in exempt]
-    unreadable = [p for p in paths
+    unreadable = [p for p in unopened
                   if p.exists() and p not in exempt and p not in skipped
                   and not can_read(p)]
     # "checked N" used to count files the scanner had only looked at the name of, so a
     # skipped file read as an inspected one. Say how many were actually opened.
-    unaccounted = (len(paths) - read - len(skipped) - len(exempt)
+    unaccounted = (len(unopened) - len(skipped) - len(exempt)
                    - len(missing) - len(unreadable))
     if read == len(paths):
         print(f"checked {len(paths)} file(s)")

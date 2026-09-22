@@ -1358,9 +1358,15 @@ def test_the_unaccounted_remainder_is_fatal():
     and not read. It lands in the remainder, which is precisely the category that exited 0.
 
     The race is made deterministic by pinning `can_read` to True in a copy of the gate --
-    standing in for the window, not asserting that can_read is wrong. `read == len(paths)`
-    cannot coexist with a non-empty category, because scan() increments `read` only after
-    every `continue`, so hoisting the subtraction out of the summary cannot make it negative.
+    standing in for the window, not asserting that can_read is wrong.
+
+    A claim that stood here and was wrong: that `read == len(paths)` cannot coexist with a
+    non-empty category, because scan() increments `read` only after every `continue`. That
+    holds for what scan() did and not for what main() later concluded, because main()
+    re-observed each file with fresh `can_read` and `looks_textual` calls. The two can
+    disagree, and the arithmetic could go negative -- see the false-red guard below, which
+    is the same window in the other direction. The categories are now subtracted from the
+    set scan() actually opened, so neither direction is reachable.
     """
     import os
     import shutil
@@ -1402,6 +1408,67 @@ def test_the_unaccounted_remainder_is_fatal():
         f"a clean bill was issued over a file in no category:\n{out[:600]}")
     assert res.returncode != 0, (
         f"the remainder printed and the run still exited 0:\n{out[:600]}")
+    shutil.rmtree(repo, ignore_errors=True)
+
+
+@test
+def test_a_file_that_was_read_is_never_called_unreadable():
+    """The other direction of the same window, and the one that gets a gate bypassed.
+
+    Every defect in this area so far was silent-green: a file nothing opened, waved through.
+    Deriving the categories from the whole path list is wrong both ways, because main()
+    re-observes each file rather than asking scan() what happened to it. If a lock appears
+    *after* the read -- or any predicate is simply wrong about a file already opened -- then
+    a file that was read lands in `unreadable`, and the gate refuses a clean commit while
+    printing `checked 1 file(s)` immediately above. Two contradictory sentences about one
+    file, in one run.
+
+    That is worse than a false pass in one specific way: a gate that fails a commit nobody
+    can fix is a gate people learn to skip, and the next real leak goes with it.
+
+    I argued in the commit for the remainder that this could not happen, on the grounds that
+    scan() increments `read` only after every `continue`. That reasoning was about scan()
+    and the bug is in main(). The second machine built the counter-example.
+
+    Categories are now subtracted from the set scan() reports it opened, so a file that was
+    read cannot be described by any of them.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    repo = _tmp / "false_red_repo"
+    repo.mkdir()
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@e",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@e"}
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=str(repo), env=env, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
+
+    git("init", "-q")
+    (repo / "ordinary.md").write_text("ordinary, readable, nothing private\n",
+                                      encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "fixture")
+
+    source = (ROOT / "check_privacy.py").read_text(encoding="utf-8")
+    marker = "def can_read(path: Path) -> bool:"
+    assert marker in source, "can_read has been renamed; this guard pins it by signature"
+    pinned = source.replace(marker, marker + "\n    return False  # pinned for this test", 1)
+    (repo / "check_privacy.py").write_text(pinned, encoding="utf-8")
+
+    res = subprocess.run([PY, str(repo / "check_privacy.py"), "--all"],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(repo), env=env)
+    out = res.stdout + res.stderr
+
+    assert "could not be read" not in out, (
+        f"a file the scanner opened is being reported as unreadable:\n{out[:600]}")
+    assert "unaccounted" not in out, (
+        f"a file the scanner opened is unaccounted for:\n{out[:600]}")
+    assert res.returncode == 0, (
+        f"a clean readable file was refused, which is how a gate gets bypassed:\n{out[:600]}")
     shutil.rmtree(repo, ignore_errors=True)
 
 def main() -> int:
