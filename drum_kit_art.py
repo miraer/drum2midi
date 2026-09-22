@@ -50,12 +50,24 @@ def _shade(c: tuple, f: float) -> tuple:
 class Kit:
     """Draws onto one image. Coordinates are fractions of the canvas, radii of width."""
 
-    def __init__(self, w: int, h: int, dark: bool):
+    def __init__(self, w: int, h: int, dark: bool, colours=None):
         self.img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         self.d = ImageDraw.Draw(self.img)
         self.w, self.h, self.dark = w, h, dark
+        self.colours = colours
         self.hw = HARDWARE_DARK if dark else HARDWARE
         self.line = max(1, int(w * 0.0035))
+
+    def rgb(self, pitch: int) -> tuple:
+        """The drum's colour: the caller's palette as given, else the icons' own.
+
+        A caller's palette is taken as already fitted to its background, so it is not
+        lifted for dark the way the icon colours are.
+        """
+        if self.colours is None:
+            return _rgb(pitch, self.dark)
+        h = self.colours(pitch)
+        return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
 
     def _px(self, x: float, y: float) -> tuple:
         return x * self.w, y * self.h
@@ -75,7 +87,7 @@ class Kit:
         rx = r * self.w
         ry = rx * 0.34          # how far the top head is foreshortened
         dep = depth * self.w
-        base = _rgb(pitch, self.dark)
+        base = self.rgb(pitch)
         side = _shade(base, 0.80 if not self.dark else 0.72)
         head = _shade(base, 1.14 if not self.dark else 1.0)
 
@@ -105,7 +117,7 @@ class Kit:
         cx, cy = self._px(x, y)
         rx = r * self.w
         ry = rx * 0.94
-        base = _rgb(pitch, self.dark)
+        base = self.rgb(pitch)
         for f in (-0.82, 0.82):  # spurs
             self.rod(cx + rx * f, cy + ry * 0.45, cx + rx * f * 1.20, cy + ry * 1.06, 1.3)
         self.d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry],
@@ -124,7 +136,7 @@ class Kit:
         cx, cy = self._px(x, y)
         rx = r * self.w
         ry = rx * tilt
-        base = _rgb(pitch, self.dark)
+        base = self.rgb(pitch)
         if floor is not None:
             self.rod(cx, cy, cx, floor * self.h, 1.0)
         # a sliver of the underside, so the disc has thickness
@@ -149,10 +161,14 @@ class Kit:
 
 
 def render(width: int = 300, height: int | None = None, dark: bool = False,
-           alpha: int = 42, scale: int = 3) -> Image.Image:
-    """The kit as an RGBA image, faded to `alpha` so it can sit behind text."""
+           alpha: int = 42, scale: int = 3, colours=None) -> Image.Image:
+    """The kit as an RGBA image, faded to `alpha` so it can sit behind text.
+
+    `colours` maps a pitch to "#rrggbb". The window passes its own theme tokens, so
+    the picture stays the legend for the rows and lanes drawn in those tokens.
+    """
     height = height or int(width * 0.76)
-    k = Kit(width * scale, height * scale, dark)
+    k = Kit(width * scale, height * scale, dark, colours)
 
     # back to front, so the near drums overlap the far ones
     k.cymbal(49, 0.152, 0.145, 0.148, tilt=0.18, floor=0.97)   # crash, player's left

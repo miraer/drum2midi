@@ -94,6 +94,11 @@ def note_name(pitch: int) -> str:
     return f"{_NOTE_LETTERS[pitch % 12]}{pitch // 12 - (5 - _MIDDLE_C_OCTAVE)}"
 
 
+def _count(n: int, word: str) -> str:
+    """1 -> "1 note", 2 -> "2 notes"."""
+    return f"{n} {word}{'s' * (n != 1)}"
+
+
 def _device_plan() -> tuple[str | None, str | None]:
     """What each stage will actually run on: (separator name, transcriber name).
 
@@ -391,7 +396,7 @@ def envelope(path: Path, bins: int = 1600) -> list[float]:
 
 # =============================================================================== Qt
 from PySide6.QtCore import QObject, QPointF, QRectF, QSize, Qt, QTimer, QUrl, Signal  # noqa: E402
-from PySide6.QtGui import (QColor, QFont, QFontDatabase, QIcon, QPainter,  # noqa: E402
+from PySide6.QtGui import (QColor, QFont, QFontDatabase, QIcon, QImage, QPainter,  # noqa: E402
                            QPainterPath, QPen, QPolygonF)
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QButtonGroup,  # noqa: E402
                                QComboBox, QFileDialog, QFrame, QGraphicsOpacityEffect,
@@ -612,6 +617,103 @@ class NoteBox(QComboBox):
         p.setBrush(Tokens.c("muted"))
         x, y = self.width() - 12, self.height() / 2 - 1.5
         p.drawPolygon(QPolygonF([QPointF(x, y), QPointF(x + 6, y), QPointF(x + 3, y + 4)]))
+
+
+def _note_box(note: int, width: int) -> NoteBox:
+    box = NoteBox()
+    box.setFixedWidth(width)
+    box.addItems([f"{n} · {note_name(n)}" for n in range(128)])
+    box.setMaxVisibleItems(16)
+    box.setCurrentIndex(note)
+    box.setToolTip("The note this drum is written as (--notes)")
+    return box
+
+
+def _channel_box(channel: int, width: int) -> NoteBox:
+    box = NoteBox()
+    box.setFixedWidth(width)
+    # shown 1-16 like every DAW; the CLI takes 0-15
+    box.addItems([str(n + 1) for n in range(16)])
+    box.setCurrentIndex(channel)
+    box.setToolTip("MIDI channel (--channels). 10 is the General MIDI drum channel.")
+    return box
+
+
+# ------------------------------------------------------------------ kit picture
+_KIT_CACHE: dict[tuple, QImage | None] = {}
+
+
+def kit_image(width: float, theme: str, alpha: int) -> QImage | None:
+    """The drawn kit (drum_kit_art) in this theme's drum colours; None without Pillow.
+
+    Rendered at a width rounded up to 32 px and scaled down when painted, so dragging
+    the window's edge does not redraw the kit for every pixel.
+    """
+    width = max(64, -(-int(width) // 32) * 32)
+    key = (width, theme, alpha)
+    if key not in _KIT_CACHE:
+        if len(_KIT_CACHE) >= 8:          # a resize walks through sizes; keep few
+            _KIT_CACHE.clear()
+        try:
+            import drum_kit_art
+            t = THEMES[theme]
+            img = drum_kit_art.render(width, dark=theme == "dark", alpha=alpha,
+                                      colours=lambda p: t[colour_key(p)])
+            _KIT_CACHE[key] = QImage(img.tobytes("raw", "RGBA"), img.width, img.height,
+                                     img.width * 4, QImage.Format.Format_RGBA8888).copy()
+        except Exception:
+            # optional, as the icons are: without Pillow the background stays plain
+            _KIT_CACHE[key] = None
+    return _KIT_CACHE[key]
+
+
+def paint_kit(p: QPainter, area: QRectF, alpha: int, max_width: float) -> bool:
+    """Draws the kit centred in `area`, as large as fits up to `max_width`."""
+    w = min(area.width(), area.height() / 0.76, max_width)
+    if w < 96:
+        return False
+    dpr = p.device().devicePixelRatioF()
+    img = kit_image(w * dpr, Tokens.name, alpha)
+    if img is None:
+        return False
+    h = w * img.height() / img.width()
+    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    p.drawImage(QRectF(area.center().x() - w / 2, area.center().y() - h / 2, w, h), img)
+    return True
+
+
+class KitPicture(QWidget):
+    """The kit on its own, above the empty state's caption: every drum that will be
+    found, each in the colour its row and lane will use."""
+
+    def __init__(self, alpha: int, max_width: int):
+        super().__init__()
+        self.alpha, self.max_width = alpha, max_width
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setMinimumHeight(0)
+
+    def sizeHint(self) -> QSize:
+        return QSize(self.max_width, int(self.max_width * 0.76))
+
+    def paintEvent(self, _):
+        paint_kit(QPainter(self), QRectF(self.rect()), self.alpha, self.max_width)
+
+
+class KitScroll(QScrollArea):
+    """A scroll area with the kit painted on its viewport, behind the rows.
+
+    The viewport stays put when the rows scroll, so the kit does too and the rows
+    pass over it, as they did in the Tk window's hand-drawn table.
+    """
+
+    def __init__(self, alpha: int, max_width: int):
+        super().__init__()
+        self.alpha, self.max_width = alpha, max_width
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        area = QRectF(self.viewport().rect()).adjusted(12, 12, -12, -12)
+        paint_kit(QPainter(self.viewport()), area, self.alpha, self.max_width)
 
 
 class Toggle(QAbstractButton):
@@ -1053,22 +1155,11 @@ class ResultRow(QFrame):
         inst.addStretch(1)
         lay.addLayout(inst, 13)
 
-        self.note = NoteBox()
-        self.note.setFixedWidth(COLS[1][1])
-        self.note.addItems([f"{n} · {note_name(n)}" for n in range(128)])
-        self.note.setMaxVisibleItems(16)
-        self.note.setCurrentIndex(note)
-        self.note.setToolTip("The note this drum is written as (--notes)")
+        self.note = _note_box(note, COLS[1][1])
         self.note.currentIndexChanged.connect(lambda _: self.edited.emit())
         lay.addWidget(self.note)
 
-        self.chan = NoteBox()
-        self.chan.setFixedWidth(COLS[2][1])
-        # shown 1-16 like every DAW; the CLI takes 0-15
-        self.chan.addItems([str(n + 1) for n in range(16)])
-        self.chan.setCurrentIndex(channel)
-        self.chan.setToolTip("MIDI channel (--channels). 10 is the General MIDI drum "
-                             "channel.")
+        self.chan = _channel_box(channel, COLS[2][1])
         self.chan.currentIndexChanged.connect(lambda _: self.edited.emit())
         lay.addWidget(self.chan)
 
@@ -1098,6 +1189,27 @@ class ResultRow(QFrame):
         self.vmax.setText("" if hi is None else str(hi))
         self.bar.lo, self.bar.hi = lo, hi
         self.bar.update()
+
+
+class MapRow(QWidget):
+    """One drum in the sidebar's channel and note map: the same two overrides as the
+    result row, there before any file is chosen."""
+    edited = Signal()
+
+    def __init__(self, pitch: int, name: str, note: int, channel: int):
+        super().__init__()
+        self.pitch = pitch
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+        lay.addWidget(Dot(colour_key(pitch)))
+        lay.addWidget(_label(name), 1)
+        self.note = _note_box(note, COLS[1][1])
+        self.note.currentIndexChanged.connect(lambda _: self.edited.emit())
+        lay.addWidget(self.note)
+        self.chan = _channel_box(channel, 52)
+        self.chan.currentIndexChanged.connect(lambda _: self.edited.emit())
+        lay.addWidget(self.chan)
 
 
 # ------------------------------------------------------------------ the window
@@ -1350,6 +1462,48 @@ class Window(QMainWindow):
         grid.addWidget(_label("e.g. kick=0.3,snare=0.25", "hint", wrap=True), 2, 1)
         opt.addLayout(grid)
         col.addLayout(opt)
+
+        # -- channels & notes: a setting made before converting, so it sits with the
+        # others. The result table edits the same map once a file is chosen.
+        mp = QVBoxLayout()
+        mp.setSpacing(6)
+        mp.addWidget(_section("Channels & notes"))
+        mp.addWidget(_label("Everything goes to channel 10, the General MIDI drum "
+                            "channel. Remap notes for a sampler that does not follow "
+                            "General MIDI, or give each drum its own channel.",
+                            "hint", wrap=True))
+        heads = QHBoxLayout()
+        heads.setSpacing(8)
+        heads.addWidget(_label("INSTRUMENT", "colhead"), 1)
+        for title, width in (("NOTE", COLS[1][1]), ("CH", 52)):
+            lab = _label(title, "colhead")
+            lab.setFixedWidth(width)
+            heads.addWidget(lab)
+        mp.addSpacing(4)
+        mp.addLayout(heads)
+        self.map_rows: dict[int, MapRow] = {}
+        for pitch, name in KIT:
+            r = MapRow(pitch, name, self.c.notes.get(pitch, pitch),
+                       self.c.channels.get(pitch, DRUM_CHANNEL))
+            r.edited.connect(lambda r=r: self._row_edited(r))
+            mp.addWidget(r)
+            self.map_rows[pitch] = r
+        buttons = QHBoxLayout()
+        buttons.setSpacing(6)
+        self.btn_map_reset = QPushButton("Reset to General MIDI")
+        self.btn_map_reset.clicked.connect(self._reset_overrides)
+        self.btn_spread = QPushButton("One channel each")
+        self.btn_spread.setToolTip("Kick on channel 1, snare on 2 … ride on 10, "
+                                   "for a sampler with one output per channel")
+        self.btn_spread.clicked.connect(self._spread_channels)
+        buttons.addWidget(self.btn_map_reset)
+        buttons.addWidget(self.btn_spread)
+        buttons.addStretch(1)
+        mp.addSpacing(6)
+        mp.addLayout(buttons)
+        self.map_hint = _label("", "hint", wrap=True)
+        mp.addWidget(self.map_hint)
+        col.addLayout(mp)
         col.addStretch(1)
         return scroll
 
@@ -1367,6 +1521,10 @@ class Window(QMainWindow):
         dl = QVBoxLayout(drop)
         dl.setSpacing(10)
         dl.addStretch(1)
+        # as the Tk window's empty table did: bolder while there is nothing to read
+        self.kit_picture = KitPicture(alpha=46, max_width=400)
+        dl.addWidget(self.kit_picture)
+        dl.addSpacing(8)
         big = _label("Drop drums here")
         big.setFont(font(20, 600))
         big.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1555,7 +1713,9 @@ class Window(QMainWindow):
                 lab.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             hh.addWidget(lab, 13 if i == 0 else 20 if width is None else 0)
         tl.addWidget(heads)
-        scroll = QScrollArea()
+        # faint once there are rows to read over it
+        scroll = KitScroll(alpha=24, max_width=420)
+        self.table_scroll = scroll
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         rows = QWidget()
@@ -1716,14 +1876,19 @@ class Window(QMainWindow):
         # results
         notes, chans = overrides(self.c)
         n = len(notes) + len(chans)
+        differ = (f"{_count(len(notes), 'note')}, {_count(len(chans), 'channel')} "
+                  f"differ from General MIDI")
         if done and n and self._overrides_changed_since_run():
             self.table_hint.setText("Changed — convert again to apply")
+            self.map_hint.setText("Changed since the last run — convert again to apply")
         elif n:
-            self.table_hint.setText(f"{len(notes)} notes, {len(chans)} channels "
-                                    f"differ from General MIDI")
+            self.table_hint.setText(differ)
+            self.map_hint.setText(differ)
         else:
             self.table_hint.setText("Click a note or channel to change it")
+            self.map_hint.setText("General MIDI notes, all on channel 10")
         self.btn_reset.setVisible(bool(n))
+        self.btn_map_reset.setEnabled(bool(n))
 
     def _single_file(self) -> bool:
         return bool(self.c.input) and Path(self.c.input).is_file()
@@ -1872,19 +2037,36 @@ class Window(QMainWindow):
         self._sync()
 
     # ---------------------------------------------------------------- overrides
-    def _row_edited(self, row: ResultRow) -> None:
+    def _row_edited(self, row) -> None:
+        """An edit in either editor, the sidebar map or the result table."""
         self.c.notes[row.pitch] = row.note.currentIndex()
         self.c.channels[row.pitch] = row.chan.currentIndex()
+        self._show_overrides()
         self._refresh_run()
 
+    def _show_overrides(self) -> None:
+        """Puts the note and channel map from Choices into both editors of it."""
+        for rows in (self.rows, self.map_rows):
+            for pitch, row in rows.items():
+                for box, value in ((row.note, self.c.notes.get(pitch, pitch)),
+                                   (row.chan, self.c.channels.get(pitch, DRUM_CHANNEL))):
+                    if box.currentIndex() != value:
+                        box.blockSignals(True)
+                        box.setCurrentIndex(value)
+                        box.blockSignals(False)
+
     def _reset_overrides(self) -> None:
-        for pitch, row in self.rows.items():
-            for box, value in ((row.note, pitch), (row.chan, DRUM_CHANNEL)):
-                box.blockSignals(True)
-                box.setCurrentIndex(value)
-                box.blockSignals(False)
+        for pitch, _ in KIT:
             self.c.notes[pitch] = pitch
             self.c.channels[pitch] = DRUM_CHANNEL
+        self._show_overrides()
+        self._refresh_run()
+
+    def _spread_channels(self) -> None:
+        """Kick on channel 1 (0 to the CLI), snare on 2, and so on in kit order."""
+        for i, (pitch, _) in enumerate(KIT):
+            self.c.channels[pitch] = i % 16
+        self._show_overrides()
         self._refresh_run()
 
     def _set_tab(self, key: str) -> None:
@@ -2307,11 +2489,7 @@ class Window(QMainWindow):
                 continue
             if pitch in self.rows and 0 <= note <= 127 and 0 <= chan <= 15:
                 c.notes[pitch], c.channels[pitch] = note, chan
-                row = self.rows[pitch]
-                for box, value in ((row.note, note), (row.chan, chan)):
-                    box.blockSignals(True)
-                    box.setCurrentIndex(value)
-                    box.blockSignals(False)
+        self._show_overrides()
         if d.get("theme") in THEMES:
             self.theme = d["theme"]
         self._last = d.get("last_dir", "") or ""

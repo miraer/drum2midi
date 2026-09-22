@@ -394,6 +394,120 @@ def test_gui_builds():
 
 
 @test
+def test_gui_notes_can_be_set_before_a_file_is_chosen():
+    """The channel and note map must be there with no file open, as it was in Tk.
+
+    The redesign merged it into the result table, which only appears once a file is
+    chosen, and "spread across channels" went with it -- so the map looked removed.
+    The sidebar map and the table now edit one set of overrides, and each has to show
+    what was changed in the other, or the two would contradict each other.
+    """
+    settings = _tmp / "gui_settings.json"
+    settings.unlink(missing_ok=True)          # earlier windows saved their overrides
+    gui, win = gui_window()
+    assert win.phase == "empty"
+    for pitch, name in gui.KIT:
+        row = win.map_rows[pitch]
+        assert row.note.isVisibleTo(win) and row.chan.isVisibleTo(win), (
+            f"{name}: its note and channel cannot be reached with no file open")
+
+    win.map_rows[38].chan.setCurrentIndex(4)
+    cmd = gui.build_command(win.c)
+    assert cmd[cmd.index("--channels") + 1] == "38=4", cmd
+    assert win.rows[38].chan.currentIndex() == 4, "the table did not follow the sidebar"
+    win.rows[36].note.setCurrentIndex(35)
+    assert win.map_rows[36].note.currentIndex() == 35, "the sidebar did not follow the table"
+    assert win.map_hint.text().startswith("1 note, 1 channel "), win.map_hint.text()
+
+    win.btn_spread.click()
+    cmd = gui.build_command(win.c)
+    got = dict(kv.split("=") for kv in cmd[cmd.index("--channels") + 1].split(","))
+    # one channel per drum in kit order; the tenth lands on 9 and so is not an override
+    want = {str(p): str(i) for i, (p, _) in enumerate(gui.KIT) if i != gui.DRUM_CHANNEL}
+    assert got == want, f"one channel each gave {got}"
+    assert [r.chan.currentIndex() for r in win.rows.values()] == list(range(len(gui.KIT)))
+
+    win.btn_map_reset.click()
+    cmd = gui.build_command(win.c)
+    assert "--notes" not in cmd and "--channels" not in cmd, f"reset left {cmd}"
+    assert all(r.note.currentIndex() == p and r.chan.currentIndex() == gui.DRUM_CHANNEL
+               for p, r in win.rows.items()), "the table kept overrides after a reset"
+    assert not win.btn_map_reset.isEnabled()
+
+    win.map_rows[42].note.setCurrentIndex(44)
+    win.close()                               # saves the settings
+    _, again = gui_window()
+    try:
+        assert again.map_rows[42].note.currentIndex() == 44, "sidebar lost a saved note"
+        assert again.rows[42].note.currentIndex() == 44, "table lost a saved note"
+    finally:
+        again.close()
+        settings.unlink(missing_ok=True)
+
+
+@test
+def test_gui_draws_the_kit_behind_the_table():
+    """The drawn kit has to reach the screen, in the window's own drum colours.
+
+    The redesign dropped it without a word. It belongs above the empty drop zone and
+    behind the result rows. Pixels are compared with and without it, because a widget
+    that holds an image proves nothing about the image being painted.
+    """
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        skip("Pillow is not installed, so a plain background is the correct result")
+    from PySide6.QtGui import QImage
+    from PySide6.QtWidgets import QApplication
+    gui, win = gui_window()
+
+    def pixels(widget):
+        img = widget.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+        raw = np.frombuffer(img.constBits(), np.uint8)
+        raw = raw[:img.bytesPerLine() * img.height()].reshape(img.height(), -1)
+        return raw[:, :img.width() * 4].reshape(img.height(), img.width(), 4).astype(int)
+
+    def changed_by_kit(widget):
+        QApplication.processEvents()
+        with_kit = pixels(widget)
+        real = gui.kit_image
+        gui.kit_image = lambda *a, **k: None        # what a missing Pillow does
+        try:
+            widget.update()
+            plain = pixels(widget)
+        finally:
+            gui.kit_image = real
+        return int((np.abs(with_kit - plain).max(axis=2) > 3).sum())
+
+    win.resize(1320, 860)
+    win.show()
+    try:
+        assert win.phase == "empty"
+        n = changed_by_kit(win.main_stack)
+        assert n > 5000, f"the kit changed {n} pixels of the empty drop zone"
+
+        # the input set directly: _set_input would start an envelope thread that can
+        # outlive this window and emit into a deleted object
+        win.c.input = str(make_fixture())
+        win._sync()
+        assert win.phase == "ready"
+        n = changed_by_kit(win.table_scroll)
+        assert n > 5000, f"the kit changed {n} pixels behind the result rows"
+    finally:
+        win.close()
+
+    # the picture's colours are the theme's tokens, so it stays the rows' legend
+    gui.THEMES["probe"] = dict(gui.THEMES["light"], kick="#00ff00")
+    try:
+        img = gui.kit_image(300, "probe", 255)
+    finally:
+        del gui.THEMES["probe"]
+    c = img.pixelColor(int(img.width() * 0.503), int(img.height() * 0.700))
+    assert c.green() > 200 and c.red() < 60 and c.blue() < 60, (
+        f"the kick was drawn {c.name()}, not in the theme's kick colour")
+
+
+@test
 def test_gui_children_run_under_a_console_interpreter():
     """Child scripts must not run under pythonw, or their own children get windows.
 
