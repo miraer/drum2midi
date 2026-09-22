@@ -348,6 +348,15 @@ def row_pitch(label: str, c: Choices) -> int | None:
     return source_pitch(written, c)
 
 
+def render_missing() -> str | None:
+    """What stops the MIDI from being rendered for listening, or None if nothing does."""
+    try:
+        import render_midi
+        return render_midi.missing()
+    except Exception as exc:  # noqa: BLE001 -- the window must open regardless
+        return f"render_midi.py could not be loaded: {exc}"
+
+
 def audio_files(folder: Path) -> list[Path]:
     return sorted(f for f in folder.iterdir()
                   if f.is_file() and f.suffix.lower() in AUDIO_EXTS)
@@ -2138,6 +2147,21 @@ class Window(QMainWindow):
         """Renders the MIDI (or the A/B pair) to audio once, into a temp cache."""
         midi = self.out_path
         if not (midi and midi.is_file()):
+            return
+        why = render_missing()
+        if why:
+            # Asked on every click rather than once, so installing the renderer while
+            # the window is open is enough; no restart.
+            self.listen = "orig"
+            self.listen_seg.set_value("orig")
+            self.timeline.mode = "orig"
+            self.timeline.update()
+            self.listen_note.setText("MIDI playback needs FluidSynth — "
+                                     "python setup_env.py --with-render")
+            self.listen_note.setToolTip(why)
+            if why != getattr(self, "_logged_missing", None):
+                self._logged_missing = why
+                self._emit(f"cannot play the MIDI: {why}")
             return
         key = hashlib.sha1(f"{midi}|{midi.stat().st_mtime}|{self.c.input}"
                            .encode()).hexdigest()[:10]
