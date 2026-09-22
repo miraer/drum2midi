@@ -24,10 +24,11 @@
 #   powershell -File restem_batch_queue.ps1 -Tracks a,b,c -Out bench\restem_batch_out
 
 param(
-    [Parameter(Mandatory = $true)][string[]] $Tracks,
+    [string[]] $Tracks,
     [string] $Expect = "Best (Offline) +",
     [int] $TimeoutMinutes = 240,
-    [string] $Out = "bench\restem_batch_out"
+    [string] $Out = "bench\restem_batch_out",
+    [switch] $DefineOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,13 +36,62 @@ $root = $PSScriptRoot
 Invoke-Expression (Get-Content "$root\restem_ui.ps1" -Raw)
 
 $log = Join-Path $root "bench\restem_batch_queue.log"
-$outDir = Join-Path $root $Out
-New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 function Say([string] $m) {
     $line = "[{0}] {1}" -f (Get-Date -Format "HH:mm:ss"), $m
     Write-Output $line
     Add-Content -Path $log -Value $line
+}
+
+# ReStem writes one folder per track into the folder its dialog shows, restem_export, and a
+# render of a track that is already there lands on top of it. For a second arm that is not
+# an edge case, it is the whole job: the ten drummer-2 recordings queued for Best+ on 22.09
+# each already had a folder there holding the OTHER arm, and the move below would then have
+# carried the overwritten folder off into -Out. The top-up would have deleted exactly the
+# pairs it existed to complete. So existing folders of queued tracks are moved aside before
+# Start and put back afterwards, and each arm stays isolated even when ReStem is not.
+function Stash-Existing([string[]] $names, [string] $from, [string] $to) {
+    $held = @()
+    foreach ($t in $names) {
+        $src = Join-Path $from $t
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        New-Item -ItemType Directory -Force -Path $to | Out-Null
+        Move-Item -LiteralPath $src -Destination (Join-Path $to $t)
+        $held += $t
+    }
+    , $held
+}
+
+function Restore-Stash([string[]] $names, [string] $from, [string] $to) {
+    $back = 0
+    foreach ($t in $names) {
+        $src = Join-Path $from $t
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        $dst = Join-Path $to $t
+        if (Test-Path -LiteralPath $dst) {
+            Say "cannot put $t back: a render this run did not move is in its place; both kept, the original is in $from" | Out-Host
+            continue
+        }
+        Move-Item -LiteralPath $src -Destination $dst
+        $back++
+    }
+    if ((Test-Path -LiteralPath $from) -and -not (Get-ChildItem -LiteralPath $from -Force)) {
+        Remove-Item -LiteralPath $from
+    }
+    $back
+}
+
+# -DefineOnly loads the functions above and stops, so the stash can be tested without
+# ReStem, the way restem_batch_mode.ps1 lets its guard be tested.
+if ($DefineOnly) { return }
+if (-not $Tracks) { throw "-Tracks is required" }
+
+$outDir = Join-Path $root $Out
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+$stash = Join-Path $root "bench\restem_stash"
+if ((Test-Path -LiteralPath $stash) -and (Get-ChildItem -LiteralPath $stash -Force)) {
+    Say "bench\restem_stash still holds folders from an interrupted run - move them back into restem_export first"
+    exit 1
 }
 
 function Get-Elements {
@@ -171,6 +221,17 @@ Start-Sleep -Seconds 3
 
 $start = Find-DialogButton "Start"
 if (-not $start) { Say "no Batch Process dialog appeared - the product took one file only"; exit 1 }
+
+$sameDir = ((Resolve-Path $outDir).Path.TrimEnd('\') -eq (Resolve-Path $watch).Path.TrimEnd('\'))
+$held = @()
+if (-not $sameDir) {
+    $held = Stash-Existing $Tracks $watch $stash
+    if ($held.Count) {
+        Say ("moved {0} existing folder(s) of queued tracks aside to bench\restem_stash, so this run cannot overwrite them" -f $held.Count)
+    }
+}
+
+try {
 Say "Batch Process dialog is up; output folder is whatever it shows - pressing Start"
 $start.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 
@@ -220,8 +281,8 @@ while ((Get-Date) -lt $deadline) {
         }
         if ($null -ne $cpu -and $null -ne $lastCpu -and ($cpu - $lastCpu) -gt 1) {
             if ($quiet -ge 4) {
-                Say ("still rendering: restem_offline took {0:N0}s of CPU in the last " +
-                     "{1:N1} min, so the wait resets" -f ($cpu - $lastCpu), ($quiet * 0.5))
+                Say (("still rendering: restem_offline took {0:N0}s of CPU in the last " +
+                      "{1:N1} min, so the wait resets") -f ($cpu - $lastCpu), ($quiet * 0.5))
             }
             $quiet = 0
         } else {
@@ -246,7 +307,6 @@ Say ("=== queue end after {0:N1} min, {1} new file(s)" -f
 # separated them that time. Rather than trust that twice, the run now moves its own output
 # out of the shared folder, so each arm is isolated by construction.
 $moved = 0
-$sameDir = ((Resolve-Path $outDir).Path.TrimEnd('\') -eq (Resolve-Path $watch).Path.TrimEnd('\'))
 if ($sameDir) {
     Say "-Out is the folder ReStem already writes to, so nothing needs moving"
 }
@@ -266,4 +326,12 @@ foreach ($t in $Tracks) {
 Say ("=== {0} of {1} render(s) moved into {2}" -f $moved, $seen, $Out)
 if (-not $sameDir -and $moved -ne $seen) {
     Say "WARNING: $seen file(s) appeared but $moved moved - check $watch for strays"
+}
+} finally {
+    # In `finally` so an exception or an early break still puts the other arm back. A kill
+    # by PID skips it; the check at the top then refuses to run until the stash is emptied.
+    if ($held.Count) {
+        $back = Restore-Stash $held $stash $watch
+        Say ("=== {0} of {1} stashed folder(s) put back into restem_export" -f $back, $held.Count)
+    }
 }

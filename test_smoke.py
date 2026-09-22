@@ -2063,9 +2063,17 @@ def test_restem_mode_guard_settles_before_it_refuses():
     assert shell, "no PowerShell on a Windows machine, so the guard was not exercised"
 
     harness = _tmp / "mode_harness.ps1"
+    real_log = ROOT / "bench" / "restem_batch_mode.log"
+    real_before = real_log.stat().st_size if real_log.exists() else None
+    test_log = _tmp / "mode_harness.log"
     harness.write_text(r"""
 . "%s" -DefineOnly
 
+# Say() writes to the script's own log, and dot-sourcing sets $log to the real one. Until
+# this line every test run appended "mode stayed 'Better'" to bench\restem_batch_mode.log,
+# indistinguishable from a real overnight refusal -- three of them were read as one on
+# 23.09 before the timestamps were matched to the test runs.
+$log = "%s"
 # Deliberately hostile locale on every run, not only on a machine that happens to have
 # one. The second machine's decimal separator is a comma, so `-f`, which formats in the
 # current culture, emitted SECS=9,1 and float() rejected it -- the verdict depending on
@@ -2104,7 +2112,7 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
     $el = ((Get-Date) - $t0).TotalSeconds
     Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, (Wire ([math]::Round($el,1))))
 }
-""" % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
+""" % (str(ROOT / "restem_batch_mode.ps1"), str(test_log)), encoding="utf-8")
 
     res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
                           "-File", str(harness)],
@@ -2154,6 +2162,88 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
     # but a selector that never appears must not be reported as agreement
     assert got["absent"][0] == "", (
         f"an unreadable selector returned a mode: {got['absent']}")
+
+    real_after = real_log.stat().st_size if real_log.exists() else None
+    assert real_after == real_before, (
+        "the test wrote its stub refusals into bench/restem_batch_mode.log, where they read "
+        "as real overnight batches that refused to start")
+    assert test_log.exists() and "stayed 'Better'" in test_log.read_text(encoding="utf-8"), (
+        "the redirected log received nothing, so the check above proves nothing")
+
+
+@test
+def test_restem_queue_does_not_overwrite_the_other_arm():
+    """A second-arm batch must leave the first arm's renders where it found them.
+
+    ReStem writes a folder per track into restem_export, and the queue then moves new
+    folders out into -Out. For a track rendered in the other arm already, both steps act on
+    the other arm's folder: ReStem overwrites it, the move carries it off. The ten Best+
+    top-up recordings were queued on 22.09 in exactly that state and survived only because
+    that batch wrote nothing at all. The script now moves such folders aside before Start
+    and puts them back after; this drives those two functions against folders on disk.
+    """
+    import shutil as _shutil
+    import subprocess
+
+    if sys.platform != "win32":
+        skip("restem_batch_queue.ps1 loads UIAutomationClient, which is Windows-only")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the stash was not exercised"
+
+    base = _tmp / "stash_case"
+    watch, stash, out = base / "restem_export", base / "stash", base / "out"
+    for t, arm in (("A", "off"), ("D", "off"), ("keep", "untouched")):
+        (watch / t).mkdir(parents=True)
+        (watch / t / f"{t}_midi.mid").write_text(arm, encoding="utf-8")
+    real_log = ROOT / "bench" / "restem_batch_queue.log"
+    real_before = real_log.stat().st_size if real_log.exists() else None
+
+    harness = _tmp / "stash_harness.ps1"
+    harness.write_text(r"""
+. "%s" -DefineOnly
+$log = "%s"
+$watch = "%s"; $stash = "%s"; $out = "%s"
+$held = Stash-Existing @("A", "C", "D") $watch $stash
+Write-Output ("HELD=" + ($held -join ","))
+Write-Output ("GONE_A=" + (-not (Test-Path -LiteralPath (Join-Path $watch "A"))))
+# ReStem renders A and D in the new arm; A is moved out as the queue does, D is left behind
+foreach ($t in "A", "D") {
+    New-Item -ItemType Directory -Force -Path (Join-Path $watch $t) | Out-Null
+    Set-Content -LiteralPath (Join-Path $watch "$t\$($t)_midi.mid") -Value "on" -NoNewline
+}
+New-Item -ItemType Directory -Force -Path $out | Out-Null
+Move-Item -LiteralPath (Join-Path $watch "A") -Destination (Join-Path $out "A")
+$back = Restore-Stash $held $stash $watch
+Write-Output ("BACK=" + $back)
+""" % (ROOT / "restem_batch_queue.ps1", _tmp / "stash_harness.log", watch, stash, out),
+        encoding="utf-8")
+
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(harness)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=300)
+    out_text = res.stdout + res.stderr
+    kv = dict(l.split("=", 1) for l in out_text.splitlines() if "=" in l and l[:1].isupper())
+
+    def mid(folder: Path, t: str) -> str:
+        p = folder / t / f"{t}_midi.mid"
+        return p.read_text(encoding="utf-8") if p.exists() else "<missing>"
+
+    assert kv.get("HELD") == "A,D", (
+        f"expected the two queued tracks already on disk to be held, got {kv.get('HELD')!r} "
+        f"(C was never rendered, so there is nothing of it to protect):\n{out_text[:800]}")
+    assert kv.get("GONE_A") == "True", "A was still in restem_export when Start would be pressed"
+    assert mid(watch, "A") == "off", (
+        f"restem_export/A holds {mid(watch, 'A')!r} after the run: the other arm's render "
+        "was not put back")
+    assert mid(out, "A") == "on", "the new arm's render did not stay where the queue moved it"
+    assert mid(watch, "D") == "on" and mid(stash, "D") == "off", (
+        "a render left behind in D was overwritten by the restore, or the original was "
+        f"dropped: watch={mid(watch, 'D')!r}, stash={mid(stash, 'D')!r}; both must be kept")
+    assert kv.get("BACK") == "1", f"one folder went back, the report says {kv.get('BACK')!r}"
+    assert mid(watch, "keep") == "untouched", "a track that was not queued was moved"
+    real_after = real_log.stat().st_size if real_log.exists() else None
+    assert real_after == real_before, "the test wrote into bench/restem_batch_queue.log"
 
 def main() -> int:
     global _tmp
