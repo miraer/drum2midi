@@ -214,8 +214,8 @@ while ((Get-Date) -lt $deadline) {
         $cpu = Renderer-Cpu
         $stuckFor++
         if ($stuckFor -ge $hardQuiet) {
-            Say ("nothing written for {0:N0} minutes though the renderer is busy - " +
-                 "this is the hang, not a long track; stopping" -f ($stuckFor * 0.5))
+            Say (("nothing written for {0:N0} minutes though the renderer is busy - " +
+                  "this is the hang, not a long track; stopping") -f ($stuckFor * 0.5))
             break
         }
         if ($null -ne $cpu -and $null -ne $lastCpu -and ($cpu - $lastCpu) -gt 1) {
