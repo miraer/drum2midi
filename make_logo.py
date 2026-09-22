@@ -19,9 +19,9 @@ from pathlib import Path
 # Pillow is imported inside the drawing functions rather than here, the way
 # drum_icons.py does it. Pillow is optional in this project: the GUI degrades without
 # it and requirements.txt says so. Importing it at module scope meant that reading the
-# palette constants below -- which theme.py restates for the GUI, and which a smoke
-# test compares -- required a library that drawing needs and reading does not, so the
-# test errored out on any install without Pillow instead of checking anything.
+# palette constants below required a library that drawing needs and reading does not,
+# so a smoke test that compared them errored out on any install without Pillow instead
+# of checking anything.
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

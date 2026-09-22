@@ -61,8 +61,12 @@ mir_eval>=0.7
 scikit-learn>=1.3
 tqdm>=4.65
 
-# Optional: the GUI shows a coloured icon per drum when Pillow is available, and
-# make_logo.py needs it. Both degrade quietly without it.
+# The window (drum2midi_gui.pyw). Only the GUI needs it; drum2midi.py runs without.
+# The full PySide6 rather than PySide6-Essentials, because the timeline's playback
+# (Original / MIDI / A-B) uses QtMultimedia, which only the Addons half ships.
+PySide6>=6.5
+
+# Optional: make_logo.py and drum_icons.py draw with Pillow. Nothing else needs it.
 pillow>=10.0
 
 # Optional: LarsNet (--separator larsnet) additionally needs
