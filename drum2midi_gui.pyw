@@ -1135,7 +1135,8 @@ class Window(QMainWindow):
         self.renders: dict[str, Path] = {}
         self.listen = "orig"
         self.player = None
-        self._pending_seek: float | None = None
+        # true between setSource and LoadedMedia, when the player cannot seek yet
+        self._loading = False
         self._want_play = False
 
         self.bridge = Bridge()
@@ -2126,17 +2127,23 @@ class Window(QMainWindow):
             return
         url = QUrl.fromLocalFile(str(src))
         if self.player.source() != url:
-            self._pending_seek = self.timeline.position
+            self._loading = True
             self._want_play = play
             self.player.setSource(url)
+        elif self._loading:
+            # still loading: remember the request; the load applies it
+            self._want_play = self._want_play or play
         elif play:
+            self.player.setPosition(int(self.timeline.position * 1000))
             self.player.play()
 
     def _media_status(self, status) -> None:
         from PySide6.QtMultimedia import QMediaPlayer
-        if status == QMediaPlayer.MediaStatus.LoadedMedia and self._pending_seek is not None:
-            self.player.setPosition(int(self._pending_seek * 1000))
-            self._pending_seek = None
+        if status == QMediaPlayer.MediaStatus.LoadedMedia and self._loading:
+            # Where the playhead is *now*, not where it was when loading began: a seek
+            # made while a render was loading used to be undone by the stale position.
+            self.player.setPosition(int(self.timeline.position * 1000))
+            self._loading = False
             if self._want_play:
                 self.player.play()
         elif status == QMediaPlayer.MediaStatus.EndOfMedia:
@@ -2205,9 +2212,6 @@ class Window(QMainWindow):
             self._render(self.listen, then_play=True)
             return
         self._load_source(play=True)
-        if self.player is not None and self._pending_seek is None:
-            self.player.setPosition(int(self.timeline.position * 1000))
-            self.player.play()
 
     def _is_playing(self) -> bool:
         if self.player is None:
@@ -2228,10 +2232,12 @@ class Window(QMainWindow):
         if self.player is not None:
             self.player.stop()
             self.player.setSource(QUrl())
+            self._loading = False
 
     def _seek(self, t: float) -> None:
         self.timeline.position = t
-        if self.player is not None and self.player.source().isValid():
+        if (self.player is not None and self.player.source().isValid()
+                and not self._loading):
             self.player.setPosition(int(t * 1000))
         self._update_time()
         self.timeline.update()
@@ -2239,6 +2245,13 @@ class Window(QMainWindow):
     def _tick(self) -> None:
         if self._is_playing():
             self.timeline.position = self.player.position() / 1000
+            # FluidSynth writes ~7 s of silence after the last note has died away, so
+            # the MIDI and A/B renders outlast the recording; without this the playhead
+            # ran off the end of the timeline through that tail
+            if 0 < self.timeline.duration <= self.timeline.position:
+                self.player.pause()
+                self.player.setPosition(0)
+                self.timeline.position = 0.0
             self._update_time()
             self.timeline.update()
         if self.phase == "converting":
