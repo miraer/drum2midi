@@ -1758,7 +1758,13 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
 }
 """ % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
 
-    res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    # Windows PowerShell is `powershell` and exists only on Windows; PowerShell 7 is
+    # `pwsh`, and is what the Ubuntu CI image carries. Calling the Windows name alone
+    # made this test an ERROR on every CI run rather than a check of the guard.
+    shell = shutil.which("powershell") or shutil.which("pwsh")
+    if shell is None:
+        return          # no PowerShell at all; the guard cannot be exercised here
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
                           "-File", str(harness)],
                          capture_output=True, text=True, encoding="utf-8",
                          errors="replace", timeout=300)
