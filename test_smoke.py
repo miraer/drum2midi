@@ -445,6 +445,15 @@ def test_gui_notes_can_be_set_before_a_file_is_chosen():
         settings.unlink(missing_ok=True)
 
 
+def _grab_pixels(widget):
+    """A widget as it is painted, as an (h, w, 4) int array of RGBA."""
+    from PySide6.QtGui import QImage
+    img = widget.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
+    raw = np.frombuffer(img.constBits(), np.uint8)
+    raw = raw[:img.bytesPerLine() * img.height()].reshape(img.height(), -1)
+    return raw[:, :img.width() * 4].reshape(img.height(), img.width(), 4).astype(int)
+
+
 @test
 def test_gui_draws_the_kit_behind_the_table():
     """The drawn kit has to reach the screen, in the window's own drum colours.
@@ -457,16 +466,9 @@ def test_gui_draws_the_kit_behind_the_table():
         import PIL  # noqa: F401
     except ImportError:
         skip("Pillow is not installed, so a plain background is the correct result")
-    from PySide6.QtGui import QImage
     from PySide6.QtWidgets import QApplication
     gui, win = gui_window()
-
-    def pixels(widget):
-        img = widget.grab().toImage().convertToFormat(QImage.Format.Format_RGBA8888)
-        raw = np.frombuffer(img.constBits(), np.uint8)
-        raw = raw[:img.bytesPerLine() * img.height()].reshape(img.height(), -1)
-        return raw[:, :img.width() * 4].reshape(img.height(), img.width(), 4).astype(int)
-
+    pixels = _grab_pixels
     def changed_by_kit(widget):
         QApplication.processEvents()
         with_kit = pixels(widget)
@@ -505,6 +507,81 @@ def test_gui_draws_the_kit_behind_the_table():
     c = img.pixelColor(int(img.width() * 0.503), int(img.height() * 0.700))
     assert c.green() > 200 and c.red() < 60 and c.blue() < 60, (
         f"the kick was drawn {c.name()}, not in the theme's kick colour")
+
+
+@test
+def test_gui_draws_drum_icons_beside_every_instrument():
+    """Every list of drums shows the project's drum icons, not bare colour dots.
+
+    The Tk window drew drum_icons beside each drum; the redesign swapped them for
+    dots in the result table, and the timeline and the sidebar map had only dots.
+    The icons have to be painted -- two drums that share a colour, the closed and the
+    open hi-hat, must still look different -- and drawn in the theme's colour for
+    the drum, like the lane and the velocity bar beside them.
+    """
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        skip("Pillow is not installed, so plain colour dots are the correct result")
+    from PySide6.QtWidgets import QApplication
+    gui, win = gui_window()
+
+    def without_icons(widget):
+        real = gui.icon_image
+        gui.icon_image = lambda *a, **k: None       # what a missing Pillow does
+        try:
+            widget.update()
+            return _grab_pixels(widget)
+        finally:
+            gui.icon_image = real
+
+    def differs(a, b):
+        return int((np.abs(a - b).max(axis=2) > 24).sum())
+
+    win.resize(1320, 860)
+    win.show()
+    try:
+        win.c.input = str(make_fixture())     # not _set_input: no envelope thread
+        win._sync()
+        QApplication.processEvents()
+        for where, rows in (("result table", win.rows), ("sidebar map", win.map_rows)):
+            for pitch, name in gui.KIT:
+                icon = rows[pitch].icon
+                assert icon.isVisibleTo(win) and icon.pitch == pitch, (
+                    f"{where}: {name} has no icon of its own")
+                n = differs(_grab_pixels(icon), without_icons(icon))
+                assert n >= 12, f"{where}: {name}'s icon is a dot ({n} pixels differ)"
+            closed, opened = (_grab_pixels(rows[p].icon) for p in (42, 46))
+            assert differs(closed, opened) >= 12, (
+                f"{where}: closed and open hi-hat look the same, so the shape is lost")
+
+        tl = win.timeline
+        assert [gui.lane_of(p) for p in gui.LANE_ICON] == list(range(len(gui.LANES))), (
+            f"a lane caption shows another lane's drum: {gui.LANE_ICON}")
+        caption = slice(0, tl.LABEL_W)
+        with_i, plain = _grab_pixels(tl)[:, caption], without_icons(tl)[:, caption]
+        for i, (name, _) in enumerate(gui.LANES):
+            y = tl.TOP + tl.AUDIO_H + i * tl.LANE_H
+            n = differs(with_i[y:y + tl.LANE_H], plain[y:y + tl.LANE_H])
+            assert n >= 12, f"timeline: the {name} lane's caption has no icon ({n})"
+
+        # in the theme's colour for the drum, not drum_icons' own palette
+        gui.THEMES["probe"] = dict(gui.THEMES["light"], kick="#00ff00")
+        was = gui.Tokens.name, gui.Tokens.t
+        gui.Tokens.name, gui.Tokens.t = "probe", gui.THEMES["probe"]
+        try:
+            px = _grab_pixels(win.map_rows[36].icon)
+            dot = without_icons(win.map_rows[36].icon)
+        finally:
+            gui.Tokens.name, gui.Tokens.t = was
+            del gui.THEMES["probe"]
+        green = (px[..., 1] > 200) & (px[..., 0] < 80) & (px[..., 2] < 80)
+        assert green.sum() >= 6, "the kick icon is not in the theme's kick colour"
+        # and without Pillow the dot is still there, in the same colour
+        green = (dot[..., 1] > 200) & (dot[..., 0] < 80) & (dot[..., 2] < 80)
+        assert green.sum() >= 6, "without Pillow the kick has no mark at all"
+    finally:
+        win.close()
 
 
 @test

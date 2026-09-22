@@ -71,16 +71,20 @@ def _rgb(hex_colour: str) -> tuple[int, int, int]:
     return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
 
 
-def draw_icon(pitch: int, size: int = 18):
-    """A small PIL image of the drum, drawn at 4x and downscaled for clean edges."""
+def draw_icon(pitch: int, size: int = 18, ink: str | None = None):
+    """A small PIL image of the drum, drawn at 4x and downscaled for clean edges.
+
+    `ink` is a "#rrggbb" to draw in instead of the palette above, for a caller with
+    its own colours per drum -- the GUI's themes.
+    """
     from PIL import Image, ImageDraw
 
     scale = 4
     s = size * scale
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    col = _rgb(colour(pitch)) + (255,)
-    pale = _rgb(colour(pitch)) + (70,)
+    col = _rgb(ink or colour(pitch)) + (255,)
+    pale = _rgb(ink or colour(pitch)) + (70,)
     line = max(2, int(s * 0.07))
     shape = SHAPE.get(pitch, "other")
     m = int(s * 0.10)

@@ -716,6 +716,64 @@ class KitScroll(QScrollArea):
         paint_kit(QPainter(self.viewport()), area, self.alpha, self.max_width)
 
 
+# ------------------------------------------------------------------- drum icons
+# The drum drawn beside its name wherever the window lists instruments: the drawings
+# the Tk window used, previewed in docs/kit_icons.png (drum_icons).
+_ICON_CACHE: dict[tuple, QImage | None] = {}
+
+# The drum a timeline lane's caption shows, one per lane in LANES order.
+LANE_ICON = (36, 38, 42, 47, 49, 51)
+
+
+def icon_image(pitch: int, px: int, theme: str) -> QImage | None:
+    """A drum's icon, px square, in this theme's colour for it; None without Pillow."""
+    key = (pitch, px, theme)
+    if key not in _ICON_CACHE:
+        try:
+            import drum_icons
+            img = drum_icons.draw_icon(pitch, px, ink=THEMES[theme][colour_key(pitch)])
+            _ICON_CACHE[key] = QImage(img.tobytes("raw", "RGBA"), img.width, img.height,
+                                      img.width * 4, QImage.Format.Format_RGBA8888).copy()
+        except Exception:
+            _ICON_CACHE[key] = None
+    return _ICON_CACHE[key]
+
+
+def paint_icon(p: QPainter, pitch: int, rect: QRectF) -> bool:
+    """Draws a drum's icon into `rect` at the screen's own pixel density."""
+    px = max(8, round(rect.width() * p.device().devicePixelRatioF()))
+    img = icon_image(pitch, px, Tokens.name)
+    if img is None:
+        return False
+    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+    p.drawImage(rect, img)
+    return True
+
+
+def paint_dot(p: QPainter, key: str, rect: QRectF, size: float, radius: float) -> None:
+    """The design's plain colour mark, centred in `rect`: what shows without Pillow."""
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(Tokens.c(key))
+    c = rect.center()
+    p.drawRoundedRect(QRectF(c.x() - size / 2, c.y() - size / 2, size, size),
+                      radius, radius)
+
+
+class DrumIcon(QWidget):
+    """A drum's icon, in the colour its lane and velocity bar are drawn in."""
+
+    def __init__(self, pitch: int, size: int):
+        super().__init__()
+        self.pitch = pitch
+        self.setFixedSize(size, size)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        if not paint_icon(p, self.pitch, QRectF(self.rect())):
+            paint_dot(p, colour_key(self.pitch), QRectF(self.rect()), 8, 4)
+
+
 class Toggle(QAbstractButton):
     """A 30x18 switch, the design's replacement for a checkbox."""
 
@@ -1059,11 +1117,11 @@ class Timeline(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         for i, (name, key) in enumerate(LANES):
             cy = y_lanes + i * self.LANE_H + self.LANE_H / 2
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(Tokens.c(key))
-            p.drawRoundedRect(QRectF(14, cy - 3.5, 7, 7), 2, 2)
+            mark = QRectF(10, cy - 7, 14, 14)
+            if not paint_icon(p, LANE_ICON[i], mark):
+                paint_dot(p, key, mark, 7, 2)
             p.setPen(muted)
-            p.drawText(QRectF(27, cy - 9, x0 - 27, 18), Qt.AlignmentFlag.AlignVCenter, name)
+            p.drawText(QRectF(29, cy - 9, x0 - 29, 18), Qt.AlignmentFlag.AlignVCenter, name)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
         # ruler
@@ -1149,8 +1207,8 @@ class ResultRow(QFrame):
 
         inst = QHBoxLayout()
         inst.setSpacing(9)
-        self.dot = Dot(colour_key(pitch))
-        inst.addWidget(self.dot)
+        self.icon = DrumIcon(pitch, 18)
+        inst.addWidget(self.icon)
         inst.addWidget(_label(name))
         inst.addStretch(1)
         lay.addLayout(inst, 13)
@@ -1202,7 +1260,8 @@ class MapRow(QWidget):
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
-        lay.addWidget(Dot(colour_key(pitch)))
+        self.icon = DrumIcon(pitch, 16)
+        lay.addWidget(self.icon)
         lay.addWidget(_label(name), 1)
         self.note = _note_box(note, COLS[1][1])
         self.note.currentIndexChanged.connect(lambda _: self.edited.emit())
