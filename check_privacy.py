@@ -374,13 +374,30 @@ def main() -> int:
         return 0
 
     fatal, warn, read = scan(paths, explicit=bool(args.files))
+    # A path that is not there was folded into "not a text type" and the run still
+    # exited 0, so asking about a file that had moved, or passing one relative to the
+    # wrong directory, produced a clean bill for a check that never happened. Green has
+    # to mean "looked and found nothing"; it cannot also mean "could not look".
+    missing = [p for p in paths if not p.exists()]
     # "checked N" used to count files the scanner had only looked at the name of, so a
     # skipped file read as an inspected one. Say how many were actually opened.
     if read == len(paths):
         print(f"checked {len(paths)} file(s)")
     else:
-        print(f"checked {len(paths)} file(s), {read} read for content "
-              f"({len(paths) - read} not a text type)")
+        binary = len(paths) - read - len(missing)
+        parts = [f"{read} read for content"]
+        if binary:
+            parts.append(f"{binary} not a text type")
+        if missing:
+            parts.append(f"{len(missing)} NOT FOUND")
+        print(f"checked {len(paths)} file(s), " + ", ".join(parts))
+    if missing:
+        print(f"\n{len(missing)} path(s) could not be read, so nothing is known about "
+              f"them:")
+        for p in missing[:10]:
+            print(f"  {p}")
+        print("\nA check that could not run is not a check that passed.")
+        return 1
 
     # Only meaningful for a real commit: an explicit file list or --all is someone
     # asking about content, not about what is being published.

@@ -1136,6 +1136,33 @@ def test_advertised_separator_flags_exist():
                      f"{sorted(valid)}: {bad}")
 
 
+@test
+def test_a_check_that_could_not_run_is_not_a_pass():
+    """A path the gate cannot read must not produce a clean bill.
+
+    A missing file was folded into the "not a text type" count and the run exited 0, so
+    asking about a file that had moved -- or passing one relative to the wrong directory,
+    which is how this was found -- reported that nothing was wrong with a file nobody had
+    opened. The gate's whole value is that green means looked-at.
+    """
+    import subprocess
+
+    gone = _tmp / "definitely_not_here.md"
+    res = subprocess.run([PY, str(ROOT / "check_privacy.py"), str(gone)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(ROOT))
+    out = res.stdout + res.stderr
+    assert res.returncode != 0, f"a missing path exited 0:\n{out}"
+    assert "NOT FOUND" in out or "could not be read" in out, (
+        f"the report does not say the file was missing:\n{out}")
+
+    present = _tmp / "present.md"
+    present.write_text("nothing sensitive here\n", encoding="utf-8")
+    ok = subprocess.run([PY, str(ROOT / "check_privacy.py"), str(present)],
+                        capture_output=True, text=True, encoding="utf-8",
+                        errors="replace", cwd=str(ROOT))
+    assert ok.returncode == 0, f"a clean file did not pass:\n{ok.stdout}{ok.stderr}"
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
