@@ -292,7 +292,8 @@ def check(install_failed: bool = False) -> int:
                              ("onnxruntime", "required for the default separator", True),
                              ("mir_eval", "benchmarks only", False),
                              ("sklearn", "learned velocity models only", False),
-                             ("PIL", "GUI icons and make_logo.py only", False),
+                             ("PySide6", "the window only; the CLI runs without", False),
+                             ("PIL", "make_logo.py and drum_icons.py only", False),
                              ("tqdm", "benchmark and training scripts only", False),
                              ("yaml", "LarsNet only", False)):
         ok = have(mod)

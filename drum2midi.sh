@@ -19,11 +19,9 @@ else
     exit 1
 fi
 
-if ! "$python_bin" -c "import tkinter" >/dev/null 2>&1; then
-    echo "tkinter is missing, so the window cannot open." >&2
-    echo "  Debian/Ubuntu:  sudo apt install python3-tk" >&2
-    echo "  Fedora:         sudo dnf install python3-tkinter" >&2
-    echo "  macOS (brew):   brew install python-tk" >&2
+if ! "$python_bin" -c "import PySide6.QtWidgets" >/dev/null 2>&1; then
+    echo "PySide6 is missing, so the window cannot open." >&2
+    echo "  $python_bin -m pip install PySide6" >&2
     echo "Command line still works:  $python_bin drum2midi.py drums.wav -o out.mid" >&2
     exit 1
 fi

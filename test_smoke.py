@@ -13,6 +13,7 @@ mangled argument, a broken MIDI writer, a channel override that never lands.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -311,38 +312,156 @@ def load_gui():
     The loader has to be named explicitly: ".pyw" is only a recognised source suffix
     on Windows, so on Linux spec_from_file_location returns None and the import fails
     with a bare AttributeError about 'NoneType' having no 'loader'.
+
+    The module is registered before it runs because dataclasses look their own module
+    up in sys.modules while the class is being built.
     """
     import importlib.util
     from importlib.machinery import SourceFileLoader
+    if "gui" in sys.modules:
+        return sys.modules["gui"]
     path = ROOT / "drum2midi_gui.pyw"
     spec = importlib.util.spec_from_loader("gui", SourceFileLoader("gui", str(path)))
     gui = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gui)
+    sys.modules["gui"] = gui
+    try:
+        spec.loader.exec_module(gui)
+    except BaseException:
+        del sys.modules["gui"]
+        raise
     return gui
+
+
+def gui_window():
+    """A real window, offscreen, that cannot touch the user's saved settings.
+
+    Offscreen is Qt's own headless platform, so this runs on CI without a display.
+    """
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    gui = load_gui()
+    gui.SETTINGS = _tmp / "gui_settings.json"
+    gui.make_app(["test"])
+    return gui, gui.Window()
 
 
 @test
 def test_gui_builds():
-    """The GUI must construct and assemble a valid command line."""
-    try:
-        import tkinter as tk
-        root = tk.Tk()
-    except ImportError:
-        return          # tkinter not installed (some Linux builds)
-    except Exception:
-        return          # no display; tk raises TclError, but be liberal here
-    root.withdraw()
-    gui = load_gui()
-    app = gui.App(root)
-    app.v_input.set(str(make_fixture()))
-    app.v_output.set(str(_tmp / "gui.mid"))
-    app.v_sep.set("none")
-    app._sync()
-    cmd = app._command()
+    """The window must construct and assemble a valid command line from what it shows."""
+    gui, win = gui_window()
+    win._set_input(make_fixture())
+    assert win.phase == "ready", f"choosing a file left the window in {win.phase}"
+    assert win.c.output.endswith(".mid"), f"no default output: {win.c.output!r}"
+
+    win.sep_cards["none"].clicked.emit("none")
+    cmd = gui.build_command(win.c)
     assert "--no-separate" in cmd, f"separator flag missing: {cmd}"
-    app.adv_rows[38][1].set("5")
-    assert "--channels" in " ".join(app._command()), "channel override not passed through"
-    root.destroy()
+    assert cmd[cmd.index("-o") + 1] == win.c.output
+
+    # The channel cell shows 1-16, as every DAW does; the CLI takes 0-15. Picking
+    # "5" in the snare row must reach the pipeline as 4, not 5.
+    win.rows[38].chan.setCurrentIndex(4)
+    cmd = gui.build_command(win.c)
+    assert "--channels" in cmd, f"channel override not passed through: {cmd}"
+    assert cmd[cmd.index("--channels") + 1] == "38=4", cmd
+    win.rows[36].note.setCurrentIndex(35)
+    cmd = gui.build_command(win.c)
+    assert cmd[cmd.index("--notes") + 1] == "36=35", cmd
+
+    for theme in ("light", "dark"):
+        win._set_theme(theme)
+        assert win.grab().width() > 0, f"{theme} theme did not render"
+    win.close()
+
+
+@test
+def test_gui_options_follow_the_separator():
+    """An option the separator cannot use is shown off and left out of the command,
+    but the preference survives switching back."""
+    gui = load_gui()
+    c = gui.Choices(input="a.wav", output="a.mid", separator="uvr", rescue=True,
+                    fuse=True)
+    cmd = gui.build_command(c)
+    assert "--no-rescue-toms" in cmd, "rescue toms reached MDX23C, where it hurts toms"
+    assert cmd[cmd.index("--fuse-stem-onsets") + 1] == "on"
+
+    c.separator = "larsnet"
+    cmd = gui.build_command(c)
+    assert "--no-rescue-toms" not in cmd, "rescue toms was dropped for LarsNet"
+    assert cmd[cmd.index("--fuse-stem-onsets") + 1] == "off", "fusion is MDX23C-only"
+    assert c.fuse, "the stored preference was overwritten"
+
+    c.quant, c.triplets = "16", True
+    cmd = gui.build_command(c)
+    assert cmd[cmd.index("--quantize") + 1] == "24", f"1/16 triplets: {cmd}"
+    c.quant = "32"
+    cmd = gui.build_command(c)
+    assert cmd[cmd.index("--quantize") + 1] == "32", "triplets leaked into 1/32"
+
+
+@test
+def test_gui_reads_the_summary_and_the_midi_back():
+    """The result table and the timeline both have to survive a note override.
+
+    The pipeline reports each row by the note it *wrote*, so with the kick moved to 35
+    the summary says "Kick" for pitch 35 and nothing for 36; the window must still put
+    those hits on the kick row and the kick lane.
+    """
+    import mido
+    gui, win = gui_window()
+    win._set_input(make_fixture())
+    win.rows[36].note.setCurrentIndex(60)        # kick written as 60, a non-GM number
+    for line in ("instrument        hits  vel min  vel max\n",
+                 "----------------------------------------\n",
+                 "Snare                2       80      120\n",
+                 "60                   4       90      127\n",
+                 "\n"):
+        win._handle(line)
+    assert win.results.get(36) == (4, 90, 127), f"kick row lost: {win.results}"
+    assert win.results.get(38) == (2, 80, 120), f"snare row lost: {win.results}"
+    assert win.rows[36].hits.text() == "4"
+
+    midi = _tmp / "readback.mid"
+    mf = mido.MidiFile(ticks_per_beat=480)
+    tr = mido.MidiTrack()
+    mf.tracks.append(tr)
+    for note, dt in ((60, 0), (38, 480), (60, 480)):
+        tr.append(mido.Message("note_on", note=note, velocity=100, channel=9, time=dt))
+        tr.append(mido.Message("note_off", note=note, velocity=0, channel=9, time=10))
+    mf.save(str(midi))
+    hits = gui.read_hits(midi, win.c)
+    lanes = sorted(lane for lane, _, _ in hits)
+    assert lanes == [0, 0, 1], f"hits landed on the wrong lanes: {hits}"
+    win.close()
+
+
+@test
+def test_gui_colours_are_legible():
+    """Every colour the window draws with must be visible on what it is drawn on.
+
+    Text needs 4.5:1. The drum colours are marks rather than text -- dots, timeline
+    ticks, velocity bars -- and need 3:1. The design's light hi-hat amber was 2.7:1 on
+    white, which is why that one token departs from it.
+    """
+    gui = load_gui()
+
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def ratio(a, b):
+        hi, lo = sorted((lum(a), lum(b)), reverse=True)
+        return (hi + 0.05) / (lo + 0.05)
+
+    for name, t in gui.THEMES.items():
+        for fg, bg, need in (("text", "panel", 4.5), ("muted", "panel", 4.5),
+                             ("muted", "bg", 4.5), ("accentInk", "accent", 4.5),
+                             ("accent", "panel", 3.0)):
+            r = ratio(t[fg], t[bg])
+            assert r >= need, f"{name}: {fg} on {bg} is {r:.2f}:1, needs {need}"
+        for drum in ("kick", "snare", "tom", "hat", "crash", "ride"):
+            r = ratio(t[drum], t["panel"])
+            assert r >= 3.0, f"{name}: {drum} on the panel is {r:.2f}:1, needs 3"
 
 
 @test
@@ -619,123 +738,6 @@ def test_privacy_gate_does_not_flag_the_repository_itself():
             f"the container folder {container!r} is guarded as an identity: {names}")
         assert "someone" in names, (
             f"the account from the remote must still be guarded: {names}")
-
-
-@test
-def test_accent_button_visible_without_pillow():
-    """The Convert button must stay legible when Pillow is absent.
-
-    Pillow is optional, and without it theme.apply skips the image elements and lets
-    clam draw its ordinary grey button -- but the accent style still painted its label
-    white. White on grey made the Convert button disappear entirely on a machine where
-    everything else worked, which reads as "the GUI has no start button" rather than as
-    a missing optional dependency.
-    """
-    import builtins
-    import importlib
-    import sys
-    try:
-        import tkinter as tk
-        from tkinter import ttk
-        root = tk.Tk()
-    except ImportError:
-        return          # tkinter not installed (some Linux builds)
-    except Exception:
-        return          # no display
-
-    real_import = builtins.__import__
-
-    def without_pillow(name, *a, **kw):
-        if name == "PIL" or name.startswith("PIL."):
-            raise ImportError("simulated absence")
-        return real_import(name, *a, **kw)
-
-    saved = {k: v for k, v in sys.modules.items()
-             if k == "theme" or k.startswith("PIL")}
-    try:
-        for k in saved:
-            del sys.modules[k]
-        builtins.__import__ = without_pillow
-        theme_nopil = importlib.import_module("theme")
-        builtins.__import__ = real_import
-        assert theme_nopil.Image is None, "the Pillow-absent case was not simulated"
-
-        root.withdraw()
-        for mode in ("light", "dark"):
-            theme_nopil.apply(root, mode)
-            style = ttk.Style(root)
-            fg = style.lookup("Accent.TButton", "foreground")
-            bg = style.lookup("Accent.TButton", "background")
-            assert fg and bg, f"{mode}: accent button has no colours at all"
-            # Difference is not legibility: #ffffff on #fafbfc are different strings
-            # and indistinguishable on screen, which is how this shipped.
-            ratio = theme_nopil.contrast(fg, bg)
-            assert ratio >= 3.0, (
-                f"{mode}: Convert button is {fg} on {bg}, contrast {ratio:.2f}, "
-                f"below the 3.0 needed to be seen")
-    finally:
-        builtins.__import__ = real_import
-        for k in list(sys.modules):
-            if k == "theme" or k.startswith("PIL"):
-                del sys.modules[k]
-        sys.modules.update(saved)
-        try:
-            root.destroy()
-        except Exception:
-            pass
-
-
-@test
-def test_theme_palette_matches_the_logo():
-    """The window and the logo must not drift apart into two different blues.
-
-    theme.py restates the logo's colours as hex strings, because make_logo works in
-    RGB tuples and the GUI needs "#rrggbb". Restating them means they can disagree.
-
-    Pillow is blocked while make_logo is imported, because it is optional here and the
-    palette is tuples: reading it must not need the drawing library. It did -- a
-    top-level `from PIL import ...` meant this test raised ModuleNotFoundError instead
-    of comparing anything on an install without Pillow, and CI installs Pillow, so the
-    only machines that could notice were the ones not running it.
-    """
-    import builtins
-    import sys
-
-    real_import = builtins.__import__
-
-    def without_pillow(name, *a, **kw):
-        if name == "PIL" or name.startswith("PIL."):
-            raise ImportError("simulated absence")
-        return real_import(name, *a, **kw)
-
-    saved = {k: v for k, v in sys.modules.items()
-             if k == "make_logo" or k.startswith("PIL")}
-    try:
-        for k in saved:
-            del sys.modules[k]
-        builtins.__import__ = without_pillow
-        import make_logo
-    finally:
-        builtins.__import__ = real_import
-        for k in list(sys.modules):
-            if k == "make_logo" or k.startswith("PIL"):
-                del sys.modules[k]
-        sys.modules.update(saved)
-
-    import theme
-    for name, rgb in (("base", make_logo.PAPER), ("ink", make_logo.INK),
-                      ("accent", make_logo.WAVE)):
-        want = "#%02x%02x%02x" % rgb
-        got = getattr(theme.Light, name)
-        assert got == want, f"theme.Light.{name} is {got}, logo uses {want}"
-
-    # and the dark theme has to stay legible: every instrument colour must lift away
-    # from the background rather than sink into it
-    import drum_icons
-    for pitch in (36, 38, 42, 49, 51):
-        lifted = theme.readable(drum_icons.colour(pitch), theme.Dark)
-        lum = sum(int(lifted[i:i + 2], 16) for i in (1, 3, 5)) / 3
-        assert lum > 90, f"{pitch} stays dark on the dark theme: {lifted}"
 
 
 @test
