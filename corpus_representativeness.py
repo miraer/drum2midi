@@ -52,6 +52,11 @@ GENRE = {
 
 # Tom share of onsets in E-GMD, the largest drum corpus we have counted: 1,074,753 tom
 # onsets of 14.3M. Measured by us while surveying it for training data, not quoted.
+# That count is renderings -- 25,524 distinct tom onsets, each performance re-recorded on
+# exactly 43 kits. The *share* is unaffected, and exactly so rather than approximately,
+# because the rendering is uniform: every performance appears 43 times, so the ratio of any
+# two families is identical before and after. Volume claims about E-GMD need the distinct
+# figure; this one does not. See docs/datasets.md.
 EGMD_TOM_SHARE = 0.0749
 
 # What else is on disk, so "23 recordings" is never mistaken for "all the real data we

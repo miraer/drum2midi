@@ -1619,6 +1619,53 @@ def test_egmd_disk_check_uses_the_peak_not_the_end_state():
     ok, _ = fetch_egmd.enough_space(150.0, "audio", have_archive_gib=45.0)
     assert not ok, "150 GiB cannot hold the remaining 45 plus a 131 GiB unpack"
 
+
+@test
+def test_egmd_redundancy_is_reported_not_left_to_prose():
+    """E-GMD's published counts are renderings, and the factor is 43.
+
+    45,537 clips are 1,059 performances -- keyed by (drummer, session, id) -- each
+    re-recorded on exactly 43 kits, so 444.5 hours rest on 10.3 hours of distinct playing and
+    the 1,074,753 tom onsets we publish are 25,524 counted 43 times. docs/datasets.md turned
+    that into "roughly 11,900x more tom data than MDB"; the honest multiplier is 284x.
+
+    Both figures are true and answer different questions, which is exactly why the survey has
+    to print both rather than leave the distinction to a sentence someone has to remember.
+    This guards the reporting, on a metadata fixture with a known answer.
+    """
+    import csv
+    import io
+    import sys
+
+    import fetch_egmd
+
+    folder = _tmp / "egmd_meta"
+    folder.mkdir()
+    rows = []
+    for perf in range(4):
+        for kit in range(43):
+            rows.append({"drummer": "d1", "session": "s1", "id": str(perf),
+                         "duration": "10.0", "kit_name": f"kit{kit}",
+                         "midi_filename": f"{perf}_{kit}.mid"})
+    with (folder / "e-gmd-v1.0.0.csv").open("w", encoding="utf-8", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]))
+        w.writeheader()
+        w.writerows(rows)
+
+    held, sys.stdout = sys.stdout, io.StringIO()
+    try:
+        fetch_egmd.redundancy(folder)
+        out = sys.stdout.getvalue()
+    finally:
+        sys.stdout = held
+
+    assert "distinct performances" in out, f"the distinct count is not reported:\n{out}"
+    assert "4" in out and "172" in out, (
+        f"the fixture's 172 clips over 4 performances are not both shown:\n{out}")
+    assert "43" in out, f"the redundancy factor is not reported:\n{out}"
+    assert "renderings" in out, (
+        f"the summary does not say the per-family counts are renderings:\n{out}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

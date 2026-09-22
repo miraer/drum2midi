@@ -86,6 +86,11 @@ and velocity histogram. We have already verified those figures on the other mach
 1,074,753 tom onsets at 7.49%, velocity 4-127 with 48.54% below 60 — so this is a check
 that the two machines agree, not new information. Report any discrepancy.
 
+Those counts are renderings. The survey also prints the redundancy: 45,537 clips are
+1,059 performances re-recorded on exactly 43 kits, so the distinct figure is 25,524 tom
+onsets over 10.3 hours of playing rather than 444.5. Use the distinct number for any claim
+about how much drumming the corpus contains.
+
 Do **not** start the 90 GB audio download without asking first.
 
 ## What to send back

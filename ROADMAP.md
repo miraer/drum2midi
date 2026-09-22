@@ -38,10 +38,15 @@ breakdown says a discrimination problem remains underneath: all 60 false toms on
 within 50 ms of a real onset of another class, 53% snare and 33% kick. That is not
 something a threshold reaches.
 
-E-GMD carries 1,074,753 tom onsets under CC BY 4.0 and is the obvious training material.
+E-GMD carries 1,074,753 tom onsets under CC BY 4.0 and is the obvious training material —
+though that figure is **25,524 distinct tom onsets rendered on 43 kits**, so the honest
+multiplier against MDB's 90 is 284x rather than 11,900x, and the remainder is timbral
+augmentation rather than more drumming. See [datasets.md](docs/datasets.md#e-gmd).
 The measurement that decides it is tom F1 on ENST **with the ceiling in place**, so the
 bar is 0.539 rather than the 0.342 it was before — training has to beat the fixed output
-stage, not the broken one.
+stage, not the broken one. That bar is fixed in advance, over the full ENST corpus and its
+2,617 tom onsets, with an interval and a held-out drummer; a result at or below it is
+published exactly as one above it.
 
 ### Pedal hi-hat
 

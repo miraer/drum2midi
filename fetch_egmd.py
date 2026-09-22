@@ -183,6 +183,53 @@ def download(url: str, dest: Path) -> None:
     print(f"  done, {human(done)}")
 
 
+def redundancy(folder: Path) -> None:
+    """How much of the corpus is distinct drumming and how much is the same take again.
+
+    E-GMD's headline counts are renderings. Every performance, keyed by
+    `(drummer, session, id)` in the metadata, was re-recorded on exactly 43 kits, so 45,537
+    clips and 444.5 hours rest on 1,059 performances and 10.3 hours of distinct playing, and
+    the 1,074,753 tom onsets we published are 25,524 counted 43 times.
+
+    Both figures are true and they answer different questions -- what a training run sees
+    against how much drumming exists to learn from -- but quoting the larger one as the size
+    of the corpus overstates it by a factor of 43, and this project's whole argument is that
+    it does not count the same thing repeatedly. So the survey reports both, measured, rather
+    than leaving the distinction to prose someone has to remember.
+    """
+    meta = next(folder.rglob("e-gmd-v*.csv"), None)
+    if meta is None:
+        return
+    import csv as _csv
+
+    with meta.open(encoding="utf-8") as fh:
+        rows = list(_csv.DictReader(fh))
+    if not rows or "id" not in rows[0]:
+        return
+
+    perf = collections.Counter((r["drummer"], r["session"], r["id"]) for r in rows)
+    seen, uniq_s = set(), 0.0
+    for r in rows:
+        k = (r["drummer"], r["session"], r["id"])
+        if k not in seen:
+            seen.add(k)
+            uniq_s += float(r.get("duration") or 0)
+    total_s = sum(float(r.get("duration") or 0) for r in rows)
+    per = sorted(set(perf.values()))
+
+    print("\nhow much of this is distinct drumming")
+    print(f"  clips                        {len(rows):>9}")
+    print(f"  distinct performances        {len(perf):>9}")
+    print(f"  renderings per performance   {min(per):>9}"
+          + ("" if len(per) == 1 else f" .. {max(per)}"))
+    print(f"  total audio                  {total_s / 3600:>9.1f} h")
+    print(f"  distinct performance time    {uniq_s / 3600:>9.1f} h")
+    if uniq_s:
+        print(f"  redundancy factor            {total_s / uniq_s:>9.1f}x")
+    print("  (the per-family counts above are renderings; divide by the redundancy factor\n"
+          "   for distinct onsets, and see docs/datasets.md)")
+
+
 def survey(folder: Path) -> None:
     """Counts every note-on, so the published claims can be checked rather than quoted."""
     import pretty_midi
@@ -234,6 +281,8 @@ def survey(folder: Path) -> None:
         print(f"  below 60: {lo} ({100 * lo / vtot:.2f}%)   "
               f"below 40: {lower} ({100 * lower / vtot:.2f}%)")
         print("  (ghost-note material; MDB annotates ghosts but carries no velocity)")
+
+    redundancy(folder)
 
 
 def main() -> int:

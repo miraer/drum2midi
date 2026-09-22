@@ -86,6 +86,20 @@ note-ons**, and every published figure matched to the digit:
 | **tom** | **1,074,753** | **7.49%** |
 | auxiliary (tambourine, clap, cowbell) | 215,587 | 1.50% |
 
+**Those counts are renderings, not distinct drumming, and the difference is a factor of 43.**
+E-GMD's 45,537 clips are 1,059 performances — keyed by `(drummer, session, id)` — each
+re-recorded on exactly 43 kits, with no exceptions: 444.5 hours of audio over **10.3 hours of
+distinct playing**. Parsing one rendering of each performance gives **25,524 distinct tom
+onsets**, and 25,524 × 43 = 1,097,532, which is the table above to within the handful of
+files the two passes count differently.
+
+Both numbers are true and they answer different questions. 1,074,753 is how many tom onsets a
+training run sees; 25,524 is how much distinct drumming exists to learn from, and the other
+43/44ths are timbral augmentation across kits. For a model that has to survive a separator's
+artefacts that augmentation may be exactly what is wanted — but it is not more music, and
+quoting the larger figure as "how much tom data E-GMD has" overstates the corpus by two orders
+of magnitude.
+
 Toms break down as 424,582 on tom 3 head, 386,871 on tom 1, 130,591 on tom 2, plus
 132,709 across the three rims. Velocity spans **4–127**, mean 66.5, 124 distinct values,
 with **48.54% of onsets below 60 and 25.04% below 40** — which is the ghost-note material
@@ -147,9 +161,12 @@ what fixes the measured weakness rather than by licence:
 
 1. **ENST-Drums** for real acoustic toms and ghost notes, with isolated tom stems to
    train or validate the fusion stage on.
-2. **E-GMD** for sheer volume — roughly 11,900x more tom data than MDB, with the velocity
-   distribution the ghost-note work needs. Measure the electronic-to-acoustic domain gap
-   before trusting it; do not assume it away.
+2. **E-GMD** for sheer volume — **284x** more distinct tom onsets than MDB (25,524 against
+   90), or 11,900x if the 43 per-kit renderings of each performance are counted separately,
+   which is how the raw 1,074,753 arises. The larger multiplier is the one to avoid quoting:
+   it counts the same drumming forty-three times. The velocity distribution the ghost-note
+   work needs is real either way. Measure the electronic-to-acoustic domain gap before
+   trusting it; do not assume it away.
 3. **RWC 2.0** as a third independent test set of real recordings, which is the one thing
    23 tracks of MDB cannot give us.
 
