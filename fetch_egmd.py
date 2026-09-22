@@ -84,7 +84,9 @@ def human(n: float) -> str:
 FOOTPRINT = {"audio": (89.8, 131.0), "midi": (0.1, 0.4)}
 
 
-def enough_space(free_gib: float, kind: str, keep_archive: bool = False) -> tuple[bool, str]:
+def enough_space(free_gib: float, kind: str, keep_archive: bool = False,
+                 have_archive_gib: float = 0.0, unpacked_present: bool = False
+                 ) -> tuple[bool, str]:
     """Whether a run can finish, judged on the high-water mark rather than the end state.
 
     Separated from the disk query so the decision can be tested with a number instead of a
@@ -93,26 +95,48 @@ def enough_space(free_gib: float, kind: str, keep_archive: bool = False) -> tupl
     docstring used to quote the post-deletion figure as the requirement, which is the one
     number that cannot fail -- it is only ever observed after the risky part is over.
 
+    What is already on disk has to count, and the first version of this did not count it.
+    The second machine's checkout holds the archive *and* the unpacked set, 221.7 GiB, with
+    97.4 GiB free; asking it for the full peak refuses a run that would download nothing and
+    unpack nothing. That is a false-red introduced by a guard against a false-green, which is
+    the same mistake in the other direction and the reason a gate gets bypassed. So the
+    requirement is what remains to be written: the rest of the archive, plus the unpacked set
+    only if it is not already there.
+
     `--keep-archive` does not raise the peak. It only decides whether the run gives the
     archive back afterwards, which is why it is reported separately.
     """
     archive, unpacked = FOOTPRINT[kind]
-    peak = archive + unpacked
-    settles_to = peak if keep_archive else unpacked
-    ok = free_gib >= peak * 1.03
+    to_download = max(0.0, archive - have_archive_gib)
+    to_unpack = 0.0 if unpacked_present else unpacked
+    need = to_download + to_unpack
+    settles_to = (unpacked if not keep_archive else unpacked + archive)
+    ok = free_gib >= need * 1.03
 
     def gib(n: float) -> str:
         return f"{n:.1f}" if n < 10 else f"{n:.0f}"
 
-    note = (f"{free_gib:.1f} GiB free; needs about {gib(peak)} GiB at peak "
-            f"({gib(archive)} archive + {gib(unpacked)} unpacked, both present during the "
-            f"unpack), settling to {gib(settles_to)} GiB")
+    if need <= 0:
+        return True, (f"{free_gib:.1f} GiB free; the archive and the unpacked set are "
+                      f"already here, so nothing more is needed")
+    parts = []
+    if to_download > 0:
+        parts.append(f"{gib(to_download)} still to download")
+    if to_unpack > 0:
+        parts.append(f"{gib(to_unpack)} to unpack")
+    note = (f"{free_gib:.1f} GiB free; needs about {gib(need)} GiB at peak "
+            f"({' + '.join(parts)}, coexisting), settling to {gib(settles_to)} GiB")
     return ok, note
 
 
-def require_space(out: Path, kind: str, keep_archive: bool) -> None:
+def require_space(out: Path, kind: str, keep_archive: bool, archive: Path | None = None,
+                  target: Path | None = None) -> None:
     free = shutil.disk_usage(out).free / (1 << 30)
-    ok, note = enough_space(free, kind, keep_archive)
+    have = 0.0
+    if archive is not None and archive.exists():
+        have = archive.stat().st_size / (1 << 30)
+    ok, note = enough_space(free, kind, keep_archive, have,
+                            bool(target is not None and target.exists()))
     print(note)
     if not ok:
         raise SystemExit(
@@ -226,11 +250,12 @@ def main() -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     url = FULL_ZIP if args.audio else MIDI_ZIP
-    require_space(args.out, "audio" if args.audio else "midi", args.keep_archive)
     archive = args.out / url.rsplit("/", 1)[1]
+    target = args.out / archive.stem
+    require_space(args.out, "audio" if args.audio else "midi", args.keep_archive,
+                  archive, target)
     download(url, archive)
 
-    target = args.out / archive.stem
     if not target.exists():
         print(f"unpacking into {target} ...")
         with zipfile.ZipFile(archive) as z:
@@ -242,6 +267,21 @@ def main() -> int:
         if not args.keep_archive:
             archive.unlink(missing_ok=True)
             print(f"removed {archive.name}")
+    elif archive.exists() and not args.keep_archive:
+        # The unlink used to live only in the branch above, so any run that found the
+        # target already unpacked skipped it -- and with it the deletion the default
+        # promises. The second machine's checkout held both for days that way, sitting at
+        # the peak rather than the settled size, which is not what `--keep-archive`
+        # defaulting to off should leave behind.
+        #
+        # Reported rather than done. This is the only local copy of a four-hour download,
+        # and removing 90 GiB as a side effect of `--survey` is not a decision to take
+        # while nobody is watching. Naming it beats both silently deleting and silently
+        # leaving it.
+        stranded = archive.stat().st_size / (1 << 30)
+        print(f"\n{archive.name} is still here ({stranded:.1f} GiB) and {target.name} is "
+              f"already unpacked, so the archive is redundant.")
+        print(f"Reclaim it when you want the space:\n    del {archive}")
 
     if args.survey:
         survey(target)

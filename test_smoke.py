@@ -1592,6 +1592,33 @@ def test_egmd_disk_check_uses_the_peak_not_the_end_state():
     assert archive + unpacked > 200, (
         "the recorded footprint no longer implies the peak this guard was written for")
 
+    # The false-red the first version of this check had, which is the second machine's
+    # actual checkout: archive and unpacked set both present, 97.4 GiB free. Nothing needs
+    # to be downloaded or unpacked, so demanding the full peak refuses a run that would do
+    # no work at all. A guard against a silent pass is not allowed to become a noisy
+    # refusal; that is how a check gets taken out of the loop.
+    ok, note = fetch_egmd.enough_space(97.4, "audio", have_archive_gib=89.8,
+                                       unpacked_present=True)
+    assert ok, (
+        f"a checkout that already holds everything was refused:\n{note}")
+    assert "nothing more is needed" in note, (
+        f"the reason is not stated, so the pass cannot be checked:\n{note}")
+
+    # Archive fully downloaded, unpack interrupted: only the unpacked size is still owed.
+    ok, note = fetch_egmd.enough_space(140.0, "audio", have_archive_gib=89.8,
+                                       unpacked_present=False)
+    assert ok, f"140 GiB free with the archive already down was refused:\n{note}"
+    ok, _ = fetch_egmd.enough_space(100.0, "audio", have_archive_gib=89.8,
+                                    unpacked_present=False)
+    assert not ok, "100 GiB cannot hold a 131 GiB unpack and was accepted"
+
+    # A half-finished download owes only the remainder: 44.8 still to fetch plus the
+    # 131 unpack is about 176, so 200 clears it and 150 does not.
+    ok, note = fetch_egmd.enough_space(200.0, "audio", have_archive_gib=45.0)
+    assert ok, f"200 GiB against 45 GiB already fetched plus the unpack was refused:\n{note}"
+    ok, _ = fetch_egmd.enough_space(150.0, "audio", have_archive_gib=45.0)
+    assert not ok, "150 GiB cannot hold the remaining 45 plus a 131 GiB unpack"
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
