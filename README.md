@@ -566,8 +566,7 @@ the lane's own colour, and every shade is at least 3:1 against the window in bot
 themes, on a hovered row as well.
 It also draws a kit in those theme colours (`drum_kit_art.py`), above the empty drop
 zone and faintly behind the result table, so the picture doubles as the legend.
-Without Pillow the icons are plain colour dots and the background is plain. The
-screenshots above predate the icons, the kit and the sidebar map.
+Without Pillow the icons are plain colour dots and the background is plain.
 
 Check the result by ear (original left, transcription right):
 
