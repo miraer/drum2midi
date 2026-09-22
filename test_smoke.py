@@ -35,6 +35,23 @@ _tmp: Path | None = None
 _fixture: Path | None = None
 PASSED: list[str] = []
 FAILED: list[tuple[str, str]] = []
+SKIPPED: list[tuple[str, str]] = []
+
+
+class Skip(Exception):
+    """Raised by a test that cannot run here, as distinct from one that passed.
+
+    Added when a guard for a PowerShell script reached CI, which is Linux, and died on a
+    missing `powershell`. The tempting repair is to return early when the tool is absent --
+    and that produces a test which reports PASS while executing nothing, which is the exact
+    defect this suite spent a week finding in `check_privacy.py`. A skip is not a pass; it
+    is a check that did not run, and it has to be reported as its own category and counted
+    so the totals reconcile.
+    """
+
+
+def skip(why: str):
+    raise Skip(why)
 
 
 def test(fn):
@@ -45,6 +62,9 @@ def test(fn):
             fn()
             PASSED.append(name)
             print(f"  PASS  {name}")
+        except Skip as exc:
+            SKIPPED.append((name, str(exc)))
+            print(f"  SKIP  {name}: {exc}")
         except AssertionError as exc:
             FAILED.append((name, str(exc)))
             print(f"  FAIL  {name}: {exc}")
@@ -1754,11 +1774,44 @@ def test_restem_mode_guard_settles_before_it_refuses():
     comment; there was no test in the repository. `-DefineOnly` loads the functions without
     running the batch, so a stubbed Current-Mode can drive it with no ReStem present.
     """
+    import shutil as _shutil
     import subprocess
+
+    # Windows only, and measured on CI rather than assumed. My first attempt accepted
+    # `pwsh` on the grounds that any PowerShell would do; the Ubuntu runner has pwsh, so
+    # the skip never fired and the harness ran and failed. mykolad diagnosed it in #3:
+    # restem_batch_mode.ps1 sources restem_ui.ps1, which calls
+    # `Add-Type -AssemblyName UIAutomationClient` at the top level -- before `-DefineOnly`
+    # is ever reached. That assembly is Windows-only, so there is no other platform for
+    # this guard to run on. ReStem is a Windows application; that is the whole reason.
+    if sys.platform != "win32":
+        skip("ReStem and UIAutomationClient are Windows-only, so this guard cannot run "
+             "here (CI is Linux; it is exercised on the Windows machine that owns ReStem)")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the guard was not exercised"
 
     harness = _tmp / "mode_harness.ps1"
     harness.write_text(r"""
 . "%s" -DefineOnly
+
+# Deliberately hostile locale on every run, not only on a machine that happens to have
+# one. The second machine's decimal separator is a comma, so `-f`, which formats in the
+# current culture, emitted SECS=9,1 and float() rejected it -- the verdict depending on
+# the operator's locale rather than on the code under test. It passed here only because
+# the elapsed times happened to round to whole numbers; the flaw was latent, not absent.
+[System.Threading.Thread]::CurrentThread.CurrentCulture =
+    [System.Globalization.CultureInfo]::GetCultureInfo("de-DE")
+
+function Wire([double]$n) {
+    # This line is a protocol between two programs, not something a person reads.
+    return "$n"   # current culture, the bug
+}
+
+# A constant with a fractional part, so the locale is tested on every run instead of
+# whenever the timing happens to produce one. Timing-dependent coverage is how this got
+# through in the first place.
+Write-Output ("PROBE={0}" -f (Wire 1.5))
+
 $script:calls = 0
 $script:case  = ""
 function Current-Mode {
@@ -1777,20 +1830,31 @@ foreach ($c in @("match","lagging","disagree","transient","absent")) {
     $t0 = Get-Date
     $r = Settled-Mode -Want "Best (Offline) +" -Seconds 9
     $el = ((Get-Date) - $t0).TotalSeconds
-    Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, [math]::Round($el,1))
+    Write-Output ("CASE={0}|RESULT={1}|SECS={2}" -f $c, $r, (Wire ([math]::Round($el,1))))
 }
 """ % str(ROOT / "restem_batch_mode.ps1").replace("\\", "\\"), encoding="utf-8")
 
-    res = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
                           "-File", str(harness)],
                          capture_output=True, text=True, encoding="utf-8",
                          errors="replace", timeout=300)
     out = res.stdout + res.stderr
     got = {}
+    probe = None
     for line in out.splitlines():
+        if line.startswith("PROBE="):
+            probe = line.split("=", 1)[1].strip()
         if line.startswith("CASE="):
             parts = dict(kv.split("=", 1) for kv in line.strip().split("|"))
             got[parts["CASE"]] = (parts["RESULT"], float(parts["SECS"]))
+
+    # The harness runs under a comma-decimal culture on purpose, so this is the assertion
+    # that the wire format does not follow it. Checked before the cases, because when this
+    # is wrong every float() below raises and the failure reads as something else entirely.
+    assert probe is not None, f"the harness emitted no locale probe:\n{out[:800]}"
+    assert probe == "1.5", (
+        f"the harness formatted 1.5 as {probe!r} under a comma-decimal culture, so the "
+        "numbers on this wire follow the operator's locale rather than the protocol")
     assert len(got) == 5, f"harness did not report all five cases:\n{out[:800]}"
 
     want = "Best (Offline) +"
@@ -1830,7 +1894,17 @@ def main() -> int:
     finally:
         shutil.rmtree(_tmp, ignore_errors=True)
 
-    print(f"\n{len(PASSED)} passed, {len(FAILED)} failed")
+    total = len(PASSED) + len(FAILED) + len(SKIPPED)
+    line = f"\n{len(PASSED)} passed, {len(FAILED)} failed"
+    if SKIPPED:
+        line += f", {len(SKIPPED)} skipped"
+    print(f"{line}  ({total} tests)")
+    if SKIPPED:
+        # Named, not just counted. A count cannot be investigated and a skip that is
+        # invisible is a test nobody notices has stopped running.
+        print("\nskipped, so these were not checked here:")
+        for name, why in SKIPPED:
+            print(f"  {name}: {why}")
     if FAILED:
         print("\nfailures:")
         for name, why in FAILED:
