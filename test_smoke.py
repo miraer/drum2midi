@@ -1781,7 +1781,7 @@ def test_restem_mode_guard_settles_before_it_refuses():
 
 function Wire([double]$n) {
     # This line is a protocol between two programs, not something a person reads.
-    return "$n"   # current culture, the bug
+    return $n.ToString([System.Globalization.CultureInfo]::InvariantCulture)
 }
 
 # A constant with a fractional part, so the locale is tested on every run instead of
