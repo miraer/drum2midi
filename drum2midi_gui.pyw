@@ -27,6 +27,7 @@ import sys
 import tempfile
 import threading
 import time
+import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -607,7 +608,23 @@ class ElidedLabel(QLabel):
 
 
 class NoteBox(QComboBox):
-    """A combo box whose arrow is drawn here, since QSS cannot draw a triangle."""
+    """A combo box whose arrow is drawn here, since QSS cannot draw a triangle.
+
+    It also ignores the mouse wheel until clicked. Qt's combo box takes the wheel on
+    hover, so scrolling the sidebar or the table over the twenty note and channel
+    pickers changed whichever one passed under the pointer -- three notches moved
+    the snare from 38 to 41 without a click. The wheel now scrolls the panel.
+    """
+
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)   # not WheelFocus
+
+    def wheelEvent(self, e):
+        if self.hasFocus():
+            super().wheelEvent(e)
+        else:
+            e.ignore()                                     # to the scroll area
 
     def paintEvent(self, e):
         super().paintEvent(e)
@@ -1286,6 +1303,7 @@ class Window(QMainWindow):
         super().__init__()
         self.setWindowTitle("drum2midi — drums to MIDI")
         self.c = Choices()
+        self.run_c = self.c        # a snapshot of it once a run starts; see _start
         self.theme = "dark"
         self.phase = "empty"                 # empty | ready | converting | done
         self.proc: subprocess.Popen | None = None
@@ -2180,6 +2198,11 @@ class Window(QMainWindow):
         self.phase = "converting"
         self.started = time.monotonic()
         self._run_overrides = overrides(self.c)
+        # The run's own copy of the settings. The summary and the MIDI are read back
+        # with it, not with whatever the pickers say when the run ends: a note changed
+        # during a two-minute conversion otherwise told the read-back that the drum
+        # had moved, and every one of its hits vanished from the lane and the count.
+        self.run_c = copy.deepcopy(self.c)
         self._save_settings()
 
         cmd = build_command(self.c)
@@ -2252,7 +2275,7 @@ class Window(QMainWindow):
                 pass
             elif (row := summary_row(stripped)) is not None:
                 name, hits, lo, hi = row
-                pitch = row_pitch(name, self.c)
+                pitch = row_pitch(name, self.run_c)
                 if pitch is not None and pitch >= 0:
                     self.results[pitch] = (hits, lo, hi)
                     target = self.rows.get(pitch) or self._add_row(pitch, name)
@@ -2289,7 +2312,7 @@ class Window(QMainWindow):
                 self.live["notes"] = f"{sum(h for h, _, _ in self.results.values()):,}"
             if self.out_path.is_file():
                 try:
-                    self.timeline.hits = read_hits(self.out_path, self.c)
+                    self.timeline.hits = read_hits(self.out_path, self.run_c)
                 except Exception as exc:  # noqa: BLE001
                     self._emit(f"(timeline: could not read the MIDI back: {exc})")
         else:
