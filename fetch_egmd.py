@@ -9,10 +9,14 @@ annotation -- every onset, every velocity. So the claims worth checking can be c
 before committing to the big download: how many tom onsets there really are, and how the
 velocities are distributed. That is the point of --survey.
 
-Disk: the audio archive downloads 90 GB and unpacks to 131 GB. The zip is deleted after
-unpacking unless --keep-archive, so the requirement is about 135 GB; keeping it needs
-**220 GB**. Measured on the second machine, which reported 45537 wavs matching the
-metadata row for row.
+Disk: the audio archive downloads 90 GB and unpacks to 131 GB. Both exist at once --
+`extractall` finishes before the archive is deleted -- so the number a machine has to have
+free is the **peak of about 221 GB**, not the 131 GB it settles to afterwards. An earlier
+version of this line promised "about 135 GB" on the strength of the deletion, which
+describes the state after the run and not the moment it fails: a machine with 150 GB free
+gets four hours into the download and dies partway through the unpack. `--keep-archive`
+does not change the peak, only what is left at the end. Checked before anything is fetched.
+Measured on the second machine, which reported 45537 wavs matching the metadata row for row.
 
 Caveat that survives any survey: the audio is a Roland TD-17 electronic kit. No room, no
 mic bleed, no cymbal wash. Expect a domain gap to acoustic drums and measure it rather
@@ -27,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import shutil
 import sys
 import time
 import urllib.error
@@ -72,6 +77,47 @@ def human(n: float) -> str:
         if n < 1024 or unit == "GB":
             return f"{n:.1f} {unit}"
         n /= 1024
+
+
+# Archive and unpacked size in GiB, measured on the second machine. The pair matters
+# rather than the total, because both exist simultaneously partway through the run.
+FOOTPRINT = {"audio": (89.8, 131.0), "midi": (0.1, 0.4)}
+
+
+def enough_space(free_gib: float, kind: str, keep_archive: bool = False) -> tuple[bool, str]:
+    """Whether a run can finish, judged on the high-water mark rather than the end state.
+
+    Separated from the disk query so the decision can be tested with a number instead of a
+    filesystem. The distinction it exists to make: `extractall()` completes before the
+    archive is unlinked, so the zip and its contents coexist and the peak is their sum. The
+    docstring used to quote the post-deletion figure as the requirement, which is the one
+    number that cannot fail -- it is only ever observed after the risky part is over.
+
+    `--keep-archive` does not raise the peak. It only decides whether the run gives the
+    archive back afterwards, which is why it is reported separately.
+    """
+    archive, unpacked = FOOTPRINT[kind]
+    peak = archive + unpacked
+    settles_to = peak if keep_archive else unpacked
+    ok = free_gib >= peak * 1.03
+
+    def gib(n: float) -> str:
+        return f"{n:.1f}" if n < 10 else f"{n:.0f}"
+
+    note = (f"{free_gib:.1f} GiB free; needs about {gib(peak)} GiB at peak "
+            f"({gib(archive)} archive + {gib(unpacked)} unpacked, both present during the "
+            f"unpack), settling to {gib(settles_to)} GiB")
+    return ok, note
+
+
+def require_space(out: Path, kind: str, keep_archive: bool) -> None:
+    free = shutil.disk_usage(out).free / (1 << 30)
+    ok, note = enough_space(free, kind, keep_archive)
+    print(note)
+    if not ok:
+        raise SystemExit(
+            f"\nNot enough disk for the {kind} archive, so this would fail partway through "
+            f"the unpack rather than now.\nFree space, or pass --out on another drive.")
 
 
 def download(url: str, dest: Path) -> None:
@@ -180,6 +226,7 @@ def main() -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     url = FULL_ZIP if args.audio else MIDI_ZIP
+    require_space(args.out, "audio" if args.audio else "midi", args.keep_archive)
     archive = args.out / url.rsplit("/", 1)[1]
     download(url, archive)
 

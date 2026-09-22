@@ -1553,6 +1553,45 @@ def test_a_read_that_fails_mid_scan_cannot_be_quiet():
     assert code == 0, (
         f"a binary file, correctly labelled, should not fail the run:\n{out[:600]}")
 
+
+@test
+def test_egmd_disk_check_uses_the_peak_not_the_end_state():
+    """The requirement that cannot fail is the one measured after the risky part is over.
+
+    fetch_egmd.py unpacks a 90 GiB archive into 131 GiB and deletes the archive afterwards,
+    so both exist at once and the high-water mark is their sum. The docstring quoted the
+    post-deletion figure -- "about 135 GB" -- as the requirement. A machine with 150 GiB
+    free passes that number, spends four hours downloading, and dies partway through the
+    unpack, which is the failure the deletion was added to prevent and does not.
+
+    The check is separated from the disk query so this can be decided with a number rather
+    than a filesystem, and asserted against the machine that found it: 147.8 GiB free must
+    be refused for the audio archive and allowed for the MIDI one.
+    """
+    import fetch_egmd
+
+    ok, note = fetch_egmd.enough_space(147.8, "audio")
+    assert not ok, f"147.8 GiB was accepted for a run that peaks near 221:\n{note}"
+    assert "221" in note or "220" in note, (
+        f"the peak is not reported, so the refusal cannot be acted on:\n{note}")
+
+    ok, _ = fetch_egmd.enough_space(147.8, "midi")
+    assert ok, "the MIDI archive is 0.1 GiB and must not be blocked"
+
+    ok, _ = fetch_egmd.enough_space(250.0, "audio")
+    assert ok, "250 GiB is comfortably above the peak and was refused"
+
+    # The archive and its contents coexist, so keeping the archive cannot lower the peak.
+    peak_kept = fetch_egmd.enough_space(200.0, "audio", keep_archive=True)[0]
+    peak_deleted = fetch_egmd.enough_space(200.0, "audio", keep_archive=False)[0]
+    assert peak_kept == peak_deleted, (
+        "--keep-archive changed the admission decision, but it only decides what is left "
+        "afterwards; the moment that runs out of disk is identical")
+
+    archive, unpacked = fetch_egmd.FOOTPRINT["audio"]
+    assert archive + unpacked > 200, (
+        "the recorded footprint no longer implies the peak this guard was written for")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
