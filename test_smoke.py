@@ -374,6 +374,27 @@ def test_gui_builds():
 
 
 @test
+def test_gui_children_run_under_a_console_interpreter():
+    """Child scripts must not run under pythonw, or their own children get windows.
+
+    pythonw is a GUI-subsystem program, and Windows ignores CREATE_NO_WINDOW for it,
+    so the pipeline ran with no console and audio-separator.exe -- a console program
+    -- opened a visible terminal for every MDX23C separation. Measured by watching
+    for new top-level windows during a run started from the window under pythonw.
+    """
+    if sys.platform != "win32":
+        return          # the console subsystem split only exists on Windows
+    gui = load_gui()
+    scripts = Path(sys.executable).parent
+    for windowless in ("pythonw.exe", "drum2midi.exe"):
+        if (scripts / "python.exe").exists():
+            got = gui._console_python(scripts / windowless)
+            assert got.name.lower() == "python.exe", (
+                f"{windowless} runs child scripts as {got.name}; their console "
+                "programs will open windows")
+
+
+@test
 def test_gui_options_follow_the_separator():
     """An option the separator cannot use is shown off and left out of the command,
     but the preference survives switching back."""

@@ -32,8 +32,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SETTINGS = ROOT / "gui_settings.json"
-PY = sys.executable
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+
+def _console_python(exe: Path) -> Path:
+    """The console interpreter beside a windowless one, for running child scripts.
+
+    The window runs under pythonw.exe (or drum2midi.exe, its branded copy), which is
+    a GUI-subsystem program, and Windows ignores CREATE_NO_WINDOW for those: the
+    pipeline then ran with no console at all. Anything *it* started that is a console
+    program -- audio-separator.exe, and FluidSynth for the listen renders -- found no
+    console to inherit and got a fresh visible one. Measured: a Windows Terminal
+    window opened for every MDX23C separation. python.exe with CREATE_NO_WINDOW gets
+    a hidden console instead, and every descendant inherits that.
+    """
+    if sys.platform != "win32":
+        return exe
+    sibling = exe.with_name("python.exe")
+    return sibling if sibling.exists() else exe
+
+
+PY = str(_console_python(Path(sys.executable)))
 
 sys.path.insert(0, str(ROOT))
 
