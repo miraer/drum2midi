@@ -665,6 +665,108 @@ def test_gui_draws_drum_icons_beside_every_instrument():
 
 
 @test
+def test_gui_tells_toms_and_hi_hats_apart():
+    """The three toms and the three hi-hats are drawn in distinct shades of their lane.
+
+    Drawing every icon in its lane's single token cleared 3:1 where drum_icons' own
+    palette did not (5 of 20 outlines under it), but lost that palette's lightness
+    steps, so floor, mid and high tom -- and pedal, closed and open hi-hat -- differed
+    only in shape. The maintainer asked for steps that keep 3:1 in both themes.
+
+    Held here: every shade clears 3:1 on the panel and on a hovered row; within a lane
+    the shades run dark to light in the drum's order, at least 0.07 apart in OKLab
+    lightness; the middle one is the lane's own colour; and icons, velocity bars and
+    the kit really are drawn in them.
+    """
+    gui = load_gui()
+
+    def lin(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        return [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+
+    def ratio(a, b):
+        la, lb = (0.2126 * r + 0.7152 * g + 0.0722 * b_ for r, g, b_ in (lin(a), lin(b)))
+        hi, lo = max(la, lb), min(la, lb)
+        return (hi + 0.05) / (lo + 0.05)
+
+    def ok_l(h):
+        r, g, b = lin(h)
+        l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+        m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+        s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+        return (0.2104542553 * l ** (1 / 3) + 0.7936178200 * m ** (1 / 3)
+                - 0.0040720468 * s ** (1 / 3))
+
+    lanes = {"toms": (43, 47, 50), "hi-hats": (44, 42, 46)}     # darkest first
+    for theme, t in gui.THEMES.items():
+        for pitch in {p for p in list(gui.LABEL_TO_PITCH.values()) + [41, 45, 48]}:
+            ink = t[gui.ink_key(pitch)]
+            for bg in ("panel", "raised"):
+                r = ratio(ink, t[bg])
+                assert r >= 3.0, (f"{theme}: {pitch} ({gui.ink_key(pitch)} {ink}) is "
+                                  f"{r:.2f}:1 on {bg}, needs 3")
+        for lane, members in lanes.items():
+            shades = [ok_l(t[gui.ink_key(p)]) for p in members]
+            for a, b in zip(shades, shades[1:]):
+                assert b - a >= 0.07, (
+                    f"{theme}: {lane} steps {[round(x, 3) for x in shades]} are not "
+                    f"distinct and in order")
+            mid = t[gui.ink_key(members[1])]
+            assert mid == t[gui.colour_key(members[1])], (
+                f"{theme}: the middle of the {lane} is not the lane's colour, so its "
+                "timeline caption would not match the lane")
+
+    # and the window draws them: a probe theme makes one shade unmistakable
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        skip("Pillow is not installed, so no icons or kit to check the shades in")
+    from PySide6.QtWidgets import QApplication
+    gui, win = gui_window()
+
+    def forget_probe():
+        # the icon and kit caches are keyed by theme name, and other tests probe a
+        # theme called "probe" with other colours
+        for cache in (gui._ICON_CACHE, gui._KIT_CACHE):
+            for key in [k for k in cache if "probe" in k]:
+                del cache[key]
+
+    forget_probe()
+    gui.THEMES["probe"] = dict(gui.THEMES["light"], tomHigh="#00ff00")
+    was = gui.Tokens.name, gui.Tokens.t
+    try:
+        win.resize(1320, 860)
+        win.show()
+        win.c.input = str(make_fixture())
+        win._sync()
+        QApplication.processEvents()
+        gui.Tokens.name, gui.Tokens.t = "probe", gui.THEMES["probe"]
+
+        def green(px):
+            return int(((px[..., 1] > 200) & (px[..., 0] < 80) & (px[..., 2] < 80)).sum())
+
+        for where, rows in (("result table", win.rows), ("sidebar map", win.map_rows)):
+            assert green(_grab_pixels(rows[50].icon)) >= 6, (
+                f"{where}: the high tom's icon is not in its own shade")
+            assert green(_grab_pixels(rows[43].icon)) == 0, (
+                f"{where}: the floor tom took the high tom's shade")
+        assert win.rows[50].bar.key == "tomHigh", "the high tom's velocity bar is unshaded"
+
+        kit = gui.kit_image(320, "probe", 255)
+        w, h = kit.width(), kit.height()
+        at = lambda x, y: kit.pixelColor(int(w * x), int(h * y))   # noqa: E731
+        c = at(0.408, 0.325 + 0.05)                  # the high rack tom's shell
+        assert c.green() > 200 and c.red() < 90, f"the kit's high tom is {c.name()}"
+        c = at(0.842, 0.505 + 0.08)                  # the floor tom's shell
+        assert not (c.green() > 200 and c.red() < 90), "the floor tom took its shade"
+    finally:
+        gui.Tokens.name, gui.Tokens.t = was
+        del gui.THEMES["probe"]
+        forget_probe()
+        win.close()
+
+
+@test
 def test_gui_children_run_under_a_console_interpreter():
     """Child scripts must not run under pythonw, or their own children get windows.
 

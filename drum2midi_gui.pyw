@@ -206,9 +206,19 @@ def lane_of(pitch: int) -> int | None:
 
 
 def colour_key(pitch: int) -> str:
-    """The token name a drum is drawn in: the same colour in every part of the window."""
+    """The token of the lane a drum is drawn on: one colour per timeline lane."""
     lane = lane_of(pitch)
     return LANES[lane][1] if lane is not None else "muted"
+
+
+# The drums that share a lane, darkest step first; see the note above THEMES.
+_STEPS = {41: "tomLow", 43: "tomLow", 50: "tomHigh", 44: "hatPedal", 46: "hatOpen"}
+
+
+def ink_key(pitch: int) -> str:
+    """The token one drum is drawn in: its lane's colour, stepped lighter or darker
+    for a tom or a hi-hat so it stays apart from the others on its lane."""
+    return _STEPS.get(pitch, colour_key(pitch))
 
 
 # --------------------------------------------------------------------- what runs
@@ -409,9 +419,22 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QButtonGroup,  # n
 # are converted to sRGB here. The six drum colours share one lightness and chroma per
 # theme and differ only in hue, in the kit's low-to-high order.
 #
-# One deliberate departure: the light theme's hi-hat is oklch(0.66 0.14 75), not the
-# design's 0.70. At 0.70 amber on white is 2.7:1, under the 3:1 a mark needs to be seen
-# at all, and the hi-hat is the busiest lane on the timeline. A smoke test holds this.
+# Toms and hi-hats get three lightness steps each, in the same hue, so the drums that
+# share a lane stay apart in the icons, the velocity bars and the kit: floor, mid and
+# high tom run dark to light, and so do pedal, closed and open hi-hat -- the order
+# drum_icons' own palette used. The steps are 0.08 apart in OKLCH lightness, about the
+# smallest gap in that palette. The middle step is the lane's token, so a timeline
+# caption is always the colour of its lane.
+#
+# Every step clears 3:1 against the panel and against the row-hover background, since
+# an icon sits on both. In the dark theme the steps centre on the design's tokens. In
+# the light theme there is no room above them: green is at its 3:1 limit by L 0.63 on
+# white and amber by 0.65. So the steps hang from those limits and the middle one moves
+# down -- toms from L 0.58 to 0.55, hi-hat from 0.66 to 0.57. That also settles the old
+# hi-hat token, which was 3.20:1 on white but 2.98:1 on a hovered row.
+#
+#   light  toms  0.47 0.55 0.63   hi-hat  0.49 0.57 0.65   (C 0.14, h 150 / 75)
+#   dark   toms  0.64 0.72 0.80   hi-hat  0.72 0.80 0.88   (C 0.14 / 0.13, h 150 / 82)
 THEMES = {
     "dark": {
         "bg": "#0e1014", "panel": "#15181e", "raised": "#1c2028", "sunken": "#0b0d10",
@@ -421,6 +444,8 @@ THEMES = {
         "ok": "#61cb7c", "warn": "#e7b551",
         "kick": "#9499fa", "snare": "#ef7e7c", "tom": "#5bbd74",
         "hat": "#e7b551", "crash": "#c987dd", "ride": "#24c1c9",
+        "tomLow": "#40a35c", "tomHigh": "#75d78d",
+        "hatPedal": "#cd9c34", "hatOpen": "#fed079",
     },
     "light": {
         "bg": "#eef0f3", "panel": "#ffffff", "raised": "#f6f7f9", "sunken": "#eceef2",
@@ -428,8 +453,10 @@ THEMES = {
         "faint": "#b3b8c1", "knob": "#ffffff", "toggleOff": "#c9ced6", "wave": "#a4abb6",
         "accent": "#1c6fd2", "accentInk": "#ffffff", "accentSoft": "rgba(28,111,210,18)",
         "ok": "#25984d", "warn": "#b07509",
-        "kick": "#6262cc", "snare": "#cb4644", "tom": "#2a904b",
-        "hat": "#c38300", "crash": "#9c4db4", "ride": "#00929f",
+        "kick": "#6262cc", "snare": "#cb4644", "tom": "#1c8742",
+        "hat": "#a06b01", "crash": "#9c4db4", "ride": "#00929f",
+        "tomLow": "#046e30", "tomHigh": "#3ca059",
+        "hatPedal": "#825604", "hatOpen": "#bf8105",
     },
 }
 
@@ -675,7 +702,7 @@ def kit_image(width: float, theme: str, alpha: int) -> QImage | None:
             import drum_kit_art
             t = THEMES[theme]
             img = drum_kit_art.render(width, dark=theme == "dark", alpha=alpha,
-                                      colours=lambda p: t[colour_key(p)])
+                                      colours=lambda p: t[ink_key(p)])
             _KIT_CACHE[key] = QImage(img.tobytes("raw", "RGBA"), img.width, img.height,
                                      img.width * 4, QImage.Format.Format_RGBA8888).copy()
         except Exception:
@@ -748,7 +775,7 @@ def icon_image(pitch: int, px: int, theme: str) -> QImage | None:
     if key not in _ICON_CACHE:
         try:
             import drum_icons
-            img = drum_icons.draw_icon(pitch, px, ink=THEMES[theme][colour_key(pitch)])
+            img = drum_icons.draw_icon(pitch, px, ink=THEMES[theme][ink_key(pitch)])
             _ICON_CACHE[key] = QImage(img.tobytes("raw", "RGBA"), img.width, img.height,
                                       img.width * 4, QImage.Format.Format_RGBA8888).copy()
         except Exception:
@@ -788,7 +815,7 @@ class DrumIcon(QWidget):
     def paintEvent(self, _):
         p = QPainter(self)
         if not paint_icon(p, self.pitch, QRectF(self.rect())):
-            paint_dot(p, colour_key(self.pitch), QRectF(self.rect()), 8, 4)
+            paint_dot(p, ink_key(self.pitch), QRectF(self.rect()), 8, 4)
 
 
 class Toggle(QAbstractButton):
@@ -1250,7 +1277,7 @@ class ResultRow(QFrame):
         self.vmin.setFixedWidth(26)
         self.vmin.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.bar = VelocityBar()
-        self.bar.key = colour_key(pitch)
+        self.bar.key = ink_key(pitch)
         self.vmax = _label("", "mono")
         self.vmax.setFixedWidth(26)
         vel.addWidget(self.vmin)
