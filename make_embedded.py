@@ -31,9 +31,24 @@ RUNTIME = ROOT / "runtime"
 VERSION = "3.13.14"
 URL = f"https://www.python.org/ftp/python/{VERSION}/python-{VERSION}-embed-amd64.zip"
 
-# tkinter is absent from the embeddable package; these are the parts that provide it
-TK_FILES = ["_tkinter.pyd", "DLLs/tcl86t.dll", "DLLs/tk86t.dll"]
-TK_DIRS = ["tcl", "Lib/tkinter"]
+# The window is PySide6 since the redesign, and Qt comes from the virtual environment's
+# site-packages, which `._pth` already points at -- so nothing Qt needs is copied here.
+# tkinter used to be, because the embeddable package omits it and the old window required
+# it. The only tkinter left in the project is a `--show` preview in drum_kit_art.py, a
+# developer tool that is not launched through this runtime, so the copy has gone.
+#
+# What stays is the DLL sweep below. Its original justification was tcl86t.dll pulling in
+# the Visual C++ runtime, and that reason has gone with tkinter -- PySide6 ships its own
+# msvcp140 and vcruntime140. It is kept deliberately rather than removed on the same
+# reasoning that retired it: the embeddable package ships only part of the standard
+# library's DLLs, the files are small, and nothing here has measured which of them torch
+# or ADTOF reach for. Removing it should follow a build that is launched, not an argument.
+#
+# Measured on a clean rebuild: tcl/, Lib/tkinter and _tkinter.pyd are gone, and Qt --
+# QtWidgets and QtMultimedia -- imports under runtime/drum2midi.exe. The sweep still
+# carries tcl86t.dll across, because it copies the host's DLLs directory wholesale, so
+# one 1.5 MB file remains for a toolkit nothing loads. Said plainly rather than described
+# as "tkinter removed", which would be the tidier sentence and not the true one.
 
 
 def base_install() -> Path:
@@ -51,27 +66,10 @@ def download(dest: Path) -> Path:
     return dest
 
 
-def copy_tkinter(base: Path) -> int:
+def copy_support_dlls(base: Path) -> int:
     copied = 0
-    for rel in TK_FILES:
-        for candidate in (base / rel, base / Path(rel).name, base / "DLLs" / Path(rel).name):
-            if candidate.exists():
-                shutil.copy2(candidate, RUNTIME / candidate.name)
-                copied += 1
-                break
-    for rel in TK_DIRS:
-        src = base / rel
-        if not src.exists():
-            continue
-        dest = RUNTIME / Path(rel).name
-        if dest.exists():
-            shutil.rmtree(dest)
-        shutil.copytree(src, dest)
-        copied += 1
-
-    # tcl86t.dll pulls in the Visual C++ runtime, which the embeddable package ships
-    # only partially. Copy anything from the host's DLLs directory we do not already
-    # have -- they are small and this avoids chasing dependencies one at a time.
+    # The embeddable package ships only part of the standard library's DLLs. These are
+    # small and copying them avoids chasing dependencies one at a time.
     for dll in sorted((base / "DLLs").glob("*.dll")):
         target = RUNTIME / dll.name
         if not target.exists():
@@ -160,8 +158,8 @@ def main() -> int:
         zf.extractall(RUNTIME)
     print(f"  extracted to {RUNTIME}")
 
-    print("[2/4] tkinter from the existing install")
-    n = copy_tkinter(base_install())
+    print("[2/4] support DLLs from the existing install")
+    n = copy_support_dlls(base_install())
     print(f"  copied {n} item(s)")
 
     print("[3/4] path configuration")

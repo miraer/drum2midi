@@ -2567,7 +2567,20 @@ What it means is narrower and worth stating plainly:
 | MDB Drums (benchmark) | CC BY-NC-SA 4.0 | ❌ |
 | IDMT-SMT-Drums (benchmark) | CC BY-NC-ND 4.0 | ❌ |
 | Demucs, audio-separator, DrumSep code | MIT | ✅ |
+| PySide6 (the window only) | LGPL-3.0 / GPL-2.0 / GPL-3.0 | ✅ with conditions on bundles |
 | GMD / E-GMD / StemGMD (datasets) | CC BY 4.0 | ✅ |
+
+PySide6 is the only copyleft entry, and it is the one thing in this table that is **not** a
+model. It arrived with the window redesign; the previous toolkit was tkinter, which ships
+with Python under the PSF licence, so the default window moved from a permissive dependency
+to a copyleft one and that is worth saying out loud. Qt for Python publishes no permissive
+option.
+
+It does not change the MIT terms above. `drum2midi.py` and the command line never import it,
+pip-installed Qt is ordinary dynamic linking, and building or using the window from this
+repository carries no obligation. What does carry one is **redistributing a bundle** — the
+`runtime/` folder from `make_embedded.py`, or any installer with Qt inside — where the LGPL
+parts must stay replaceable by whoever receives them, and the licence text must travel along.
 
 A non-commercial licence in Creative Commons terms restricts **use**, not just
 redistribution — running an NC model on your own server and charging users is exactly the
@@ -2682,11 +2695,18 @@ interpreter. With a Microsoft Store install that interpreter lives under `Window
 and Windows binds the taskbar button to *that* process, which cannot be rebranded.
 
 `make_embedded.py` solves it without reinstalling anything: it downloads the embeddable
-distribution (10 MB, an ordinary folder rather than a packaged app), copies `tkinter`
-and the tcl/tk DLLs from the existing install, points `._pth` at the venv's
-`site-packages`, and registers `.venv/Library/bin` through a `sitecustomize.py` so
+distribution (10 MB, an ordinary folder rather than a packaged app), points `._pth` at the
+venv's `site-packages`, and registers `.venv/Library/bin` through a `sitecustomize.py` so
 torch's Intel runtime is still found. Our icon is written into its `pythonw.exe` copy
 with the Win32 resource API — no compiler, no packer.
+
+It used to copy `tkinter` and the tcl/tk DLLs across as well, because the embeddable
+package omits them and the old window needed them. Since the window became PySide6 that
+copy has gone: Qt is found through the shared `site-packages` like everything else, and a
+clean rebuild loads `QtWidgets` and `QtMultimedia` under `runtime\drum2midi.exe`. One
+stray `tcl86t.dll` still arrives, because the DLL sweep copies the host's `DLLs` folder
+wholesale — 1.5 MB for a toolkit nothing loads, recorded here rather than described as a
+removal that was not quite complete.
 
 The lesson is the one this project keeps relearning: measure the thing itself. Four
 rounds of plausible reasoning were beaten by one diagnostic that reported which process
