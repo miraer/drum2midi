@@ -1163,6 +1163,46 @@ def test_a_check_that_could_not_run_is_not_a_pass():
                         errors="replace", cwd=str(ROOT))
     assert ok.returncode == 0, f"a clean file did not pass:\n{ok.stdout}{ok.stderr}"
 
+@test
+def test_the_gate_answers_about_itself_under_a_hook():
+    """GIT_DIR must not decide which repository the gate is asking about.
+
+    The gate asks git who owns this project and which clone URL may therefore appear in
+    its text. It asked with cwd=ROOT, which is right until something sets GIT_DIR -- and
+    git exports GIT_DIR to every hook it runs. A hook in the coordination repository made
+    cwd lose, so the exemption was built from that repository's slug and this project's
+    own clone URL, quoted in correspondence, was reported as a leaked account name.
+
+    Clean by hand, one hit under the hook, same file and same content. A check that is
+    wrong only when it runs automatically is worse than one that is wrong always, because
+    the automatic run is the one nobody is watching.
+    """
+    import os
+    import subprocess
+
+    ours = _tmp / "quotes_our_own_url.md"
+    url = subprocess.run(["git", "remote", "get-url", "origin"], capture_output=True,
+                         text=True, cwd=str(ROOT)).stdout.strip()
+    if not url:
+        return  # no remote configured; nothing to exempt and nothing to test
+    ours.write_text(f"the repository is at {url} and that is public\n", encoding="utf-8")
+
+    def run(env):
+        return subprocess.run([PY, str(ROOT / "check_privacy.py"), str(ours)],
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", cwd=str(ROOT), env=env)
+
+    plain = run(None)
+    assert plain.returncode == 0, (
+        f"our own clone URL is flagged even by hand:\n{plain.stdout}{plain.stderr}")
+
+    hooked = dict(os.environ)
+    hooked["GIT_DIR"] = str(_tmp / "some_other_repo" / ".git")
+    under_hook = run(hooked)
+    assert under_hook.returncode == 0, (
+        "the gate flags this project's own URL when GIT_DIR points elsewhere, which is "
+        f"how every hook invokes it:\n{under_hook.stdout}{under_hook.stderr}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

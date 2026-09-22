@@ -56,6 +56,35 @@ RULES = [
     ("email address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]{2,}\b"), False),
 ]
 
+def origin_url() -> str:
+    r"""The clone URL of the repository this file lives in -- not the one git is in.
+
+    Both callers below ask git a question about *this project*: which account owns it,
+    and which clone URL is therefore allowed to appear in its text. They asked with
+    `cwd=ROOT`, which is correct until something else sets GIT_DIR, and git exports
+    GIT_DIR to every hook it runs. A hook in another repository that calls this gate --
+    the coordination repository now has one -- makes cwd lose, so the gate answers both
+    questions about the committing repository instead.
+
+    The visible effect was the exemption above landing on the wrong slug: run from that
+    hook, the gate flagged this project's own clone URL, quoted in correspondence, as a
+    leaked account name. Clean by hand, one hit under the hook, same file and same
+    content. The automatic run is the one nobody is watching, so a check that is wrong
+    only there is worse than one that is wrong always.
+
+    Scrubbing GIT_* restores what `cwd=ROOT` was for: the answer depends on where this
+    file is, not on who invoked it.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        out = subprocess.run(["git", "remote", "get-url", "origin"],
+                             capture_output=True, text=True, cwd=ROOT, timeout=10,
+                             env=env)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.stdout.strip()
+
+
 def remote_owner() -> str | None:
     """The account this repository belongs to, from the configured remote.
 
@@ -63,12 +92,7 @@ def remote_owner() -> str | None:
     of them is wrong on CI. The owner is the same on every machine that has the remote,
     which makes it the only identity worth guarding that a build server can also know.
     """
-    try:
-        out = subprocess.run(["git", "remote", "get-url", "origin"],
-                             capture_output=True, text=True, cwd=ROOT, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", out.stdout.strip())
+    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", origin_url())
     return m.group(1) if m else None
 
 
@@ -160,12 +184,7 @@ def own_repo_url() -> re.Pattern | None:
     coordinate with a second machine would have been exempted by the rule meant to
     protect it. A test asserts that specific URL is still rejected.
     """
-    try:
-        out = subprocess.run(["git", "remote", "get-url", "origin"],
-                             capture_output=True, text=True, cwd=ROOT, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", out.stdout.strip())
+    m = re.search(r"github\.com[/:]([\w.-]+)/([\w.-]+?)(?:\.git)?\s*$", origin_url())
     if not m:
         return None
     return re.compile(rf"github\.com[/:]{re.escape(m.group(1))}/"
