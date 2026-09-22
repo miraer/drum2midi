@@ -1243,6 +1243,38 @@ def test_the_summary_says_why_a_file_was_skipped_and_adds_up():
         f"{sum(counted)} accounted for against {total} checked:\n{line}")
 
 
+@test
+def test_a_file_that_cannot_be_opened_is_not_a_pass():
+    """Present but unreadable is the same claim as absent, and was exiting 0.
+
+    `scan()` ends its read in `except OSError: continue`, which increments nothing, and the
+    missing, self-exempt and binary categories are all derived from the path list, so none
+    of them can see a read that failed. A file held open by another process -- an editor, a
+    sync client, a scanner, or a file removed between listing and reading, which is exactly
+    what a pre-commit hook meets -- was reported as "1 unaccounted", then "no machine paths
+    found", then exit 0.
+
+    That is 300ca50 one branch over: a path that exists and cannot be opened is as unchecked
+    as one that is not there. The remainder category is what reported it, which is why it
+    was kept rather than deleted as unreachable -- it was not unreachable, the tests simply
+    had no unreadable input.
+
+    A directory with a text name is the portable way to be present and unopenable.
+    """
+    import subprocess
+
+    unreadable = _tmp / "held_open.md"
+    unreadable.mkdir()
+
+    res = subprocess.run([PY, str(ROOT / "check_privacy.py"), str(unreadable)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", cwd=str(ROOT))
+    out = res.stdout + res.stderr
+    assert res.returncode != 0, (
+        f"a file that could not be opened reported a clean bill:\n{out}")
+    assert "could not be read" in out or "UNREADABLE" in out, (
+        f"the report does not say the file was unreadable:\n{out}")
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

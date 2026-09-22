@@ -244,6 +244,28 @@ ALLOW = re.compile(
     re.I)
 
 
+def can_read(path: Path) -> bool:
+    r"""Whether the file can actually be opened, not merely whether it is there.
+
+    `300ca50` made a path that does not exist exit 1 instead of passing, on the rule that
+    a check which could not run is not a check that passed. A path that exists and cannot
+    be opened is the same claim and was still silently dropped: the read in scan() ends
+    in `except OSError: continue`, which increments nothing, so the file left no trace in
+    any category.
+
+    It showed up as the `unaccounted` remainder that was believed unreachable -- an
+    ordinary .md file held open by another process reported `1 unaccounted` and exited 0
+    under "no machine paths, personal names, private drafts or credentials found". A
+    pre-commit hook meets exactly that: an editor with an exclusive lock, a sync client,
+    a scanner, or a file removed between listing and reading.
+    """
+    try:
+        with path.open("rb"):
+            return True
+    except OSError:
+        return False
+
+
 def staged_files() -> list[Path]:
     out = subprocess.run(["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR"],
                          capture_output=True, text=True, cwd=ROOT,
@@ -416,6 +438,9 @@ def main() -> int:
     skipped = [p for p in paths
                if p.exists() and not args.files and not looks_textual(p)
                and p not in exempt]
+    unreadable = [p for p in paths
+                  if p.exists() and p not in exempt and p not in skipped
+                  and not can_read(p)]
     # "checked N" used to count files the scanner had only looked at the name of, so a
     # skipped file read as an inspected one. Say how many were actually opened.
     if read == len(paths):
@@ -428,7 +453,10 @@ def main() -> int:
             parts.append(f"{len(exempt)} self-exempt")
         if missing:
             parts.append(f"{len(missing)} NOT FOUND")
-        unaccounted = len(paths) - read - len(skipped) - len(exempt) - len(missing)
+        if unreadable:
+            parts.append(f"{len(unreadable)} UNREADABLE")
+        unaccounted = (len(paths) - read - len(skipped) - len(exempt)
+                       - len(missing) - len(unreadable))
         if unaccounted:
             parts.append(f"{unaccounted} unaccounted")
         print(f"checked {len(paths)} file(s), " + ", ".join(parts))
@@ -438,10 +466,11 @@ def main() -> int:
             except OSError:
                 size = -1
             print(f"  skipped as binary: {p} ({size} bytes)")
-    if missing:
-        print(f"\n{len(missing)} path(s) could not be read, so nothing is known about "
+    if missing or unreadable:
+        blind = missing + unreadable
+        print(f"\n{len(blind)} path(s) could not be read, so nothing is known about "
               f"them:")
-        for p in missing[:10]:
+        for p in blind[:10]:
             print(f"  {p}")
         print("\nA check that could not run is not a check that passed.")
         return 1
