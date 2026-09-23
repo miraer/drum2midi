@@ -81,6 +81,32 @@ function Restore-Stash([string[]] $names, [string] $from, [string] $to) {
     $back
 }
 
+# ReStem names every file it gives up on in its own telemetry log, and nowhere else: the
+# window shows a drawn dialog, the batch simply moves on, and the log is deleted when ReStem
+# exits. Without reading it, a renderer that crashed on every file looked exactly like one
+# that hung -- 25 minutes of silence either way -- and that is how the 22.09 batch was
+# reported as a hang while the real message was "ReStem stopped unexpectedly (Error 106)",
+# file after file. Only the latest run in the log counts; earlier runs share the file.
+function Batch-Failures([string[]] $lines) {
+    $begin = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '\[batch\] run started:') { $begin = $i }
+    }
+    $fails = @()
+    if ($begin -lt 0) { return , $fails }
+    for ($i = $begin + 1; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '\[batch\] file (\d+)/(\d+) terminal state=4 \((.*)\)\s*$') {
+            $fails += [pscustomobject]@{ N = [int]$Matches[1]; Of = [int]$Matches[2]; Why = $Matches[3] }
+        }
+    }
+    , $fails
+}
+
+function Telemetry-Log {
+    Get-ChildItem (Join-Path $env:APPDATA "ReStem 2\telemetry") -Filter "log-*.txt" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+}
+
 # -DefineOnly loads the functions above and stops, so the stash can be tested without
 # ReStem, the way restem_batch_mode.ps1 lets its guard be tested.
 if ($DefineOnly) { return }
@@ -261,8 +287,23 @@ function Renderer-Cpu {
 # left alone -- and with the reset alone that burned 48 minutes before a human stopped
 # it. Silence this long means stuck whatever the CPU says.
 $hardQuiet = 50   # 25 minutes at 30 s a turn
+$failSeen = 0
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
+    $tl = Telemetry-Log
+    if ($tl) {
+        $fails = Batch-Failures @(Get-Content -LiteralPath $tl.FullName -ErrorAction SilentlyContinue)
+        for ($k = $failSeen; $k -lt $fails.Count; $k++) {
+            Say ("file {0} of {1} failed inside ReStem: {2}" -f $fails[$k].N, $fails[$k].Of, $fails[$k].Why)
+        }
+        $failSeen = $fails.Count
+        # Two failures and nothing rendered is the renderer failing, not bad luck with a file:
+        # tonight a recording that rendered cleanly on 21.09 failed the same way.
+        if ($seen -eq 0 -and $failSeen -ge 2) {
+            Say "ReStem failed $failSeen file(s) outright and rendered none - the renderer is failing, not hanging; stopping"
+            break
+        }
+    }
     $now = Queue-Done $t0
     if ($now -ne $seen) {
         $seen = $now
@@ -298,6 +339,15 @@ while ((Get-Date) -lt $deadline) {
 
 Say ("=== queue end after {0:N1} min, {1} new file(s)" -f
      ((Get-Date) - $t0).TotalMinutes, $seen)
+
+# Kept because ReStem deletes it on exit, and it is the file their error message asks for.
+$tl = Telemetry-Log
+if ($tl) {
+    $keep = Join-Path $root ("bench\restem_telemetry\{0}.txt" -f (Get-Date -Format "yyyyMMdd-HHmm"))
+    New-Item -ItemType Directory -Force -Path (Split-Path $keep) | Out-Null
+    Copy-Item -LiteralPath $tl.FullName -Destination $keep -Force
+    Say "ReStem's own log for this run kept as bench\restem_telemetry\$(Split-Path $keep -Leaf)"
+}
 
 # ReStem writes where its own dialog points, which is restem_export, and -Out did not
 # reach it: the parameter used to create an empty folder and the closing line then named

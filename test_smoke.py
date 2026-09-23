@@ -2245,6 +2245,64 @@ Write-Output ("BACK=" + $back)
     real_after = real_log.stat().st_size if real_log.exists() else None
     assert real_after == real_before, "the test wrote into bench/restem_batch_queue.log"
 
+
+@test
+def test_restem_queue_names_the_files_restem_failed():
+    """The queue reads ReStem's own log for files it gave up on, and only the latest run's.
+
+    A renderer that crashes on every file and one that hangs both look like silence from
+    outside; only ReStem's telemetry names the failure. The lines here are the shape it
+    wrote on 23.09, including the nested parentheses in the message and an earlier run in
+    the same file whose failure must not be counted against the next one.
+    """
+    import shutil as _shutil
+    import subprocess
+
+    if sys.platform != "win32":
+        skip("restem_batch_queue.ps1 loads UIAutomationClient, which is Windows-only")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the parser was not exercised"
+
+    why = ("ReStem stopped unexpectedly while processing this audio. Please try again - if it "
+           "keeps happening, send us your log file. (Error 106)")
+    lines = [
+        "[01:14:53.828 t13ab4] [batch] run started: 10 files -> X inst=1",
+        f"[01:18:33.775 t13ab4] [batch] file 1/10 terminal state=4 ({why})",
+        "[03:38:58.975 t158c8] [state] standalone restore COMPLETE",
+        "[03:39:43.084 t158c8] [batch] run started: 2 files -> X inst=2",
+        "[03:39:43.085 t158c8] [batch] file 1/2: X\\036.wav inst=2",
+        f"[03:40:17.030 t158c8] [batch] file 1/2 terminal state=4 ({why})",
+        "[03:40:17.176 t158c8] [batch] file 2/2: X\\146.wav inst=2",
+        f"[03:52:00.000 t158c8] [batch] file 2/2 terminal state=4 ({why})",
+    ]
+    tele = _tmp / "telemetry_case.txt"
+    tele.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    harness = _tmp / "failures_harness.ps1"
+    harness.write_text(r"""
+. "%s" -DefineOnly
+$log = "%s"
+$f = Batch-Failures @(Get-Content -LiteralPath "%s")
+Write-Output ("COUNT=" + $f.Count)
+foreach ($x in $f) { Write-Output ("FAIL={0}/{1}|{2}" -f $x.N, $x.Of, $x.Why) }
+$none = Batch-Failures @("[01:00:00.000 t1] [batch] file 1/3 terminal state=4 (no run header)")
+Write-Output ("NOHEADER=" + $none.Count)
+""" % (ROOT / "restem_batch_queue.ps1", _tmp / "failures_harness.log", tele), encoding="utf-8")
+
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(harness)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    count = next((l.split("=", 1)[1] for l in out.splitlines() if l.startswith("COUNT=")), None)
+    fails = [l.split("=", 1)[1] for l in out.splitlines() if l.startswith("FAIL=")]
+    assert count == "2", (
+        f"counted {count!r} failures; the latest run has 2, and the earlier run's one must "
+        f"not be charged to it:\n{out[:800]}")
+    assert [f.split("|")[0] for f in fails] == ["1/2", "2/2"], f"wrong files named: {fails}"
+    assert all(f.split("|", 1)[1] == why for f in fails), (
+        f"the message was cut at its inner parenthesis, losing the error number: {fails}")
+    assert "NOHEADER=0" in out, "failures were counted from a log with no run in it"
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))
