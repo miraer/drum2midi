@@ -501,6 +501,12 @@ def separate_uvr(src: Path, device: str, length: int) -> Dict[str, np.ndarray]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def diffq_available() -> bool:
+    """Whether the Demucs models, and so --from-song, can load."""
+    import importlib.util
+    return importlib.util.find_spec("diffq") is not None
+
+
 def extract_drums(src: Path, device: str, dest: Path, model: str = None) -> Path:
     """Pull a drum stem out of a full mix, so the pipeline can take whole songs.
 
@@ -508,8 +514,16 @@ def extract_drums(src: Path, device: str, dest: Path, model: str = None) -> Path
     by 1.5 dB, so the choice is exposed -- compare_extractors.py scores them end to end
     rather than by SDR.
     """
-    tmp = Path(tempfile.mkdtemp(prefix="extract_"))
     chosen = model or HTDEMUCS_MODEL
+    # The Demucs models (named *.yaml) load through audio-separator's Demucs code,
+    # which imports diffq -- optional on macOS, where it often cannot be built. Say so
+    # here rather than let the import fail deep inside the separator.
+    if chosen.endswith(".yaml") and not diffq_available():
+        raise RuntimeError(
+            f"{chosen} needs the diffq package, which is not installed. On macOS it "
+            "has to be compiled: run `xcode-select --install`, then "
+            f"`{sys.executable} -m pip install diffq`")
+    tmp = Path(tempfile.mkdtemp(prefix="extract_"))
     try:
         _audio_separator(src, chosen, tmp, device)
         hits = [p for p in tmp.iterdir() if "drums" in p.name.lower()]

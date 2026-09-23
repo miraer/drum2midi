@@ -368,12 +368,20 @@ a drum to its own channel with `--channels 36=3`.
 ## Install
 
 **Python 3.10 to 3.13; use 3.12 if you have the choice.** The upper bound is not this
-project's: `audio-separator` depends on `diffq-fixed`, which publishes wheels for
-cp310–cp313 only, so on 3.14 pip falls back to a source build that fails and the default
-separator cannot be installed at all. Its metadata claims `>=3.7.0`, which is why the
-failure arrives as a compiler error inside a dependency rather than as a version check.
-3.13 has a Windows wheel but no Linux one, so 3.12 is the safest everywhere and is what
-CI runs.
+project's. `audio-separator` depends on a compiled package that differs by platform, per
+its own metadata:
+
+| | package | wheels | otherwise |
+|---|---|---|---|
+| Windows | `diffq-fixed` | cp310–cp313 | on 3.14 pip falls back to a source build that fails |
+| Linux, macOS | `diffq` | up to cp310 | pip compiles it, which needs a C compiler |
+
+Both claim `>=3.7.0`, which is why a failure arrives as a compiler error inside a
+dependency rather than as a version check. 3.12 is the safest everywhere and is what CI
+runs, on Linux and macOS.
+
+Only extracting drums from a whole song (`--from-song`) uses `diffq`; the default
+separator does not. On macOS it is therefore optional — see below.
 
 ```powershell
 git clone https://github.com/miraer/drum2midi.git
@@ -435,6 +443,39 @@ than runs. `--no-render` skips both when you will only use the command line.
 
 `--check` reports which device each stage will use. If an Intel GPU is present but torch
 cannot see it, the installer says so instead of silently running on the CPU.
+
+### Linux and macOS
+
+The same steps, with the paths spelled the Unix way:
+
+```bash
+git clone https://github.com/miraer/drum2midi.git
+cd drum2midi
+python3.12 -m venv .venv
+.venv/bin/python setup_env.py
+./drum2midi.sh                      # the window
+```
+
+**Linux.** Install a compiler first, since `diffq` is built from source above Python
+3.10: `sudo apt install build-essential python3-dev` on Debian or Ubuntu. Then `ffmpeg`,
+FluidSynth for listening to the MIDI (`sudo apt install ffmpeg fluidsynth`), and, under
+X11, `libxcb-cursor0`: Qt 6.5 and later cannot open a window without it, and say so only
+as "Could not load the Qt platform plugin xcb". `drum2midi.sh` checks for it and names
+the package. `.venv/bin/python make_shortcut.py` adds drum2midi to the application menu.
+
+**macOS.** `brew install ffmpeg fluid-synth`. `diffq` has no macOS wheel above Python
+3.10 and needs Xcode's command line tools to build, so `setup_env.py` installs the
+separator without it, then tries it, and carries on if the build fails. Everything but
+`--from-song` works either way; the window turns its "whole song" switch off and says
+what is missing. To add it later: `xcode-select --install`, then
+`.venv/bin/python -m pip install diffq`. Use `setup_env.py` here rather than
+`pip install -r requirements.txt`, which leaves the separator out on macOS for this
+reason. On Apple Silicon, separation runs on the GPU (`mps`) and transcription stays on
+the CPU, as `devices.py` decides; neither has been timed on a Mac, so the runtime
+estimates in the window are the Windows machine's.
+
+CI runs the smoke tests on Linux and on macOS (Apple Silicon, CPU only). The window has
+been used by hand only on Windows.
 
 ### NVIDIA: run that install through the virtualenv, not a bare `pip3`
 

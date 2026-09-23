@@ -26,4 +26,19 @@ if ! "$python_bin" -c "import PySide6.QtWidgets" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Qt 6.5 and later need libxcb-cursor to open a window under X11, and most
+# distributions do not install it. Without it Qt stops with "Could not load the Qt
+# platform plugin xcb", which names neither the library nor the package. A Wayland
+# session uses Qt's Wayland plugin instead, so only X11 is checked.
+if [ "$(uname -s)" = "Linux" ] && [ -z "${WAYLAND_DISPLAY:-}" ] \
+        && command -v ldconfig >/dev/null 2>&1 \
+        && ! ldconfig -p 2>/dev/null | grep -q "libxcb-cursor.so.0"; then
+    echo "libxcb-cursor is missing, which Qt needs to open a window under X11." >&2
+    echo "  Debian/Ubuntu:  sudo apt install libxcb-cursor0" >&2
+    echo "  Fedora:         sudo dnf install xcb-util-cursor" >&2
+    echo "  Arch:           sudo pacman -S xcb-util-cursor" >&2
+    echo "Command line still works:  $python_bin drum2midi.py drums.wav -o out.mid" >&2
+    exit 1
+fi
+
 exec "$python_bin" "$here/drum2midi_gui.pyw" "$@"

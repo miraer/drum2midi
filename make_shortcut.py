@@ -11,6 +11,9 @@ and the shortcut as the same application.
 
     python make_shortcut.py                 # onto the desktop
     python make_shortcut.py --start-menu
+
+On Linux it writes a freedesktop entry instead, so drum2midi appears in the
+application menu with its icon, launched through drum2midi.sh.
 """
 
 from __future__ import annotations
@@ -83,6 +86,42 @@ def set_app_id(lnk: Path, app_id: str, attempts: int = 6) -> bool:
     return False
 
 
+def desktop_entry(root: Path) -> str:
+    """The freedesktop .desktop entry for a checkout at `root` (Linux menus)."""
+    def quoted(path: Path) -> str:
+        # Two layers, per the spec: an Exec argument in double quotes escapes " ` $
+        # and backslash with a backslash, and then the value as a whole is a string,
+        # whose own escaping doubles every backslash -- so a literal backslash ends up
+        # as four.
+        text = path.as_posix()
+        for ch in ("\\", '"', "`", "$"):
+            text = text.replace(ch, "\\" + ch)
+        return '"' + text.replace("\\", "\\\\") + '"'
+    return "\n".join([
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name=drum2midi",
+        "Comment=Drum recordings to General MIDI",
+        f"Exec={quoted(root / 'drum2midi.sh')} %f",
+        f"Icon={(root / 'docs' / 'logo_256.png').as_posix()}",
+        "Terminal=false",
+        "Categories=AudioVideo;Audio;Music;",
+        "MimeType=audio/x-wav;audio/wav;audio/flac;audio/mpeg;audio/ogg;",
+        "",
+    ])
+
+
+def install_linux_entry() -> int:
+    """Writes the entry to ~/.local/share/applications, where menus look."""
+    apps = Path.home() / ".local" / "share" / "applications"
+    apps.mkdir(parents=True, exist_ok=True)
+    target = apps / "drum2midi.desktop"
+    target.write_text(desktop_entry(ROOT), encoding="utf-8")
+    target.chmod(0o755)
+    print(f"menu entry -> {target}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -96,8 +135,11 @@ def main() -> int:
     args = ap.parse_args()
 
     import os
+    if sys.platform.startswith("linux"):
+        return install_linux_entry()
     if os.name != "nt":
-        print("Windows only.")
+        print("On macOS, start the window with ./drum2midi.sh; there is no menu entry "
+              "to make.")
         return 1
 
     pythonw = ROOT / ".venv" / "Scripts" / "drum2midi.exe"
