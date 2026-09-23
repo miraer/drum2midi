@@ -2363,15 +2363,16 @@ foreach ($k in $cases.Keys) { Write-Output ("ENDED_{0}={1}" -f $k, (Batch-Ended 
 
 @test
 def test_restem_queue_tells_a_stuck_render_from_a_slow_one():
-    """A file whose renderer never gets going is found, so the batch can move on.
+    """A file whose renderer never starts is found, so the batch can move on.
 
     ReStem's renderer sometimes sits on a file at 3% with a core busy for as long as it is
     left, and the batch never moves past it: on 23.09 that was file 4 of 10, and the queue
     would have waited out its 25 minutes and stopped with six files unrendered. Stopping
     that renderer made ReStem fail the one file and go on. This checks the reading that
-    decides when: ReStem's own "ticker pinned" heartbeat is not progress, a finished or
-    failed file is not stuck, only the latest run counts, and a batch running across
-    midnight is timed correctly.
+    decides when: only a file that never engaged a stage or logged progress counts --
+    file 9 of the same run went 8 minutes between two progress lines and finished --
+    ReStem's own "ticker pinned" heartbeat is not a start, a failed file is not stuck,
+    only the latest run counts, and a batch running across midnight is timed correctly.
     """
     import shutil as _shutil
     import subprocess
@@ -2400,7 +2401,9 @@ $end   = L "10:07:00" "[batch] run finished: 10 ok, 0 failed, 0 cancelled (of 10
 $now = [datetime]"2026-09-23 10:15:00"
 $cases = [ordered]@{
     never_started = @($run, $f3, $f4, $pin)
-    stalled_at_61 = @($run, $f3, $f4, $stage, $p11, $p61)
+    slow_stage2   = @($run, $f3, $f4, $stage, $p11, $p61)
+    only_progress = @($run, $f3, $f4, $p11)
+    only_stage    = @($run, $f3, $f4, $stage)
     busy          = @($run, $f3, $f4, $stage, $p11, $p61, $busy)
     young         = @($run, $f3, (L "10:09:00" "[batch] file 4/10: X\restem_in\121_charleston.wav inst=1"))
     failed        = @($run, $f4, $pin, $fail4)
@@ -2428,7 +2431,8 @@ foreach ($t in "00:05:00", "00:12:00") {
                          errors="replace", timeout=300)
     out = res.stdout + res.stderr
     got = dict(l.split("=", 1) for l in out.splitlines() if l.startswith("HUNG_"))
-    want = {"HUNG_never_started": "4:121_charleston", "HUNG_stalled_at_61": "4:121_charleston",
+    want = {"HUNG_never_started": "4:121_charleston", "HUNG_slow_stage2": "none",
+            "HUNG_only_progress": "none", "HUNG_only_stage": "none",
             "HUNG_busy": "none", "HUNG_young": "none", "HUNG_failed": "none",
             "HUNG_moved_on": "none", "HUNG_finished": "none", "HUNG_earlier_run": "none",
             "HUNG_no_run": "none",
