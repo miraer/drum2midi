@@ -133,6 +133,18 @@ def separate_uvr(src: Path, sep, tmp_root: Path) -> dict:
     return out
 
 
+def dataset_dir(separator: str) -> Path:
+    """Where this script writes the data for a separator, and where train_onset.py looks.
+
+    One function for both, because they used to be two literals: this script wrote
+    LarsNet data to bench/onset_data by default while the trainer read only
+    bench/onset_data_uvr, so the documented pair, each run with its defaults, stopped at
+    "no dataset".
+    """
+    return ROOT / "bench" / ("onset_data" if separator == "larsnet"
+                             else f"onset_data_{separator}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=None)
@@ -142,9 +154,7 @@ def main() -> int:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    out_dir = Path(args.out) if args.out else \
-        ROOT / "bench" / ("onset_data" if args.separator == "larsnet"
-                          else f"onset_data_{args.separator}")
+    out_dir = Path(args.out) if args.out else dataset_dir(args.separator)
 
     import torch
 

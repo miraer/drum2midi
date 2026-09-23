@@ -15,8 +15,13 @@ appears on both sides.
 Convolution is what an integrated GPU is good at, so this trains on the GPU even though
 the rest of the transcription stage stays on the CPU.
 
-    python train_onset.py --epochs 6
-    python train_onset.py --stem kick --epochs 10
+Nothing in the pipeline loads what this writes. The five classes come from ADTOF, and
+models/onset_<stem>_<dataset>.pt is read only by whatever experiment is built to score it.
+The file name carries the dataset so that two datasets cannot overwrite each other's model.
+
+    python train_onset.py --epochs 6                        # LarsNet data, as built by default
+    python train_onset.py --separator uvr --stem kick --epochs 10
+    python train_onset.py --data bench/egmd_onset_data --stem toms
 """
 
 from __future__ import annotations
@@ -34,7 +39,7 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-DATA = ROOT / "bench" / "onset_data_uvr"
+DATA: Path = ROOT / "bench" / "onset_data"      # set from --separator / --data in main()
 STEMS = ["kick", "snare", "toms", "hihat", "cymbals"]
 CONTEXT = 7          # frames either side, so the window is 15 frames = 150 ms
 FPS = 100
@@ -176,11 +181,21 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=None,
                     help="use only N performances per split, for a quick trial")
     ap.add_argument("--device", default="auto")
+    ap.add_argument("--separator", default="larsnet", choices=["larsnet", "uvr"],
+                    help="read the data build_onset_dataset.py wrote for this separator; "
+                         "the same default as that script, so the pair runs as documented. "
+                         "The onset experiments in the README used --separator uvr")
+    ap.add_argument("--data", type=Path, default=None,
+                    help="a dataset directory in the same format, e.g. one built from E-GMD")
     args = ap.parse_args()
 
+    global DATA
+    from build_onset_dataset import dataset_dir
+    DATA = args.data if args.data else dataset_dir(args.separator)
     if not DATA.exists():
-        print(f"no dataset at {DATA}\nBuild it with: python build_onset_dataset.py "
-              f"--separator uvr")
+        how = ("" if args.data else
+               f"\nBuild it with: python build_onset_dataset.py --separator {args.separator}")
+        print(f"no dataset at {DATA}{how}")
         return 1
 
     import torch
@@ -236,8 +251,8 @@ def main() -> int:
 
         results[stem] = evaluate(model, Xte, yte, device)
         torch.save({"state": model.state_dict(), "n_mels": n_mels,
-                    "context": CONTEXT, "stem": stem},
-                   ROOT / "models" / f"onset_{stem}.pt")
+                    "context": CONTEXT, "stem": stem, "data": DATA.name},
+                   ROOT / "models" / f"onset_{stem}_{DATA.name}.pt")
 
         full = evaluate_full(model, te_X, te_y, device)
         if full:

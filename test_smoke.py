@@ -339,6 +339,13 @@ def load_gui():
     """
     import importlib.util
     from importlib.machinery import SourceFileLoader
+    if importlib.util.find_spec("PySide6") is None:
+        # The window is Qt since the redesign, and PySide6 is roughly 100 MB that the
+        # CLI never imports -- setup_env lists it as "the window only; the CLI runs
+        # without". A machine that took that at its word runs every other test in this
+        # file and cannot make the suite green, which is how a suite stops being run.
+        # Skip rather than fail, and rather than pass: the six GUI checks did not run.
+        skip("PySide6 is not installed; the GUI tests need Qt")
     if "gui" in sys.modules:
         return sys.modules["gui"]
     path = ROOT / "drum2midi_gui.pyw"
@@ -2302,6 +2309,52 @@ Write-Output ("NOHEADER=" + $none.Count)
     assert all(f.split("|", 1)[1] == why for f in fails), (
         f"the message was cut at its inner parenthesis, losing the error number: {fails}")
     assert "NOHEADER=0" in out, "failures were counted from a log with no run in it"
+
+
+@test
+def test_onset_trainer_reads_where_the_builder_writes():
+    """Run with their defaults, build_onset_dataset.py and train_onset.py must meet.
+
+    They did not: the builder wrote LarsNet data to bench/onset_data by default and the
+    trainer read only bench/onset_data_uvr, so the documented pair stopped at "no dataset"
+    -- found on the second machine after an E-GMD build. The trainer runs here from a copy
+    in a temp directory with no data, and its refusal must name the directory the builder
+    would have written for the same separator, and point at an explicit --data unchanged.
+    """
+    import shutil as _shutil
+    import subprocess
+
+    import build_onset_dataset as bod
+
+    root = _tmp / "onset_pair"
+    root.mkdir()
+    for f in ("train_onset.py", "build_onset_dataset.py"):
+        _shutil.copy(ROOT / f, root / f)
+
+    def refusal(*extra):
+        r = subprocess.run([sys.executable, str(root / "train_onset.py"), *extra],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=300, cwd=str(root))
+        return r.returncode, r.stdout + r.stderr
+
+    for sep, extra in (("larsnet", ()), ("uvr", ("--separator", "uvr"))):
+        want = root / bod.dataset_dir(sep).relative_to(bod.ROOT)
+        code, out = refusal(*extra)
+        assert code == 1, f"--separator {sep}: expected a refusal, got exit {code}:\n{out[:600]}"
+        # whole lines, not substrings: ".../onset_data" is a prefix of ".../onset_data_uvr",
+        # which let the very bug this test is for pass its first version
+        lines = out.splitlines()
+        assert f"no dataset at {want}" in lines, (
+            f"with --separator {sep} the trainer looked somewhere other than {want}, where "
+            f"the builder writes:\n{out[:600]}")
+        assert f"Build it with: python build_onset_dataset.py --separator {sep}" in lines, (
+            f"the refusal did not name the build command for {sep}:\n{out[:600]}")
+
+    own = root / "somewhere_else"
+    code, out = refusal("--data", str(own))
+    assert code == 1 and f"no dataset at {own}" in out.splitlines(), (
+        f"--data was not honoured:\n{out[:600]}")
+
 
 def main() -> int:
     global _tmp
