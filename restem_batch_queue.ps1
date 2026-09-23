@@ -107,6 +107,21 @@ function Telemetry-Log {
         Sort-Object LastWriteTime | Select-Object -Last 1
 }
 
+# True when this ReStem session's last batch ran to the end and nothing has opened since,
+# which is when its "N files finished" dialog is still on screen. While it is, Load still
+# takes files but no Batch Process dialog appears, and the queue used to report that as
+# "the product took one file only" -- twice on 23.09, after a probe batch had finished
+# cleanly. The dialog is drawn and its button shares a name with the window's own close
+# button, so it is cleared by restarting ReStem, never by clicking.
+function Batch-Ended([string[]] $lines) {
+    $last = $null
+    foreach ($l in $lines) {
+        if ($l -match '\[life\] .* created') { $last = $null }
+        elseif ($l -match '\[batch\] (run started|run finished|setup opened)') { $last = $Matches[1] }
+    }
+    $last -eq "run finished"
+}
+
 # -DefineOnly loads the functions above and stops, so the stash can be tested without
 # ReStem, the way restem_batch_mode.ps1 lets its guard be tested.
 if ($DefineOnly) { return }
@@ -184,8 +199,14 @@ if ($mode -ne $Expect) { Say "mode is '$mode' but '$Expect' was expected - refus
 # WM_CLOSE via CloseMainWindow() exits in about two seconds and updates the settings
 # file. Force is kept as a fallback for a hung renderer, where the mode is lost anyway
 # and the guard will catch it.
-if (-not (Find-ByName (Get-RestemWindow) "Load")) {
-    Say "Load is unavailable -- restarting ReStem rather than clicking anything"
+$tl = Telemetry-Log
+$leftover = [bool]($tl -and (Batch-Ended @(Get-Content -LiteralPath $tl.FullName -ErrorAction SilentlyContinue)))
+if ($leftover -or -not (Find-ByName (Get-RestemWindow) "Load")) {
+    if ($leftover) {
+        Say "the last batch's 'finished' dialog is still up, and ReStem opens no new batch while it is - restarting ReStem rather than clicking it"
+    } else {
+        Say "Load is unavailable -- restarting ReStem rather than clicking anything"
+    }
     foreach ($proc in @(Get-Process -Name "ReStem 2" -ErrorAction SilentlyContinue)) {
         $null = $proc.CloseMainWindow()
         for ($i = 0; $i -lt 15; $i++) {

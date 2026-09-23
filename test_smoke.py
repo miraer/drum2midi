@@ -2312,6 +2312,56 @@ Write-Output ("NOHEADER=" + $none.Count)
 
 
 @test
+def test_restem_queue_sees_the_last_batch_dialog_still_up():
+    """A batch that ran to the end leaves a dialog up that blocks the next one.
+
+    Twice on 23.09 a queue started straight after a clean probe batch loaded its files,
+    got no Batch Process dialog, and reported "the product took one file only". The probe's
+    "finished" dialog was still on screen. The queue now reads that state from ReStem's log
+    and restarts ReStem instead; this checks the reading, including that a batch from a
+    previous session, or one reopened since, does not count.
+    """
+    import shutil as _shutil
+    import subprocess
+
+    if sys.platform != "win32":
+        skip("restem_batch_queue.ps1 loads UIAutomationClient, which is Windows-only")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the check was not exercised"
+
+    harness = _tmp / "ended_harness.ps1"
+    harness.write_text(r"""
+. "%s" -DefineOnly
+$log = "%s"
+$life  = "[09:39:06.181 t1] [life] inst=1 ReStem 2.0.18 created: format=Standalone"
+$setup = "[09:39:53.537 t1] [batch] setup opened: 2 files (out=X) inst=1"
+$start = "[09:39:58.638 t1] [batch] run started: 2 files -> X inst=1"
+$file  = "[09:39:58.642 t1] [batch] file 1/2: X\036.wav inst=1"
+$done  = "[09:43:19.834 t1] [batch] run finished: 2 ok, 0 failed, 0 cancelled (of 2) inst=1"
+$cases = [ordered]@{
+    finished = @($life, $setup, $start, $file, $done)
+    reopened = @($life, $setup, $start, $file, $done, $setup)
+    running  = @($life, $setup, $start, $file)
+    fresh    = @($life)
+    previous = @($life, $setup, $start, $done, $life)
+}
+foreach ($k in $cases.Keys) { Write-Output ("ENDED_{0}={1}" -f $k, (Batch-Ended $cases[$k])) }
+""" % (ROOT / "restem_batch_queue.ps1", _tmp / "ended_harness.log"), encoding="utf-8")
+
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(harness)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    got = dict(l.split("=", 1) for l in out.splitlines() if l.startswith("ENDED_"))
+    want = {"ENDED_finished": "True", "ENDED_reopened": "False", "ENDED_running": "False",
+            "ENDED_fresh": "False", "ENDED_previous": "False"}
+    assert got == want, (
+        f"misread which state leaves the finished dialog up:\n  got  {got}\n  want {want}\n"
+        f"{out[:600]}")
+
+
+@test
 def test_onset_trainer_reads_where_the_builder_writes():
     """Run with their defaults, build_onset_dataset.py and train_onset.py must meet.
 
