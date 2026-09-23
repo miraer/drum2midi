@@ -1101,23 +1101,46 @@ def test_from_song_without_diffq_says_what_to_install():
 
     Only the Demucs models import diffq, and on macOS it is optional. The run is real
     -- drum2midi.py on the fixture -- with diffq hidden from the import system, which
-    is how an install without it looks.
+    is how an install without it looks. --no-separate keeps the separator's own
+    pre-flight (ffmpeg, absent on CI) out of the way: extraction is checked on its
+    own, and diffq first, because that is the part only it needs.
     """
     code = (
         "import importlib.util as u, runpy, sys\n"
         "real = u.find_spec\n"
         "u.find_spec = lambda n, *a, **k: None if n == 'diffq' else real(n, *a, **k)\n"
         f"sys.argv = ['drum2midi.py', r'{make_fixture()}', '-o', r'{_tmp / 'song.mid'}',"
-        " '--device', 'cpu', '--from-song']\n"
+        " '--device', 'cpu', '--no-separate', '--from-song']\n"
         f"runpy.run_path(r'{ROOT / 'drum2midi.py'}', run_name='__main__')\n")
     res = subprocess.run([PY, "-c", code], capture_output=True, text=True,
                          encoding="utf-8", errors="replace", cwd=str(ROOT), timeout=300)
     out = res.stdout + res.stderr
     assert res.returncode != 0, f"--from-song ran without diffq:\n{out[-400:]}"
-    assert "needs the diffq package" in out and "xcode-select --install" in out, (
+    assert "--from-song needs diffq" in out and "xcode-select --install" in out, (
         f"the failure does not say what to install:\n{out[-600:]}")
     assert "[1/4]" not in out, "it went on to transcribe instead of stopping"
     assert "Traceback" not in out, f"crashed instead of reporting:\n{out[-600:]}"
+
+
+@test
+def test_from_song_checks_its_programs_before_any_work():
+    """--from-song runs audio-separator, so it needs ffmpeg even with --no-separate,
+    which the separator's own pre-flight rightly ignores."""
+    import argparse
+    import shutil as _shutil
+    import drum2midi
+
+    real_which, real_diffq = _shutil.which, drum2midi.diffq_available
+    _shutil.which = lambda name, *a, **k: None if name == "ffmpeg" else real_which(name, *a, **k)
+    drum2midi.diffq_available = lambda: True
+    try:
+        song = argparse.Namespace(from_song=True, extractor=None, no_separate=True)
+        missing = drum2midi.song_extraction_missing(song)
+        assert missing and missing[0] == "FFmpeg", f"ffmpeg not required: {missing}"
+        stem = argparse.Namespace(from_song=False, extractor=None, no_separate=True)
+        assert drum2midi.song_extraction_missing(stem) is None, "a drum stem was held up"
+    finally:
+        _shutil.which, drum2midi.diffq_available = real_which, real_diffq
 
 
 @test
