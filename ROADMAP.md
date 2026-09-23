@@ -25,10 +25,14 @@ either transcriber, which is a harder problem than it first looked.
 
 The obvious remedy — fire a fallback detector only where the model is silent — was
 measured and [does not
-work](README.md#-a-fallback-for-the-passages-where-adtof-goes-silent). Nothing else is
-currently proposed. Untried directions, none of them evaluated: a second transcriber
-trained on different material, spectral pre-emphasis ahead of ADTOF, or simply detecting
-the condition and telling the user rather than writing silence.
+work](README.md#-a-fallback-for-the-passages-where-adtof-goes-silent). Spectral
+pre-emphasis ahead of ADTOF was measured next and [fails its own
+gate](README.md#-pre-emphasis-ahead-of-adtof-for-the-same-passages): two fixed tilts lift
+4.2% and 25.3% [10.6, 41.5] of the blind onsets to threshold, against a pre-registered
+50%, and the mallet recordings respond least. Nothing else is currently proposed.
+Untried directions, none of them evaluated: a second transcriber trained on different
+material, or simply detecting the condition and telling the user rather than writing
+silence.
 
 ### Toms, still the weakest class
 
@@ -159,6 +163,7 @@ nobody proposes them again without new evidence:
 | idea | why it died |
 |---|---|
 | Fallback where the model is silent | blind share does not predict per-track F1; three of the five worst tracks have **zero** blind onsets; ceiling on recall 1.27% |
+| Pre-emphasis ahead of ADTOF for deaf passages | failed a pre-registered gate: two fixed tilts lift 4.2% and 25.3% [10.6, 41.5] of blind onsets to threshold against 50% needed; mallets 0 and 11 of 112 |
 | Learned onset detector on separated stems | toms, E-GMD-trained, paired on ENST: **−0.204 [−0.274, −0.137]**. Recall rose and precision collapsed. The older "fires everywhere" verdict was frame-exact scoring and is withdrawn. Other classes are unmeasured |
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |

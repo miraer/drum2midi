@@ -2143,6 +2143,57 @@ reproduced to the digit on a second machine running **librosa 0.11.0 against 1.0
 stronger evidence that the measurement is a property of the audio than matched versions
 would have been.
 
+### ❌ Pre-emphasis ahead of ADTOF, for the same passages
+
+The deaf material is dull, with a centroid of 2129 Hz against 4037 Hz in the loud sections.
+That suggested tilting the spectrum before ADTOF sees it. `preemphasis_gate.py` tests the
+necessary condition, and was written down before it ran: does a tilt lift the blind onsets
+to threshold at all? If it doesn't, there is nothing for a full-pipeline run to find.
+
+The design, fixed in advance:
+
+- **Filters:** two fixed first-order filters, y[n] = x[n] − a·x[n−1] with a = 0.5 and
+  0.97. Each output is RMS-matched to the original, so only the spectral shape changes;
+  ENST's `048` mallet recording had already shown that level is not the problem.
+- **Onsets:** audible onsets come from the *original* audio, so every arm shares one
+  denominator.
+- **Blind:** an onset is blind when every class stays under half its threshold, as in
+  `blind_spots.py`.
+- **Recovered:** a blind onset counts as recovered only if it reaches threshold.
+- **Pass rule:** at least half the blind onsets recovered, pooled over MDB's 23 tracks
+  and the 210 ENST recordings.
+
+The baseline reproduced the published figure exactly: 101 blind onsets of 5081 on MDB.
+
+| arm | blind onsets recovered | seen onsets pushed under threshold |
+|---|---|---|
+| a = 0.5 | 18 of 430, **4.2%** [1.9, 7.1] | 151 of 27 893, 0.5% [0.3, 0.8] |
+| a = 0.97 | 109 of 430, **25.3%** [10.6, 41.5] | 702 of 27 893, 2.5% [1.7, 3.5] |
+
+Intervals are 95%, bootstrapped over recordings. **Both arms fail**, and for the stronger
+filter the whole interval sits below the 50% bar.
+
+The breakdown makes it worse rather than better:
+
+- **Most of the recovery is one track.** MDB alone reads 59.4% for a = 0.97, but 50 of those
+  60 recoveries are SwingJazz, and the interval is [0.0, 82.6]. Without SwingJazz the
+  stronger filter recovers 59 of 373, or 15.8%.
+- **The mallet recordings respond least.** These are the closest match in the benchmark to
+  the dull material that motivated the idea. They hold 112 blind onsets, and the filters
+  recover 0 and 11 of them. `048`, which ADTOF cannot hear anywhere, stays at 0 of 18 under
+  both.
+- **The cost points the wrong way.** For each blind onset the stronger filter lifts, it pushes
+  about six previously seen onsets under threshold. That column is only a hint: a class
+  under threshold is not a wrong note. It is still reason enough not to pay for a
+  full-pipeline run on a filter that has already failed the cheaper test.
+
+What this does not settle: it tested two fixed first-order tilts, not every possible
+equaliser. A filter tuned to recover these onsets would be tuned on the test set. Other
+directions stay open and are listed in [ROADMAP.md](ROADMAP.md): a second transcriber
+trained on different material, or detecting the condition and warning the user.
+
+Cost: 20 minutes of CPU for 233 recordings × 3 arms.
+
 ### ❌ A learned ride/crash classifier, and a tuned margin
 
 The largest remaining gap against ReStem that is our own doing rather than a data
@@ -2662,8 +2713,9 @@ python setup_env.py --check
    its unclassified bucket — so this is a property of the material rather than of either
    transcriber. The obvious remedy, firing a fallback only where the model is silent,
    [was measured and does not
-   work](#-a-fallback-for-the-passages-where-adtof-goes-silent). Unsolved, and no approach
-   currently proposed.
+   work](#-a-fallback-for-the-passages-where-adtof-goes-silent), and neither does
+   [tilting the spectrum ahead of ADTOF](#-pre-emphasis-ahead-of-adtof-for-the-same-passages).
+   Unsolved, and no approach currently proposed.
 9. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
 
