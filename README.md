@@ -300,10 +300,12 @@ of date silently.
 
 The two branches matter. **ADTOF looks at the drum mixture, not at the separated
 stems** — that is the single most counter-intuitive design decision here, and the
-separator's output never reaches the onset detector. It was measured three ways: running
-ADTOF on stems scores tom F1 0.000, a handwritten amplitude trigger did no better, and a
-purpose-trained CNN reached 0.623 against the pipeline's 0.882. The context of the other
-drums turns out to be worth more than isolation.
+separator's output never reaches the onset detector. Running ADTOF on stems scores tom F1
+0.000, and a handwritten amplitude trigger did no better, so for ADTOF the context of the
+other drums is worth more than isolation. A third test, a purpose-trained CNN, used to be
+quoted here as 0.623 against the pipeline's 0.882. That comparison was between two scorers
+rather than two detectors, and it is withdrawn in the section on the learned onset detector
+below. Whether a detector trained on stems can beat the mixture is not measured yet.
 
 With `--from-song`, htdemucs runs first and **everything downstream uses its output** —
 both the transcriber and the separator see the extracted drum audio, never the original
@@ -1659,10 +1661,24 @@ The fix is one constant, `TOM_CEILING = 0.45`, bounding the adaptive value from 
 > error was in our own favour, which is the direction these go.
 
 The MDB figures are this pipeline's own re-run with the separator on, which is the
-configuration every other number in this README uses. The ENST figures come from the
-second machine with separation off, on the grounds that the separator provably does not
-move tom scores on MDB; that keeps the tom comparison sound but means the two MICRO
-columns are not like for like.
+configuration every other number in this README uses. The ENST figures were first measured
+on the second machine, in the sweep that chose the ceiling, with separation off. The
+separator provably does not move tom scores on MDB, so the tom comparison is sound, but the
+two MICRO columns are not like for like.
+
+The sweep's own "after" MIDI was not kept. What survives is a re-run of the shipped policy on
+this machine: `benchmark_enst.py` at its defaults (wet mix, separation off, 210
+recordings), written to `bench/enst` on 19 September, four hours after the ceiling was
+committed. Rescoring that output on 23 September (`--rescore`) reproduces the published
+figure to the digit:
+
+```
+toms   ref 2617   est 1913   matched 1220   P 0.638   R 0.466   F1 0.539 [0.471, 0.604]
+```
+
+That re-run, not the sweep, is where the 0.539 quoted throughout this README comes from. The
+second machine found that nothing on its own disk reproduced 0.539. It raised this before any
+comparison against the figure was allowed to spend ENST.
 
 Sixteen candidate policies scored on the recordings that selected them is how a benchmark
 gets overfitted — [this README carries that scar already](#-tuning-all-five-thresholds-globally-my-earlier-result-was-biased).
@@ -1921,7 +1937,7 @@ Separate-and-Detect is the one to revisit the day this project has a GPU: it emi
 exactly our five classes and publishes MDB numbers, and it is the only candidate ruled
 out for cost rather than for quality.
 
-### ❌ A learned onset detector on separated stems
+### ⚠️ A learned onset detector on separated stems, rejected with the wrong scorer
 
 This was the last big untested idea, and the one the whole 417 MB training set was built
 for: since a stem already tells you *which* drum it is, finding *when* it was hit should
@@ -1945,13 +1961,39 @@ in real audio but 25% of a balanced training sample, so precision measured on th
 balanced set counts false positives against a pool thirty times too small. Evaluating
 every frame of the held-out tracks costs kick 0.345 F1 and snare 0.372.
 
-Against the pipeline's actual 0.882, even the best stem is far behind. Peak-picking
-would recover something, but not that gap. **ADTOF looking at the mixture beats a
-detector that was handed the isolated instrument** — the context of the other drums
-turns out to be worth more than the isolation.
+That part stands: a balanced sample does not measure a detector. The conclusion drawn
+next did not follow, and it is withdrawn. It read:
+
+> Against the pipeline's actual 0.882, even the best stem is far behind. Peak-picking
+> would recover something, but not that gap. **ADTOF looking at the mixture beats a
+> detector that was handed the isolated instrument.**
+
+The right-hand column and 0.882 are not scored alike:
+
+- **`train_onset.py`** thresholds raw probabilities frame by frame. It counts a hit only when
+  the predicted frame *is* the annotated frame, on one class, on Groove MIDI.
+- **The pipeline** peak-picks, then pairs notes within 50 ms (the MIREX tolerance), across
+  all five classes, on MDB.
+
+Under the first scorer, a prediction 10 ms early is both a miss and a false alarm. Under the
+second it is a clean hit. "Fires everywhere" is what frame-by-frame thresholding looks like
+before any peak-picking.
+
+The second machine measured the size of that difference on a newer tom model trained on
+E-GMD, on the same test clips, with each scorer at its own best threshold:
+
+- **0.227** scored frame-exact;
+- **0.578** scored through the pipeline's `PeakPicker` and 50 ms matching.
+
+So the gap to 0.882 was never shown, and neither was its absence. "Peak-picking would
+recover something, but not that gap" was a guess written as a measurement. The comparison
+that settles it has to be paired, on the same recordings and the pipeline's own scorer. For
+toms it is under way on ENST, with its threshold chosen on E-GMD and its decision rule fixed
+before any ENST number exists. It will be reported here whichever way it falls.
 
 Cost: 3.9 hours to build the dataset (would have been 23 without the GPU) and 20 minutes
-to train. Worth it to close a question that had been open since the beginning.
+to train. This was once described as worth it for closing a question that had been open
+since the beginning. It did not close that question.
 
 ### ❌ A fallback for the passages where ADTOF goes silent
 
@@ -1965,7 +2007,8 @@ its unclassified bucket.
 
 That suggested a narrow fallback — emit onsets only where the model is silent. Narrow is
 the operative word, because a stem-based onset detector had already been rejected above
-for firing everywhere.
+for firing everywhere. That rejection has since turned out to rest on frame-exact scoring,
+but the fallback was measured on its own terms, below.
 
 `blind_spots.py` measures how much of a recording falls in that hole: peak-pick the
 audio's own onset envelope, then ask whether any class reacted within 60 ms. A peak
@@ -2659,7 +2702,8 @@ transcriber from scratch.
 | **Training** | |
 | `build_dataset.py`, `build_onset_dataset.py` | feature extraction from GMD |
 | `train_models.py`, `train_cc4.py` | model training with held-out evaluation |
-| `train_ride.py`, `train_onset.py` | two ideas that were measured and rejected |
+| `train_ride.py` | an idea that was measured and rejected |
+| `train_onset.py` | onset detector for stems; its rejection was withdrawn because it was scored frame-exact |
 | `bench_training.py` | is CPU training feasible (yes: 3.8 h for an onset detector) |
 | `bench_mdx_openvino.py` | can the separator run on the NPU, and is it faster than the path we use |
 | **Utilities** | |

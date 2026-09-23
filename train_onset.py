@@ -18,6 +18,15 @@ the rest of the transcription stage stays on the CPU.
 Nothing in the pipeline loads what this writes. The five classes come from ADTOF, and
 models/onset_<stem>_<dataset>.pt is read only by whatever experiment is built to score it.
 The file name carries the dataset so that two datasets cannot overwrite each other's model.
+A second run on the same dataset does overwrite it, and only the last epoch is saved, so
+copy the file aside before retraining if the earlier model matters.
+
+Neither figure this prints is comparable with the pipeline's. Both count a hit only on the
+annotated frame itself, with no peak-picking, while every benchmark here peak-picks and
+matches within 50 ms. On one E-GMD tom model that difference alone was 0.227 against 0.578.
+To choose a threshold or an epoch, score through adtof_pytorch's PeakPicker and
+benchmark_gmd.match. The picker subtracts a local mean before thresholding, so its useful
+thresholds sit an order of magnitude below the raw probabilities used here.
 
     python train_onset.py --epochs 6                        # LarsNet data, as built by default
     python train_onset.py --separator uvr --stem kick --epochs 10
@@ -133,7 +142,11 @@ def evaluate_full(model, X_list, y_list, device, thresholds=(0.1, 0.3, 0.5, 0.7,
     The balanced set used for training has roughly one onset per four windows. A real
     track has one per thirty or more, so precision measured on the balanced set is
     meaningless -- false positives are counted against a far smaller pool of negatives.
-    This is the number that predicts pipeline behaviour.
+
+    This is still not the pipeline's number. A frame counts as a hit only if it is the
+    annotated frame, so a prediction 10 ms early is both a miss and a false alarm, and no
+    peak-picking is applied, so the grid below 0.5 fires almost everywhere. Use it to see
+    that training did something, not to choose between models.
     """
     import torch
 
@@ -256,7 +269,7 @@ def main() -> int:
 
         full = evaluate_full(model, te_X, te_y, device)
         if full:
-            print(f"  on complete tracks ({full['_onsets']} onsets in "
+            print(f"  on complete tracks, frame-exact ({full['_onsets']} onsets in "
                   f"{full['_frames']} frames, {full['_onsets']/full['_frames']:.1%}):")
             for thr in (0.1, 0.3, 0.5, 0.7, 0.9):
                 m = full[thr]
@@ -276,8 +289,10 @@ def main() -> int:
             print(f"{stem:<10}{m['f1']:>13.3f}"
                   f"{(f'{full:.3f}' if full is not None else '-'):>16}"
                   f"{(f'{thr:.1f}' if thr is not None else '-'):>14}")
-        print("\nThe whole-track column is the honest one. Whether it helps the "
-              "pipeline\nstill has to be measured end to end by benchmark_mdb.py.")
+        print("\nBoth columns are frame-exact and unpicked, so neither is comparable with "
+              "a benchmark\nfigure: those peak-pick and match within 50 ms. Whether this "
+              "helps the pipeline\nhas to be measured through the pipeline's own picker "
+              "and scorer.")
     return 0
 
 

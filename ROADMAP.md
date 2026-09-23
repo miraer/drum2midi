@@ -161,7 +161,7 @@ nobody proposes them again without new evidence:
 | idea | why it died |
 |---|---|
 | Fallback where the model is silent | blind share does not predict per-track F1; three of the five worst tracks have **zero** blind onsets; ceiling on recall 1.27% |
-| Learned onset detector on separated stems | fires everywhere |
+| Learned onset detector on separated stems | **withdrawn, not dead:** "fires everywhere" was frame-exact scoring, compared against a 50 ms MICRO. Toms are being re-measured paired on ENST |
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |
 | Tuning all five thresholds globally | overfitting — 0.848 held out against a stock 0.850 |

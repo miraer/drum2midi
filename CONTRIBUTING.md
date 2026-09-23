@@ -31,7 +31,9 @@ direction, is close to meaningless. See [docs/datasets.md](docs/datasets.md).
 
 Watch for balanced samples too. An earlier experiment reported kick F1 0.968 on a
 balanced training sample and 0.623 on real tracks, because onsets are 1.5% of frames in
-real audio and 25% in the sample. Score on whole recordings.
+real audio and 25% in the sample. Score on whole recordings, and score them the way the
+pipeline is scored: peak-picked, matched within 50 ms. That same 0.623 was frame-exact,
+and on another model frame-exact scoring gave 0.227 where the pipeline's scorer gave 0.578.
 
 ## Running the tests
 

@@ -6,11 +6,12 @@ none at all. That makes the failure material-specific rather than general, and r
 the question this script answers: on the benchmark, do the tracks with more blind
 onsets also score worse?
 
-It matters because of an experiment already rejected here. A stem-based onset detector
-scored 0.623 against 0.882, because it fired everywhere and buried the good tracks in
-false positives. A fallback that only fires where the model is silent is a different
-proposition -- on four of six tracks measured it would never fire at all -- but that
-argument is only worth making if the blind share actually predicts the damage.
+It matters because of an experiment rejected here. A stem-based onset detector was
+recorded as scoring 0.623 against 0.882 and firing everywhere. That verdict has since been
+withdrawn, because it was scored frame-exact against a peak-picked 50 ms MICRO. A fallback
+that only fires where the model is silent is a different proposition anyway -- on four of
+six tracks measured it would never fire at all -- but that argument is only worth making
+if the blind share actually predicts the damage.
 
 Correlation is not proof of a fix. If the two are unrelated, the fallback idea dies
 here and the finding is recorded as another negative result.

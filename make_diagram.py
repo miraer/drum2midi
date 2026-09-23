@@ -182,8 +182,8 @@ def draw(width: int = 1200) -> Image.Image:
           dashed=True)
 
     note = ("The separated stems never reach the onset detector. Measured: ADTOF on "
-            "stems scores tom F1 0.000,\nand a CNN trained for it reaches 0.623 against "
-            "the pipeline's 0.882.")
+            "stems scores tom F1 0.000,\nand a handwritten amplitude trigger does "
+            "no better.")
     d.text((S(60), S(924)), note, font=font(S(16)), fill=MUTED)
     return img
 
