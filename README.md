@@ -98,8 +98,11 @@ competitor, scored by the same code, comes out **level**:
 
 **The two columns are not in the same ReStem mode, and that is stated rather than implied.**
 The batches were simply run that way. It is not what makes the corpora disagree: Bleed
-Reduction is worth +0.014 to ReStem on MDB and **+0.002 [−0.003, +0.005]** on the 26 ENST
+Reduction is worth +0.014 to ReStem on MDB and **+0.003 [−0.001, +0.008]** on the 36 ENST
 recordings held in both modes from the two kits where it behaves — no difference measured.
+By class, kick (+0.004 [+0.001, +0.008]) and cymbals (+0.011 [+0.003, +0.019]) clear zero,
+but that is two of six uncorrected intervals, over recordings from only two kits, so neither
+is claimed.
 It matters for one row only. The option empties drummer 1's kick entirely, and that kit is
 24 of these 60 recordings, so an ENST column rendered with it on would have a kick row that
 looks nothing like this one. `restem_bleed_enst.py`.
@@ -191,7 +194,8 @@ cymbal margins shrink to within noise and the tom margin hardens into a real los
 > Best (Offline) + Bleed Reduction. All three offline modes were rendered across all 23
 > recordings on one machine: Better and Best (Offline) came out byte-identical on every
 > track, so that pair is settled, and Bleed Reduction is worth +0.014 MICRO to ReStem on
-> these 23 MDB recordings. On ENST it buys nothing measurable, +0.002 [−0.003, +0.005].
+> these 23 MDB recordings. On ENST it buys nothing measurable, +0.003 [−0.001, +0.008]
+> over 36 recordings.
 > The earlier published figure of 0.820 was its weaker configuration and has been
 > restated rather than quietly replaced.
 >

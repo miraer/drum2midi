@@ -172,6 +172,13 @@ function Hung-Render([string[]] $lines, [datetime] $now, [double] $minutes) {
 # ReStem, the way restem_batch_mode.ps1 lets its guard be tested.
 if ($DefineOnly) { return }
 if (-not $Tracks) { throw "-Tracks is required" }
+# One file never reaches the Batch Process dialog: ReStem opens it in the editor and
+# renders it there, where nothing is exported. That is what a lone retry of a failed
+# file did on 23.09. Pair it with any recording; -Out keeps the pair apart.
+if ($Tracks.Count -lt 2) {
+    throw ("ReStem batches two or more files; with one it opens the editor instead. " +
+           "Add a second recording to -Tracks.")
+}
 
 $outDir = Join-Path $root $Out
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -226,6 +233,13 @@ function Current-Mode {
     return $null
 }
 
+# Not running used to read as mode '' and a refusal, though the restart below launches it
+# anyway; a fresh session has no leftover dialog, and the mode is still checked.
+if (-not (Get-Process -Name "ReStem 2" -ErrorAction SilentlyContinue)) {
+    Say "ReStem is not running - starting it"
+    & (Join-Path $root "restem_launch.ps1") | ForEach-Object { Say "  $_" }
+    Start-Sleep -Seconds 3
+}
 $mode = Current-Mode
 if ($mode -ne $Expect) { Say "mode is '$mode' but '$Expect' was expected - refusing"; exit 1 }
 
