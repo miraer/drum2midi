@@ -98,13 +98,52 @@ IGNORED = {
     "sweep": "brush sweep -- a sustained gesture, not an onset",
 }
 
+# The population every published ENST figure uses. 108 of the 318 recordings are "hits",
+# isolated strokes in silence rather than music. A scorer that walks the annotations and
+# forgets this filter gets 318 recordings and 2770 tom onsets instead of 210 and 2617, and
+# the shipped pipeline's tom F1 reads 0.521 instead of 0.539. That has happened three times,
+# the last in a script written to avoid it, so the filter lives here once, and the counts it
+# must produce are written beside it. Import `recordings` rather than restating it.
+DEFAULT_KINDS = ("phrase", "solo", "minus-one", "MIDI-minus-one")
+DEFAULT_POPULATION = {"recordings": 210, "tom_onsets": 2617}
+
+
+def recordings(data: Path, kinds=DEFAULT_KINDS, mix: str = "wet_mix") -> list:
+    """(drummer, annotation, wav, kind) for each recording of `kinds` whose audio exists.
+
+    The kind is the second underscore-separated field of the name, e.g. `phrase` in
+    `036_phrase_disco_simple_slow_sticks`.
+    """
+    kinds = set(kinds)
+    found = []
+    for d in (1, 2, 3):
+        for ann in sorted((data / f"drummer_{d}" / "annotation").glob("*.txt")):
+            parts = ann.stem.split("_")
+            if len(parts) < 2 or parts[1] not in kinds:
+                continue
+            wav = data / f"drummer_{d}" / "audio" / mix / f"{ann.stem}.wav"
+            if wav.exists():
+                found.append((d, ann, wav, parts[1]))
+    return found
+
+
+def population_warning(n_recordings: int, n_tom_onsets: int):
+    """None if a full run at the default kinds saw the published population, else why not."""
+    want = DEFAULT_POPULATION
+    if n_recordings == want["recordings"] and n_tom_onsets == want["tom_onsets"]:
+        return None
+    return (f"POPULATION MISMATCH: {n_recordings} recordings and {n_tom_onsets} tom onsets, "
+            f"not the {want['recordings']} and {want['tom_onsets']} that every published "
+            f"ENST figure uses, so nothing below is comparable with them. 318 and 2770 "
+            f"mean the kind filter was skipped; fewer mean ENST is incomplete on disk.")
+
 
 def main() -> int:
     ap = argparse.ArgumentParser(add_help=False)
     ap.add_argument("--repo", default=None)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--mix", default="wet_mix", choices=["wet_mix", "dry_mix"])
-    ap.add_argument("--kinds", default="phrase,solo,minus-one,MIDI-minus-one")
+    ap.add_argument("--kinds", default=",".join(DEFAULT_KINDS))
     ap.add_argument("--only", default=None,
                     help="substring the recording name must contain, e.g. mallets")
     ap.add_argument("--separate", action="store_true",
@@ -142,16 +181,12 @@ def main() -> int:
         kinds.add("hits")
 
     items = []
-    for d in (1, 2, 3):
-        for ann in sorted((data / f"drummer_{d}" / "annotation").glob("*.txt")):
-            parts = ann.stem.split("_")
-            if len(parts) < 2 or parts[1] not in kinds:
-                continue
-            wav = data / f"drummer_{d}" / "audio" / args.mix / f"{ann.stem}.wav"
-            if args.only and args.only not in ann.stem:
-                continue
-            if wav.exists():
-                items.append((f"d{d}/{ann.stem}", wav, ann, parts[1]))
+    for d, ann, wav, kind in recordings(data, kinds, args.mix):
+        if args.only and args.only not in ann.stem:
+            continue
+        items.append((f"d{d}/{ann.stem}", wav, ann, kind))
+    full_default = (set(kinds) == set(DEFAULT_KINDS) and not args.only
+                    and not args.limit)
     items = items[: args.limit]
     if not items:
         print(f"no recordings matched kinds={sorted(kinds)}")
@@ -245,6 +280,11 @@ def main() -> int:
         return 2 * p * r / max(p + r, 1e-9), tp, ref, est
 
     names = sorted(per_rec)
+    if full_default:
+        warning = population_warning(
+            len(per_rec), sum(per_rec[n]["counts"]["TT"]["ref"] for n in names))
+        if warning:
+            print(f"!! {warning}\n")
     print(f"{'drum':<10}{'ref':>7}{'est':>7}{'match':>7}{'prec':>8}{'rec':>8}{'F1':>8}")
     print("-" * 55)
     micro = [0, 0, 0]

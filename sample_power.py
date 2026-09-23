@@ -43,7 +43,9 @@ if {"-h", "--help"} & set(sys.argv[1:]):
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-KINDS = {"phrase", "solo", "minus-one", "MIDI-minus-one"}
+from benchmark_enst import DEFAULT_KINDS  # noqa: E402
+
+KINDS = set(DEFAULT_KINDS)
 
 # The MDB comparison's measured half-widths, for scale. From significance.py on the 23
 # recordings: MICRO +0.062 [+0.032, +0.097], hi-hat +0.139 [+0.062, +0.249].

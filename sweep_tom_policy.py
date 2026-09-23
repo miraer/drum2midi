@@ -56,11 +56,11 @@ import numpy as np  # noqa: E402
 
 import drum2midi  # noqa: E402
 from benchmark_mdb import ANN, AUDIO, CLASSES, WINDOW, read_annotation  # noqa: E402
-from benchmark_enst import IGNORED, LABEL_TO_CLASS  # noqa: E402
+from benchmark_enst import DEFAULT_KINDS, IGNORED, LABEL_TO_CLASS  # noqa: E402
 
 FPS = 100
 TOM_COLUMN = 2          # LABELS_5 order: kick, snare, tom, hi-hat, cymbal
-ENST_KINDS = {"phrase", "solo", "minus-one", "MIDI-minus-one"}
+ENST_KINDS = set(DEFAULT_KINDS)
 CACHE = Path(args.cache or (ROOT / "bench" / "act_cache"))
 
 

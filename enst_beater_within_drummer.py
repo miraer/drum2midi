@@ -121,6 +121,9 @@ def main() -> int:
 
     rows, meta = {}, {}
     silent = []
+    # ENST population: names ending in a beater, which is 209 of the default 210. The
+    # exception is 096_solo_latin_hands, played with no beater. No "hits" name ends in one
+    # (they end in a stroke count such as _x6), so this is why DEFAULT_KINDS is not applied.
     for d in (1, 2, 3):
         for ann in sorted((DATA / f"drummer_{d}" / "annotation").glob("*.txt")):
             b = beater_of(ann.stem)

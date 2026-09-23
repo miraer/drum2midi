@@ -38,7 +38,9 @@ if {"-h", "--help"} & set(sys.argv[1:]):
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-KINDS = {"phrase", "solo", "minus-one", "MIDI-minus-one"}
+from benchmark_enst import DEFAULT_KINDS  # noqa: E402
+
+KINDS = set(DEFAULT_KINDS)
 KICK_PITCHES = {35, 36}
 
 

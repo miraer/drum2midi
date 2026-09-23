@@ -2030,6 +2030,21 @@ differences are −0.111, −0.230 and −0.089; over three clusters the interva
 recall rises from 0.466 to 0.741. It pays for them with 4.7 times as many notes, and
 precision falls to a third of what it was.
 
+It also fails in the same way the shipped pipeline does. Most false toms from both arms fall
+within 50 ms of a real snare or kick:
+
+| false toms within 50 ms of… | shipped (693) | detector (7033) |
+|---|---|---|
+| a real snare | 62.5% [41.6, 79.5] | 43.0% [36.3, 50.0] |
+| a real kick | 38.5% [27.4, 50.1] | 45.8% [41.6, 50.2] |
+| neither | 21.2% [9.1, 37.4] | 25.6% [21.2, 30.3] |
+
+The intervals are over recordings. Every pair overlaps, so the detector's apparent lean
+towards kicks is not a finding. A million tom onsets taught the model to fire more often,
+but not that a snare is not a tom, which is the confusion measured on MDB and ENST before
+any training. The detector's 7033 were counted with the greedy matcher, which pairs two
+fewer notes than the scorer.
+
 What this does not settle:
 
 - It covers one trainer, one training set and one separator. LarsNet is CC BY-NC and was used

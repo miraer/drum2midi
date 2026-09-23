@@ -2486,6 +2486,65 @@ def test_onset_trainer_reads_where_the_builder_writes():
         f"--data was not honoured:\n{out[:600]}")
 
 
+@test
+def test_enst_scripts_score_the_published_population():
+    """Every ENST figure here is over 210 recordings; the other 108 are isolated hits.
+
+    Walking the annotations without the kind filter gives 318 recordings and 2770 toms, and
+    the shipped pipeline's tom F1 then reads 0.521 rather than 0.539. That has happened three
+    times, the third in a script written specifically to avoid it. So the filter lives once,
+    in benchmark_enst, and three things are checked here:
+    - it keeps exactly the default kinds;
+    - benchmark_enst says so when a full run sees any other population;
+    - any script that walks ENST annotations either uses the shared kinds or says, in a
+      comment starting "ENST population:", how it picks its recordings instead.
+    The last is a text check and can be fooled, but a new script that forgets the filter
+    will fail it.
+    """
+    import re
+
+    import benchmark_enst as be
+
+    data = _tmp / "enst_population"
+    names = {1: ["001_hits_snare-drum_sticks_x6", "036_phrase_disco_simple_slow_sticks",
+                 "012_hits_snare-drum_brushes_x5"],
+             2: ["061_MIDI-minus-one_bigband_sticks", "070_minus-one_funk_sticks"],
+             3: ["096_solo_latin_hands", "003_hits_medium-tom_sticks_x5"]}
+    for d, stems in names.items():
+        (data / f"drummer_{d}" / "annotation").mkdir(parents=True)
+        (data / f"drummer_{d}" / "audio" / "wet_mix").mkdir(parents=True)
+        for s in stems:
+            (data / f"drummer_{d}" / "annotation" / f"{s}.txt").write_text("0.1 bd\n")
+            (data / f"drummer_{d}" / "audio" / "wet_mix" / f"{s}.wav").write_bytes(b"")
+    got = sorted(ann.stem for _d, ann, _w, _k in be.recordings(data))
+    want = sorted(s for stems in names.values() for s in stems if "_hits_" not in s)
+    assert got == want, f"the shared ENST filter kept {got}, expected {want}"
+
+    assert be.population_warning(210, 2617) is None, "the published population was flagged"
+    assert be.population_warning(318, 2770), "the unfiltered population passed silently"
+    assert be.population_warning(210, 2770), "a changed tom count passed silently"
+
+    # Code, not prose: a comment that merely mentions DEFAULT_KINDS must not count as using it.
+    uses_shared = re.compile(
+        r"^\s*from benchmark_enst import [^\n]*\b(DEFAULT_KINDS|recordings)\b"
+        r"|^def recordings\(", re.M)
+    explains = re.compile(r"^\s*# ENST population:", re.M)
+    unexplained = []
+    for path in sorted(ROOT.glob("*.py")):
+        if path.name == "test_smoke.py":
+            continue
+        src = path.read_text(encoding="utf-8", errors="replace")
+        if '"annotation"' not in src or '.glob("*.txt")' not in src:
+            continue
+        if not (uses_shared.search(src) or explains.search(src)):
+            unexplained.append(path.name)
+        if path.name != "benchmark_enst.py" and '"minus-one", "MIDI-minus-one"' in src:
+            unexplained.append(f"{path.name} (restates the kind list)")
+    assert not unexplained, (
+        "these walk ENST annotations without benchmark_enst's kind filter and without an "
+        f"'ENST population:' comment saying why: {unexplained}")
+
+
 def main() -> int:
     global _tmp
     _tmp = Path(tempfile.mkdtemp(prefix="drum2midi_test_"))

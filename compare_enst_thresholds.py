@@ -46,10 +46,10 @@ import pretty_midi  # noqa: E402
 from benchmark_mdb import CLASSES, WINDOW  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).parent))
-from benchmark_enst import IGNORED, LABEL_TO_CLASS  # noqa: E402
+from benchmark_enst import DEFAULT_KINDS, IGNORED, LABEL_TO_CLASS  # noqa: E402
 
 DATA = ROOT / "enst" / "enst_drums_public"
-KINDS = {"phrase", "solo", "minus-one", "MIDI-minus-one"}
+KINDS = set(DEFAULT_KINDS)
 
 
 def collect(tag: str) -> dict:

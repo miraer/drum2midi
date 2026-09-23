@@ -35,6 +35,14 @@ real audio and 25% in the sample. Score on whole recordings, and score them the 
 pipeline is scored: peak-picked, matched within 50 ms. That same 0.623 was frame-exact,
 and on another model frame-exact scoring gave 0.227 where the pipeline's scorer gave 0.578.
 
+Watch for populations with the same name. Every ENST figure here is over **210
+recordings and 2617 tom onsets**. The other 108 recordings are isolated hits, and a script
+that walks the annotations without filtering them out scores 318 recordings. That turns
+the shipped tom F1 of 0.539 into 0.521, and it has happened three times. Take the
+recordings from `benchmark_enst.recordings()`. If a script picks them another way, say how
+in a comment starting `# ENST population:`, because the smoke test checks for one or the
+other.
+
 ## Running the tests
 
 ```powershell

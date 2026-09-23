@@ -61,7 +61,7 @@ def main() -> int:
     import numpy as np
 
     import drum2midi
-    from benchmark_enst import IGNORED, LABEL_TO_CLASS
+    from benchmark_enst import DEFAULT_KINDS, IGNORED, LABEL_TO_CLASS
     from blind_spots import activations
 
     thr = list(drum2midi.DEFAULT_THRESHOLDS)
@@ -74,6 +74,11 @@ def main() -> int:
     for d in (1, 2, 3):
         for ann in sorted((data / f"drummer_{d}" / "annotation").glob("*.txt")):
             stem = ann.stem
+            # Without the kind filter, --style brushes would also match 35 "hits"
+            # recordings, which are isolated strokes rather than music.
+            parts = stem.split("_")
+            if len(parts) < 2 or parts[1] not in DEFAULT_KINDS:
+                continue
             if args.style not in stem:
                 continue
             for beater in picked:

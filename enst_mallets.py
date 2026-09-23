@@ -30,6 +30,8 @@ if {"-h", "--help"} & set(sys.argv[1:]):
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+from benchmark_enst import DEFAULT_KINDS  # noqa: E402
+
 BEATERS = ("sticks", "rods", "brushes", "mallets")
 
 
@@ -45,7 +47,7 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tag", default="enst", help="cached transcriptions under bench/")
     ap.add_argument("--mix", default="wet_mix", choices=["wet_mix", "dry_mix"])
-    ap.add_argument("--kinds", default="phrase,solo,minus-one,MIDI-minus-one")
+    ap.add_argument("--kinds", default=",".join(DEFAULT_KINDS))
     ap.add_argument("--rounds", type=int, default=4000)
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()

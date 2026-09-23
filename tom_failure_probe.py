@@ -151,6 +151,8 @@ def main() -> int:
     tom_key = LABELS_5[TOM_COL]
 
     picked: dict[str, list[tuple[str, Path]]] = {}
+    # ENST population: whatever was exported to restem_in/, which holds default-kind
+    # recordings only, not "hits". This is why DEFAULT_KINDS is not applied here.
     for d in (1, 2, 3):
         adir = ENST / f"drummer_{d}" / "annotation"
         if not adir.is_dir():
