@@ -303,9 +303,10 @@ stems** — that is the single most counter-intuitive design decision here, and 
 separator's output never reaches the onset detector. Running ADTOF on stems scores tom F1
 0.000, and a handwritten amplitude trigger did no better, so for ADTOF the context of the
 other drums is worth more than isolation. A third test, a purpose-trained CNN, used to be
-quoted here as 0.623 against the pipeline's 0.882. That comparison was between two scorers
-rather than two detectors, and it is withdrawn in the section on the learned onset detector
-below. Whether a detector trained on stems can beat the mixture is not measured yet.
+quoted here as 0.623 against the pipeline's 0.882, but that compared two scorers rather than
+two detectors and is withdrawn. Measured properly, on toms, a detector trained on E-GMD stems
+loses to the shipped pipeline by **0.204 [−0.274, −0.137]** on ENST. That is set out in the
+section on the learned onset detector below. The other classes are not measured yet.
 
 With `--from-song`, htdemucs runs first and **everything downstream uses its output** —
 both the transcriber and the separator see the extracted drum audio, never the original
@@ -1666,19 +1667,24 @@ on the second machine, in the sweep that chose the ceiling, with separation off.
 separator provably does not move tom scores on MDB, so the tom comparison is sound, but the
 two MICRO columns are not like for like.
 
-The sweep's own "after" MIDI was not kept. What survives is a re-run of the shipped policy on
-this machine: `benchmark_enst.py` at its defaults (wet mix, separation off, 210
-recordings), written to `bench/enst` on 19 September, four hours after the ceiling was
-committed. Rescoring that output on 23 September (`--rescore`) reproduces the published
-figure to the digit:
+The sweep's own "after" MIDI was not kept, but the figure has since been reproduced three
+times, twice from a fresh render:
+
+- **This machine, 19 September.** `benchmark_enst.py` at its defaults (wet mix, separation
+  off, 210 recordings) was written to `bench/enst` four hours after the ceiling was
+  committed. Rescoring it on 23 September (`--rescore`) gives the figure to the digit.
+- **The second machine, 21 September.** The no-separation arm of its separated-against-not
+  comparison covers all 210 recordings, and it gives toms 0.539 and MICRO 0.834.
+- **The second machine, 23 September.** A fresh render of current `main` at the defaults
+  gives the same tom row. Every other class matches too.
 
 ```
 toms   ref 2617   est 1913   matched 1220   P 0.638   R 0.466   F1 0.539 [0.471, 0.604]
 ```
 
-That re-run, not the sweep, is where the 0.539 quoted throughout this README comes from. The
-second machine found that nothing on its own disk reproduced 0.539. It raised this before any
-comparison against the figure was allowed to spend ENST.
+The second machine asked for this before it would spend ENST on a comparison against the
+figure, because none of its cached transcription directories reproduced it. That check is
+why 0.539 now has a named origin rather than an assumed one.
 
 Sixteen candidate policies scored on the recordings that selected them is how a benchmark
 gets overfitted — [this README carries that scar already](#-tuning-all-five-thresholds-globally-my-earlier-result-was-biased).
@@ -1937,7 +1943,7 @@ Separate-and-Detect is the one to revisit the day this project has a GPU: it emi
 exactly our five classes and publishes MDB numbers, and it is the only candidate ruled
 out for cost rather than for quality.
 
-### ⚠️ A learned onset detector on separated stems, rejected with the wrong scorer
+### ❌ A learned onset detector on separated stems: for toms, measured properly, it loses
 
 This was the last big untested idea, and the one the whole 417 MB training set was built
 for: since a stem already tells you *which* drum it is, finding *when* it was hit should
@@ -1988,12 +1994,64 @@ E-GMD, on the same test clips, with each scorer at its own best threshold:
 So the gap to 0.882 was never shown, and neither was its absence. "Peak-picking would
 recover something, but not that gap" was a guess written as a measurement. The comparison
 that settles it has to be paired, on the same recordings and the pipeline's own scorer. For
-toms it is under way on ENST, with its threshold chosen on E-GMD and its decision rule fixed
-before any ENST number exists. It will be reported here whichever way it falls.
+toms that comparison has now been made, and it follows.
 
-Cost: 3.9 hours to build the dataset (would have been 23 without the GPU) and 20 minutes
-to train. This was once described as worth it for closing a question that had been open
-since the beginning. It did not close that question.
+#### Toms, measured properly: the detector loses by 0.204
+
+A new tom model was trained on E-GMD, which is CC BY 4.0; ENST's licence forbids training on
+it. It used 4140 training clips separated by LarsNet. Everything below was fixed before any
+ENST number existed, and ENST was used once:
+
+- **The bar** is the shipped pipeline's tom F1 on the same 210 recordings, rendered fresh on
+  the same machine. That came out at 0.539, the figure [reproduced above](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months)
+  to the digit.
+- **The epoch count and the threshold** were chosen on E-GMD's 123-clip test split, scored
+  through the pipeline's `PeakPicker` with 50 ms matching: three epochs, threshold 0.270,
+  E-GMD tom F1 0.587.
+- **The rule:** the 95% interval of the paired per-recording difference, detector minus
+  shipped, must lie entirely above zero. Otherwise the idea closes and is written up with
+  its number.
+
+The detector's arm is the baseline's own MIDI with its 1913 tom notes replaced by the
+detector's. Every other class is bit-identical between the two arms.
+
+| ENST, 2617 tom onsets | tom notes | precision | recall | F1 |
+|---|---|---|---|---|
+| shipped | 1913 | 0.638 | 0.466 | 0.539 |
+| E-GMD tom detector | 8970 | 0.216 | 0.741 | 0.335 |
+| **paired difference** | | | | **−0.204 [−0.274, −0.137]** |
+
+Not one of the 4000 resamples over recordings lands above zero. Per drummer the
+differences are −0.111, −0.230 and −0.089; over three clusters the interval is
+[−0.230, −0.089], which three clusters make too narrow to lean on. MICRO falls from 0.834 to
+0.785, all of it the tom channel.
+
+**Closed, by the rule fixed in advance.** The detector does find toms the pipeline misses:
+recall rises from 0.466 to 0.741. It pays for them with 4.7 times as many notes, and
+precision falls to a third of what it was.
+
+What this does not settle:
+
+- It covers one trainer, one training set and one separator. LarsNet is CC BY-NC and was used
+  as a measurement only, so the weights are not in `models/`. It also used one threshold and
+  one corpus.
+- The threshold came from a flat top on E-GMD, where every value from 0.240 to 0.285 scores
+  0.585–0.587. ENST may have preferred another point on that plateau, and nobody looked.
+- Training is unstable, not merely noisy. The second epoch scored 0.004 in one run and 0.391
+  in another, a larger spread than any choice that was made.
+- The other four classes have still not been measured with the pipeline's scorer.
+
+The withdrawn sentence turns out to be right in direction for toms. For toms, a detector
+handed the isolated stem does lose to ADTOF looking at the mixture. That is now shown for a
+different model from the one the sentence described, and the numbers once printed under it
+never showed it.
+
+Checkpoint: sha256 `e3b513fb47487cbde73bb39b4e31d50989161052dc63c170fc2afea5ac28624d`,
+944 885 bytes.
+
+Cost: 3.9 hours to build the first dataset (would have been 23 without the GPU) and 20
+minutes to train. That run was once described as closing a question that had been open
+since the beginning, and it did not. The tom measurement above does close it for toms.
 
 ### ❌ A fallback for the passages where ADTOF goes silent
 
@@ -2353,7 +2411,9 @@ many toms to expect. That is one wall in two costumes.
 **None of this establishes that retraining fixes it**, and the temptation to read it that
 way is worth resisting. E-GMD's own toms are 7.49% of its onsets with 48.54% of them
 below velocity 60 — rare and quiet, the same profile that produces a weak tom channel in
-the first place. Whether training on it repairs the confusion or reproduces it is open.
+the first place. One attempt has since been measured: a tom detector trained on E-GMD
+stems found more toms and lost on F1 by 0.204 [−0.274, −0.137] on ENST, by drowning them
+in false ones. See [the learned onset detector](#-a-learned-onset-detector-on-separated-stems-for-toms-measured-properly-it-loses).
 
 Kept as a negative result. `clamp(p98.5, TOM_FLOOR, TOM_CEILING)` stands, because nothing
 fitted honestly and tested out of sample beat it. And the whole question — two rounds of
@@ -2703,7 +2763,7 @@ transcriber from scratch.
 | `build_dataset.py`, `build_onset_dataset.py` | feature extraction from GMD |
 | `train_models.py`, `train_cc4.py` | model training with held-out evaluation |
 | `train_ride.py` | an idea that was measured and rejected |
-| `train_onset.py` | onset detector for stems; its rejection was withdrawn because it was scored frame-exact |
+| `train_onset.py` | onset detector for stems; its tom model lost on ENST by 0.204 when scored the pipeline's way |
 | `bench_training.py` | is CPU training feasible (yes: 3.8 h for an onset detector) |
 | `bench_mdx_openvino.py` | can the separator run on the NPU, and is it faster than the path we use |
 | **Utilities** | |

@@ -38,15 +38,13 @@ breakdown says a discrimination problem remains underneath: all 60 false toms on
 within 50 ms of a real onset of another class, 53% snare and 33% kick. That is not
 something a threshold reaches.
 
-E-GMD carries 1,074,753 tom onsets under CC BY 4.0 and is the obvious training material —
+E-GMD carries 1,074,753 tom onsets under CC BY 4.0 and was the obvious training material —
 though that figure is **25,524 distinct tom onsets rendered on 43 kits**, so the honest
 multiplier against MDB's 90 is 284x rather than 11,900x, and the remainder is timbral
 augmentation rather than more drumming. See [datasets.md](docs/datasets.md#e-gmd).
-The measurement that decides it is tom F1 on ENST **with the ceiling in place**, so the
-bar is 0.539 rather than the 0.342 it was before — training has to beat the fixed output
-stage, not the broken one. That bar is fixed in advance, over the full ENST corpus and its
-2,617 tom onsets, with an interval and a held-out drummer; a result at or below it is
-published exactly as one above it.
+The bar was fixed in advance: tom F1 on ENST **with the ceiling in place**, so 0.539 rather
+than the 0.342 it was before, over all 2,617 tom onsets, with an interval. One attempt has
+been measured against it, and it lost by 0.204 [−0.274, −0.137] ([Queued](#queued)).
 
 ### Pedal hi-hat
 
@@ -67,7 +65,7 @@ proven impossible.
 | | what would settle it |
 |---|---|
 | **Reproduce the ENST figures independently** | ✅ done 20 Sept. A second machine reproduced kick, snare, hi-hat and cymbals to three decimals with identical intervals; toms differed by exactly the +0.197 the ceiling buys, which identified their run as pre-ceiling rather than a disagreement. |
-| **Train toms on E-GMD** | tom F1 on ENST above 0.539, with an interval, held out on a drummer not used in training. **Sharper now:** every model measured confuses toms with snares in its activations, ours included and Vogl's more so. What distinguishes them is that ours concentrates the confusion in its *most confident* predictions while theirs dilutes with confidence — which is why no threshold or post-processing helped here, and it is the property training would have to change. It is in the weights, not the vocabulary: Vogl's single-tom-channel model behaves like its three-channel sibling. **Still not obviously the answer:** E-GMD's own toms are 7.49% of onsets with 48.54% below velocity 60 — the same rare-and-quiet profile that produces a weak tom channel. |
+| **Train toms on E-GMD** | ❌ **closed 23 Sept, measured.** The bar was fixed in advance: tom F1 on ENST above 0.539, with an interval. A detector trained on E-GMD stems (LarsNet, 3 epochs, threshold 0.270, both chosen on E-GMD) replaced the tom channel and scored **0.335 against 0.539: −0.204 [−0.274, −0.137]** paired over 210 recordings. Not one resample landed above zero. Recall rose 0.466 → 0.741, but precision fell 0.638 → 0.216 on 4.7 times as many notes. This closes one trainer, one separator and one threshold. It does not close learned tom detection. The discrimination problem it was aimed at is still there: every model measured puts its tom/snare confusion in its most confident predictions. [Write-up](README.md#-a-learned-onset-detector-on-separated-stems-for-toms-measured-properly-it-loses). |
 | **Survey the alternatives to ADTOF** | ✅ **done 20 Sept.** Inventory built by reading licences and release assets, not READMEs. Upstream ADTOF publishes exactly one checkpoint, so our port is the complete set. The Inverse Drum Machine measured at MICRO 0.703 against 0.860 — Apache-2.0 against CC BY-NC-SA, which is the trade, and today it is not worth taking. Four candidates remain runnable and unrun; Separate-and-Detect emits exactly our five classes and needs a GPU. [Full table](README.md#the-rest-of-the-alternatives-surveyed). |
 | ~~**Synthetic training data with realistic degradation**~~ | ❌ **closed 20 Sept as measured-unnecessary.** See below. |
 | **ENST as the acoustic counterweight** | it ships isolated close-mic tom stems, which is exactly what the stem-fusion stage consumes; unexplored |
@@ -161,7 +159,7 @@ nobody proposes them again without new evidence:
 | idea | why it died |
 |---|---|
 | Fallback where the model is silent | blind share does not predict per-track F1; three of the five worst tracks have **zero** blind onsets; ceiling on recall 1.27% |
-| Learned onset detector on separated stems | **withdrawn, not dead:** "fires everywhere" was frame-exact scoring, compared against a 50 ms MICRO. Toms are being re-measured paired on ENST |
+| Learned onset detector on separated stems | toms, E-GMD-trained, paired on ENST: **−0.204 [−0.274, −0.137]**. Recall rose and precision collapsed. The older "fires everywhere" verdict was frame-exact scoring and is withdrawn. Other classes are unmeasured |
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |
 | Tuning all five thresholds globally | overfitting — 0.848 held out against a stock 0.850 |
