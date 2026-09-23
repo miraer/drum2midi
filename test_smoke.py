@@ -2362,6 +2362,82 @@ foreach ($k in $cases.Keys) { Write-Output ("ENDED_{0}={1}" -f $k, (Batch-Ended 
 
 
 @test
+def test_restem_queue_tells_a_stuck_render_from_a_slow_one():
+    """A file whose renderer never gets going is found, so the batch can move on.
+
+    ReStem's renderer sometimes sits on a file at 3% with a core busy for as long as it is
+    left, and the batch never moves past it: on 23.09 that was file 4 of 10, and the queue
+    would have waited out its 25 minutes and stopped with six files unrendered. Stopping
+    that renderer made ReStem fail the one file and go on. This checks the reading that
+    decides when: ReStem's own "ticker pinned" heartbeat is not progress, a finished or
+    failed file is not stuck, only the latest run counts, and a batch running across
+    midnight is timed correctly.
+    """
+    import shutil as _shutil
+    import subprocess
+
+    if sys.platform != "win32":
+        skip("restem_batch_queue.ps1 loads UIAutomationClient, which is Windows-only")
+    shell = _shutil.which("powershell") or _shutil.which("pwsh")
+    assert shell, "no PowerShell on a Windows machine, so the check was not exercised"
+
+    harness = _tmp / "hung_harness.ps1"
+    harness.write_text(r"""
+. "%s" -DefineOnly
+$log = "%s"
+function L([string] $t, [string] $what) { "[${t}.000 t1] $what" }
+$run   = L "09:45:55" "[batch] run started: 10 files -> X inst=1"
+$f3    = L "09:56:29" "[batch] file 3/10: X\restem_in\119_funky.wav inst=1"
+$f4    = L "10:02:43" "[batch] file 4/10: X\restem_in\121_charleston.wav inst=1"
+$stage = L "10:02:50" "engine: stage1 Vulkan engaged"
+$p11   = L "10:03:20" "[offline] render progress 11%%"
+$p61   = L "10:04:30" "[offline] render progress 61%%"
+$pin   = L "10:11:11" "progress ticker pinned at 0.0323990 after 483.8 s - heartbeat keeps the render alive"
+$busy  = L "10:13:30" "[offline] render progress 85%%"
+$fail4 = L "10:14:27" "[batch] file 4/10 terminal state=4 (ReStem stopped unexpectedly (Error 106))"
+$f5    = L "10:14:28" "[batch] file 5/10: X\restem_in\124_bossa.wav inst=1"
+$end   = L "10:07:00" "[batch] run finished: 10 ok, 0 failed, 0 cancelled (of 10) inst=1"
+$now = [datetime]"2026-09-23 10:15:00"
+$cases = [ordered]@{
+    never_started = @($run, $f3, $f4, $pin)
+    stalled_at_61 = @($run, $f3, $f4, $stage, $p11, $p61)
+    busy          = @($run, $f3, $f4, $stage, $p11, $p61, $busy)
+    young         = @($run, $f3, (L "10:09:00" "[batch] file 4/10: X\restem_in\121_charleston.wav inst=1"))
+    failed        = @($run, $f4, $pin, $fail4)
+    moved_on      = @($run, $f4, $pin, $fail4, $f5)
+    finished      = @($run, $f4, $stage, $p11, $end)
+    earlier_run   = @($run, $f4, $pin, (L "10:14:40" "[batch] run started: 1 files -> X inst=1"))
+    no_run        = @($f4, $pin)
+}
+foreach ($k in $cases.Keys) {
+    $h = Hung-Render $cases[$k] $now 10
+    Write-Output ("HUNG_{0}={1}" -f $k, $(if ($h) { "$($h.N):$($h.Name)" } else { "none" }))
+}
+$night = @((L "23:40:00" "[batch] run started: 2 files -> X inst=1"),
+           (L "23:58:00" "[batch] file 2/2: X\restem_in\152_fusion.wav inst=1"))
+foreach ($t in "00:05:00", "00:12:00") {
+    $h = Hung-Render $night ([datetime]"2026-09-24 $t") 10
+    Write-Output ("HUNG_midnight_{0}={1}" -f $t.Substring(0, 5).Replace(":", ""),
+                  $(if ($h) { "$($h.N):$($h.Name)" } else { "none" }))
+}
+""" % (ROOT / "restem_batch_queue.ps1", _tmp / "hung_harness.log"), encoding="utf-8")
+
+    res = subprocess.run([shell, "-NoProfile", "-ExecutionPolicy", "Bypass",
+                          "-File", str(harness)],
+                         capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    got = dict(l.split("=", 1) for l in out.splitlines() if l.startswith("HUNG_"))
+    want = {"HUNG_never_started": "4:121_charleston", "HUNG_stalled_at_61": "4:121_charleston",
+            "HUNG_busy": "none", "HUNG_young": "none", "HUNG_failed": "none",
+            "HUNG_moved_on": "none", "HUNG_finished": "none", "HUNG_earlier_run": "none",
+            "HUNG_no_run": "none",
+            "HUNG_midnight_0005": "none", "HUNG_midnight_0012": "2:152_fusion"}
+    assert got == want, (
+        f"misjudged which render is stuck:\n  got  {got}\n  want {want}\n{out[:600]}")
+
+
+@test
 def test_onset_trainer_reads_where_the_builder_writes():
     """Run with their defaults, build_onset_dataset.py and train_onset.py must meet.
 

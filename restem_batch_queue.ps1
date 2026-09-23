@@ -28,6 +28,7 @@ param(
     [string] $Expect = "Best (Offline) +",
     [int] $TimeoutMinutes = 240,
     [string] $Out = "bench\restem_batch_out",
+    [double] $HangMinutes = 10,
     [switch] $DefineOnly
 )
 
@@ -120,6 +121,51 @@ function Batch-Ended([string[]] $lines) {
         elseif ($l -match '\[batch\] (run started|run finished|setup opened)') { $last = $Matches[1] }
     }
     $last -eq "run finished"
+}
+
+# The time of a telemetry line, which carries the time of day only. A line stamped later
+# than now is from before midnight.
+function Line-Time([string] $line, [datetime] $now) {
+    if ($line -notmatch '^\[(\d{2}):(\d{2}):(\d{2})\.(\d{3}) ') { return $null }
+    $t = $now.Date.Add([timespan]::new(0, [int]$Matches[1], [int]$Matches[2],
+                                       [int]$Matches[3], [int]$Matches[4]))
+    if ($t -gt $now.AddMinutes(1)) { $t = $t.AddDays(-1) }
+    $t
+}
+
+# The file the latest run is on, when its renderer has shown no progress for $minutes.
+# ReStem's renderer sometimes never gets going on a file: one core busy, the progress
+# stuck at 3%, stage 1 never engaged, for as long as it is left -- 048 on 21.09, the
+# second file of the 22.09 night, 121 on 23.09 with 9.9 GB free. A healthy file logs
+# "render progress" every half minute or so and at most a minute apart. The batch itself
+# never moves on, so the whole queue used to wait out its 25 minutes and stop with every
+# file behind the stuck one unrendered. ReStem's own "progress ticker pinned" line is a
+# heartbeat, not progress.
+function Hung-Render([string[]] $lines, [datetime] $now, [double] $minutes) {
+    $begin = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '\[batch\] run started:') { $begin = $i }
+    }
+    if ($begin -lt 0) { return $null }
+    $cur = $null
+    for ($i = $begin + 1; $i -lt $lines.Count; $i++) {
+        $l = $lines[$i]
+        if ($l -match '\[batch\] file (\d+)/(\d+): (.+?) inst=') {
+            $n, $of, $path = [int]$Matches[1], [int]$Matches[2], $Matches[3]
+            $t = Line-Time $l $now
+            $cur = [pscustomobject]@{ N = $n; Of = $of; Started = $t; Since = $t
+                                      Name = [IO.Path]::GetFileNameWithoutExtension($path) }
+        } elseif ($l -match '\[batch\] (file \d+/\d+ terminal state|run finished)') {
+            $cur = $null
+        } elseif ($cur -and $l -match '\[offline\] render progress|engine: stage\d .*engaged') {
+            $t = Line-Time $l $now
+            if ($t) { $cur.Since = $t }
+        }
+    }
+    if (-not $cur -or -not $cur.Since) { return $null }
+    $idle = ($now - $cur.Since).TotalMinutes
+    if ($idle -lt $minutes) { return $null }
+    $cur | Add-Member -NotePropertyName Minutes -NotePropertyValue $idle -PassThru
 }
 
 # -DefineOnly loads the functions above and stops, so the stash can be tested without
@@ -309,11 +355,13 @@ function Renderer-Cpu {
 # it. Silence this long means stuck whatever the CPU says.
 $hardQuiet = 50   # 25 minutes at 30 s a turn
 $failSeen = 0
+$unstuck = 0
 while ((Get-Date) -lt $deadline) {
     Start-Sleep -Seconds 30
     $tl = Telemetry-Log
     if ($tl) {
-        $fails = Batch-Failures @(Get-Content -LiteralPath $tl.FullName -ErrorAction SilentlyContinue)
+        $lines = @(Get-Content -LiteralPath $tl.FullName -ErrorAction SilentlyContinue)
+        $fails = Batch-Failures $lines
         for ($k = $failSeen; $k -lt $fails.Count; $k++) {
             Say ("file {0} of {1} failed inside ReStem: {2}" -f $fails[$k].N, $fails[$k].Of, $fails[$k].Why)
         }
@@ -323,6 +371,28 @@ while ((Get-Date) -lt $deadline) {
         if ($seen -eq 0 -and $failSeen -ge 2) {
             Say "ReStem failed $failSeen file(s) outright and rendered none - the renderer is failing, not hanging; stopping"
             break
+        }
+        # Stopping the stuck renderer is what a crash does: ReStem fails that one file and
+        # starts the next, as it did at 10:14 on 23.09. Only a renderer started for this
+        # file is stopped, and each file at most once.
+        $hung = Hung-Render $lines (Get-Date) $HangMinutes
+        if ($hung -and $hung.N -gt $unstuck) {
+            $unstuck = $hung.N
+            $pids = @(Get-Process -Name "restem_offline" -ErrorAction SilentlyContinue |
+                      Where-Object { $_.StartTime -ge $hung.Started.AddSeconds(-30) } |
+                      ForEach-Object { $_.Id })
+            if ($pids.Count) {
+                Say (("file {0} of {1} ({2}): no render progress for {3:N0} min - the " +
+                      "known hang; stopping its renderer (pid {4}) so the batch moves on. " +
+                      "Queue it again on its own.") -f $hung.N, $hung.Of, $hung.Name,
+                     $hung.Minutes, ($pids -join ", "))
+                foreach ($id in $pids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+                $stuckFor = 0
+            } else {
+                Say (("file {0} of {1} ({2}) shows no render progress for {3:N0} min, but no " +
+                      "renderer started for it is running; leaving it to the 25-minute stop") -f
+                     $hung.N, $hung.Of, $hung.Name, $hung.Minutes)
+            }
         }
     }
     $now = Queue-Done $t0
