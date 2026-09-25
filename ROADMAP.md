@@ -43,8 +43,12 @@ gate](README.md#-pre-emphasis-ahead-of-adtof-for-the-same-passages): two fixed t
 50%, and the mallet recordings respond least. A second transcriber also fails its gate
 overall, at 33.5% [19.3, 48.1].
 
-Still open: **warning the user.** Detect the condition and tell the user instead of
-writing silence.
+Nothing is left that has not been measured. A warning that names the silent passages
+[fails its gate as well](README.md#-a-warning-for-the-passages-that-come-out-silent). Its
+precision is 45.8% [31.8, 64.6] against a pre-registered 50% lower bound, because ADTOF's
+blind onsets are usually scattered between hits it does catch. A real fix probably needs
+a transcriber trained on this kind of material, and this project has no training data of
+that kind.
 
 ### Toms, still the weakest class
 
@@ -177,6 +181,7 @@ nobody proposes them again without new evidence:
 | Fallback where the model is silent | blind share does not predict per-track F1; three of the five worst tracks have **zero** blind onsets; ceiling on recall 1.27% |
 | Pre-emphasis ahead of ADTOF for deaf passages | failed a pre-registered gate: two fixed tilts lift 4.2% and 25.3% [10.6, 41.5] of blind onsets to threshold against 50% needed; mallets 0 and 11 of 112 |
 | A second transcriber (ADT_STR) for deaf passages | failed a pre-registered gate: hears 33.5% [19.3, 48.1] of ADTOF-blind onsets. With timeouts scored from disk it is 42.3%, against 38.1% by chance. Mallets are the post-hoc exception. There its notes score 0.466 against our 0.409, +0.058 [−0.043, +0.200], so it is not better |
+| A warning naming the silent passages | failed a pre-registered gate: 45.8% [31.8, 64.6] of 59 warnings over 233 drum-only recordings would be right, against a required lower bound of 50%. The right ones cover 5.6% of the notes the export misses |
 | Learned onset detector on separated stems | toms, E-GMD-trained, paired on ENST: **−0.204 [−0.274, −0.137]**. Recall rose and precision collapsed. The older "fires everywhere" verdict was frame-exact scoring and is withdrawn. Other classes are unmeasured |
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |

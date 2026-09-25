@@ -2277,6 +2277,44 @@ Cost: 837 minutes on the Intel GPU. 525 of them went to one recording that the t
 could not stop, and the run finished at 14:22, six hours into the day it was meant to
 stay out of.
 
+### ❌ A warning for the passages that come out silent
+
+With no fix left, the fallback was to tell the user. The warning would name each stretch
+where ADTOF hears nothing, so the user knows where the MIDI is missing hits. A warning
+that is wrong half the time teaches people to ignore it, so it had to earn its place
+first. `silence_warning_gate.py` fixed these rules before any passage was scored:
+
+- **Detector:** `blind_spots.py` word for word, with nothing tuned. Blind onsets less
+  than 2 s apart form a passage, and a passage must span more than 0.5 s.
+- **A warning is right** when its passage contains at least one reference onset and the
+  published export misses at least half of them. A miss means no note of any pitch within
+  50 ms.
+- **Ships** if the lower bound on precision is at least 50% over at least 10 passages,
+  on 233 drum-only recordings: MDB's 23 plus ENST's 210.
+- **Full mixes** go through htdemucs as well, but only once drum-only has passed. A
+  drum-only failure decides the question on its own.
+
+| drum-only | recordings warned | passages | right | precision |
+|---|---:|---:|---:|---:|
+| **all 233** | 33 | 59 | 27 | **45.8% [31.8, 64.6]** |
+| MDB | 3 | 18 | 4 | 22.2% |
+| ENST, no mallets | 24 | 32 | 14 | 43.8% |
+| ENST mallets | 6 | 9 | 9 | 100% |
+
+It fails. More than half the warnings would be wrong, and the right ones cover 5.6% of
+the notes the export misses. The typical miss is a passage like SwingJazz 1.2–8.8 s. It
+holds 28 reference onsets, and the export has 17 of them, because ADTOF's blind onsets
+are scattered between hits it does catch. Reporting that stretch as silent would be
+false. Some passages contain no drum onset at all.
+
+The mallet row is right every time, 9 of 9. It is below the 10-passage minimum, the
+subgroup comes from the same recordings as the earlier mallet finding, and the pipeline
+cannot tell which beater was used. It does not justify a mallet-only warning.
+
+What stays is the whole-file check that already existed: when a file produces no notes
+at all and the model's strongest response is below 0.05, the error says so and names
+soft mallets or brushes as the usual cause.
+
 ### ❌ A learned ride/crash classifier, and a tuned margin
 
 The largest remaining gap against ReStem that is our own doing rather than a data
@@ -2802,6 +2840,8 @@ python setup_env.py --check
    [was measured and does not
    work](#-a-fallback-for-the-passages-where-adtof-goes-silent), and neither does
    [tilting the spectrum ahead of ADTOF](#-pre-emphasis-ahead-of-adtof-for-the-same-passages).
+   A warning naming the silent passages was measured too, and
+   [more than half of them would be wrong](#-a-warning-for-the-passages-that-come-out-silent).
    Unsolved.
 9. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
@@ -2903,6 +2943,7 @@ transcriber from scratch.
 | `preemphasis_gate.py` | does tilting the spectrum let ADTOF hear its blind onsets |
 | `second_transcriber_gate.py` | does ADT_STR hear the onsets ADTOF is blind to, against chance |
 | `adt_str_mallets.py` | ADT_STR against ours on the mallet recordings, paired over recordings |
+| `silence_warning_gate.py` | would a warning about silent passages be right often enough |
 | `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
 | `enst_beater_within_drummer.py` | the same question with the confound reversed: one drummer, four beaters |
 | `level_gate.py` | would a level gate like ReStem's remove any note we emit |
