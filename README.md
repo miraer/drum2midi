@@ -1121,8 +1121,9 @@ beater" remedy, which is why [Limitation 6](#limitations) and [Limitation
 This is [the same deafness as Limitation 8](#limitations) with a name attached: where
 that one describes passages inside a track, this is the soft attack that produces them.
 It is ADTOF's deafness, though, not the sound's. A transcriber trained on different data
-hears 82% of the mallet onsets ADTOF is blind to. That subgroup was picked after the fact,
-and the details are [with the second-transcriber
+hears 82% of the mallet onsets ADTOF is blind to. That subgroup was picked after the fact.
+Its notes there also score no better than ours: MICRO 0.466 against 0.409,
++0.058 [−0.043, +0.200]. The details are [with the second-transcriber
 test](#-a-second-transcriber-for-the-same-passages).
 
 ENST is **CC BY-NC-ND**: evaluation only. Nothing here is trained on it and no derived
@@ -2256,8 +2257,21 @@ That finding should be held loosely, for three reasons:
 - "Heard" means some note, not the right drum. ADT_STR's class accuracy on this benchmark
   is poor: MICRO 0.673, cymbals 0.041.
 
-Nothing ships. Whether ADT_STR's mallet notes are *right* is a separate measurement, and it
-needs its own rule written down first.
+**Its mallet notes are not measurably better than ours.** Whether they are *right* was
+settled by a second rule, written down before scoring (`adt_str_mallets.py`). It uses the
+same eight recordings, so it could close the exception but not establish it. The score is
+MICRO F1 over five classes at 50 ms. ADT_STR's 26 classes are folded as in the published
+0.673. The interval is a paired bootstrap over recordings.
+
+| ENST | recordings | ours | ADT_STR | ADT_STR − ours |
+|---|---:|---:|---:|---:|
+| mallets | 8 | 0.409 | 0.466 | +0.058 [−0.043, +0.200] |
+| everything else with a blind onset (context) | 83 | 0.806 | 0.646 | −0.160 [−0.192, −0.126] |
+
+The interval contains zero, so by the rule the exception closes: ADT_STR hears these
+onsets, but it has not been shown to transcribe them better. The class rows lean both ways
+and carry no intervals of their own. Toms are 0.564 against 0.419 and kick 0.530 against
+0.752. On everything else it is clearly worse. Nothing ships.
 
 Cost: 837 minutes on the Intel GPU. 525 of them went to one recording that the timeout
 could not stop, and the run finished at 14:22, six hours into the day it was meant to
@@ -2781,7 +2795,8 @@ python setup_env.py --check
    **ReStem fails on the same passage**, emitting 73 of its 106 notes there as pitch 60,
    its unclassified bucket. Counted across 99 benchmark recordings with a second
    transcriber, the deafness is mostly shared: ADT_STR hears ADTOF's blind onsets no
-   more often than chance, except on mallets, where it hears 82% of them
+   more often than chance, except on mallets, where it hears 82% of them. Even there its
+   notes score no better than ours
    ([details](#-a-second-transcriber-for-the-same-passages)). The obvious remedy, firing a
    fallback only where the model is silent,
    [was measured and does not
@@ -2887,6 +2902,7 @@ transcriber from scratch.
 | `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
 | `preemphasis_gate.py` | does tilting the spectrum let ADTOF hear its blind onsets |
 | `second_transcriber_gate.py` | does ADT_STR hear the onsets ADTOF is blind to, against chance |
+| `adt_str_mallets.py` | ADT_STR against ours on the mallet recordings, paired over recordings |
 | `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
 | `enst_beater_within_drummer.py` | the same question with the confound reversed: one drummer, four beaters |
 | `level_gate.py` | would a level gate like ReStem's remove any note we emit |
