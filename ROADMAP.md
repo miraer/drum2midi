@@ -20,8 +20,17 @@ than a near miss. The material is percussive but dull, harmonic fraction 0.101 a
 spectral centroid 2129 Hz against 4037 Hz in the loud sections.
 
 **ReStem 2 Pro fails on the same passage**, emitting 73 of its 106 notes there as pitch
-60, its unclassified bucket. That makes it a property of the material rather than of
-either transcriber, which is a harder problem than it first looked.
+60, its unclassified bucket. That was one recording. [Counted across 99 benchmark
+recordings](README.md#-a-second-transcriber-for-the-same-passages), ADT_STR, which was
+trained on entirely different data, hears ADTOF's blind onsets no more often than chance:
++4.2 points [−8.7, +15.0]. Outside the mallet recordings it hears them *less* often than
+chance. So for most of it, the deafness does belong to the material.
+
+**Mallets are the exception.** ADT_STR hears 82.1% [68.1, 95.5] of the mallet onsets
+ADTOF is blind to, against 36.4% by chance, including 14 of 18 on `048`, which ADTOF hears
+nowhere. That is a subgroup found after the run, seven of its eight recordings come from
+one drummer, and "heard" means some note rather than the right one. Still, it is the first
+evidence that part of this defect is ADTOF's.
 
 The obvious remedy — fire a fallback detector only where the model is silent — was
 measured and [does not
@@ -29,10 +38,14 @@ work](README.md#-a-fallback-for-the-passages-where-adtof-goes-silent). Spectral
 pre-emphasis ahead of ADTOF was measured next and [fails its own
 gate](README.md#-pre-emphasis-ahead-of-adtof-for-the-same-passages): two fixed tilts lift
 4.2% and 25.3% [10.6, 41.5] of the blind onsets to threshold, against a pre-registered
-50%, and the mallet recordings respond least. Nothing else is currently proposed.
-Untried directions, none of them evaluated: a second transcriber trained on different
-material, or simply detecting the condition and telling the user rather than writing
-silence.
+50%, and the mallet recordings respond least. A second transcriber also fails its gate
+overall, at 33.5% [19.3, 48.1].
+
+Still open:
+
+- **Are ADT_STR's mallet notes right?** That needs class-level F1 on the mallet
+  recordings, with a rule written before it runs.
+- **Warning the user.** Detect the condition and tell the user instead of writing silence.
 
 ### Toms, still the weakest class
 
@@ -164,6 +177,7 @@ nobody proposes them again without new evidence:
 |---|---|
 | Fallback where the model is silent | blind share does not predict per-track F1; three of the five worst tracks have **zero** blind onsets; ceiling on recall 1.27% |
 | Pre-emphasis ahead of ADTOF for deaf passages | failed a pre-registered gate: two fixed tilts lift 4.2% and 25.3% [10.6, 41.5] of blind onsets to threshold against 50% needed; mallets 0 and 11 of 112 |
+| A second transcriber (ADT_STR) for deaf passages | failed a pre-registered gate: hears 33.5% [19.3, 48.1] of ADTOF-blind onsets. With timeouts scored from disk it is 42.3%, against 38.1% by chance. Mallets are the post-hoc exception and are still open above |
 | Learned onset detector on separated stems | toms, E-GMD-trained, paired on ENST: **−0.204 [−0.274, −0.137]**. Recall rose and precision collapsed. The older "fires everywhere" verdict was frame-exact scoring and is withdrawn. Other classes are unmeasured |
 | Replacing ADTOF with ADT_STR (2026) | MICRO 0.673 against 0.882 on the same 23 tracks |
 | Inverse Drum Machine for velocity | worse, and slower |

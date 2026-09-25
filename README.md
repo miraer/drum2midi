@@ -1119,8 +1119,11 @@ beater" remedy, which is why [Limitation 6](#limitations) and [Limitation
 7](#limitations) are listed as separate problems.
 
 This is [the same deafness as Limitation 8](#limitations) with a name attached: where
-that one describes passages inside a track, this is the material property that produces
-them.
+that one describes passages inside a track, this is the soft attack that produces them.
+It is ADTOF's deafness, though, not the sound's. A transcriber trained on different data
+hears 82% of the mallet onsets ADTOF is blind to. That subgroup was picked after the fact,
+and the details are [with the second-transcriber
+test](#-a-second-transcriber-for-the-same-passages).
 
 ENST is **CC BY-NC-ND**: evaluation only. Nothing here is trained on it and no derived
 annotations are redistributed.
@@ -2188,11 +2191,77 @@ The breakdown makes it worse rather than better:
   full-pipeline run on a filter that has already failed the cheaper test.
 
 What this does not settle: it tested two fixed first-order tilts, not every possible
-equaliser. A filter tuned to recover these onsets would be tuned on the test set. Other
-directions stay open and are listed in [ROADMAP.md](ROADMAP.md): a second transcriber
-trained on different material, or detecting the condition and warning the user.
+equaliser. A filter tuned to recover these onsets would be tuned on the test set. The
+second transcriber was [measured next](#-a-second-transcriber-for-the-same-passages);
+detecting the condition and warning the user is still open in [ROADMAP.md](ROADMAP.md).
 
 Cost: 20 minutes of CPU for 233 recordings × 3 arms.
+
+### ❌ A second transcriber for the same passages
+
+The README said ADTOF's deafness belongs to the material and not to the transcriber. That
+rested on one recording, where ReStem failed on the same passage. `second_transcriber_gate.py`
+counts it on every benchmark recording with an ADTOF-blind onset: 99 recordings and 430 blind
+onsets. It uses ADT_STR, which was trained on synthetic audio from Lakh MIDI and shares
+none of ADTOF's training data.
+
+The rule was written before the run:
+
+- **Heard:** an onset is heard when ADT_STR writes any note within 60 ms of it.
+- **Gate:** it passes when at least half of the blind onsets are heard.
+- **Material claim:** ADT_STR's heard rate on the onsets ADTOF *does* see, in the same
+  recordings, is the baseline. If seen minus blind has a lower bound above zero, the
+  deafness goes with the material.
+- **Timeouts:** a recording that runs past 20 minutes counts as unheard.
+
+| | heard by ADT_STR |
+|---|---|
+| onsets ADTOF is blind to | 144 of 430, **33.5%** [19.3, 48.1] |
+| onsets ADTOF sees | 11 915 of 13 282, 89.7% [85.8, 92.7] |
+| seen minus blind | **+56.2%** [+42.4, +68.8] |
+
+**The gate fails. By the rule as written, the deafness goes with the material.** Two
+checks were added after the run and cannot change that verdict, but they change what it
+means.
+
+**Timeouts.** Three recordings timed out, and SwingJazz alone holds 57 of MDB's 101 blind
+onsets. The timeout never stopped a render (see `kill_tree`), so all three eventually
+wrote MIDI. Scored from disk, blind onsets reach 182 of 430, 42.3% [30.3, 53.3], still
+under the bar.
+
+**Chance.** "Any note within 60 ms" also happens by accident, and the design had no
+baseline for it. It needed one. Around the blind onsets, ADT_STR's notes cover 38.1% of the
+time, so a random instant is "heard" 38.1% of the time.
+
+| after the run | blind onsets heard | by chance | above chance |
+|---|---|---|---|
+| all 99, timeouts from disk | 42.3% | 38.1% | +4.2 [−8.7, +15.0] |
+| the 8 ENST mallet recordings | 92 of 112, **82.1%** | 36.4% | **+45.7 [+28.2, +60.3]** |
+| everything else | 90 of 318, 28.3% | 38.8% | **−10.5 [−19.9, −3.5]** |
+
+Onsets ADTOF sees are heard 91.8% of the time against 47.3% by chance, so ADT_STR does
+follow real hits. Outside the mallet recordings it hears ADTOF's blind onsets *less* often
+than a random instant. It goes quiet in the same places. For those 318 onsets the material
+claim now rests on 91 recordings instead of one.
+
+**Mallets are the exception, and the exception is ADTOF's.** ADT_STR hears 82% of the
+mallet onsets ADTOF is blind to. `048` is the recording ADTOF hears nowhere, with a peak
+activation of 0.008. On it ADT_STR writes 18 notes, and 14 of them land on the 18 blind
+onsets. For mallets, then, the deafness belongs to the transcriber and not to the sound.
+
+That finding should be held loosely, for three reasons:
+
+- The subgroup was chosen after seeing the data.
+- Seven of the eight recordings are one drummer playing afro material.
+- "Heard" means some note, not the right drum. ADT_STR's class accuracy on this benchmark
+  is poor: MICRO 0.673, cymbals 0.041.
+
+Nothing ships. Whether ADT_STR's mallet notes are *right* is a separate measurement, and it
+needs its own rule written down first.
+
+Cost: 837 minutes on the Intel GPU. 525 of them went to one recording that the timeout
+could not stop, and the run finished at 14:22, six hours into the day it was meant to
+stay out of.
 
 ### ❌ A learned ride/crash classifier, and a tuned margin
 
@@ -2710,12 +2779,15 @@ python setup_env.py --check
    is noise rather than a near miss. The material is percussive but dull, harmonic
    fraction 0.101 and spectral centroid 2129 Hz against 4037 Hz in the loud sections.
    **ReStem fails on the same passage**, emitting 73 of its 106 notes there as pitch 60,
-   its unclassified bucket — so this is a property of the material rather than of either
-   transcriber. The obvious remedy, firing a fallback only where the model is silent,
+   its unclassified bucket. Counted across 99 benchmark recordings with a second
+   transcriber, the deafness is mostly shared: ADT_STR hears ADTOF's blind onsets no
+   more often than chance, except on mallets, where it hears 82% of them
+   ([details](#-a-second-transcriber-for-the-same-passages)). The obvious remedy, firing a
+   fallback only where the model is silent,
    [was measured and does not
    work](#-a-fallback-for-the-passages-where-adtof-goes-silent), and neither does
    [tilting the spectrum ahead of ADTOF](#-pre-emphasis-ahead-of-adtof-for-the-same-passages).
-   Unsolved, and no approach currently proposed.
+   Unsolved.
 9. **Learned velocity models** were trained on GMD's electronic kits. Transfer is verified
    for cymbals and hi-hat, and failed for pedal. Disable with `--no-learned`.
 
@@ -2813,6 +2885,8 @@ transcriber from scratch.
 | `compare_idm.py` | Inverse Drum Machine vs MDX23C for the velocity stage |
 | **Analysis** | |
 | `enst_mallets.py` | does the beater explain the failures — sticks, rods, brushes, mallets |
+| `preemphasis_gate.py` | does tilting the spectrum let ADTOF hear its blind onsets |
+| `second_transcriber_gate.py` | does ADT_STR hear the onsets ADTOF is blind to, against chance |
 | `enst_beater_activations.py` | at a known soft hit, is the model nearly seeing it or seeing nothing |
 | `enst_beater_within_drummer.py` | the same question with the confound reversed: one drummer, four beaters |
 | `level_gate.py` | would a level gate like ReStem's remove any note we emit |
