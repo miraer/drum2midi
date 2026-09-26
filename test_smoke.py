@@ -1199,6 +1199,43 @@ def test_shell_launcher_parses():
 
 
 @test
+def test_launcher_library_check_survives_a_long_listing():
+    """drum2midi.sh must not report libxcb-cursor missing when it is installed.
+
+    The first version piped `ldconfig -p` into `grep -q` under pipefail. grep quits
+    at its first match; ldconfig, still writing a listing larger than the 64 KB pipe
+    buffer, dies of SIGPIPE, and pipefail turns that into "missing" -- blocking a
+    window that would have opened. Found in review; measured in Ubuntu 24.04 with a
+    982-line, 80 KB cache and libxcb-cursor.so.0 on line 40: 190 false alarms in
+    200 runs. Here a stand-in ldconfig prints the library first and then 400,000
+    lines, the worst case, and the launcher's own function is asked 20 times.
+    """
+    import shutil as _shutil
+    import stat
+    bash = _shutil.which("bash")
+    if bash is None:
+        skip("no bash on this machine to run the launcher's check with")
+    fake = _tmp / "fake_ldconfig"
+    fake.mkdir(exist_ok=True)
+    tool = fake / "ldconfig"
+    tool.write_text("#!/usr/bin/env bash\n"
+                    "echo \"\tlibxcb-cursor.so.0 (libc6,x86-64) => /usr/lib/libxcb-cursor.so.0\"\n"
+                    "seq 1 400000\n", encoding="utf-8", newline="\n")
+    tool.chmod(tool.stat().st_mode | stat.S_IEXEC)
+    script = (ROOT / "drum2midi.sh").as_posix()
+    # Git Bash splits PATH on the colon in "C:/", so a Windows path goes in as /c/...
+    probe = (f'd="{fake.as_posix()}"; command -v cygpath >/dev/null && d="$(cygpath -u "$d")"; '
+             f'export PATH="$d:$PATH"; source "{script}"; '
+             'n=0; for i in $(seq 20); do lib_known libxcb-cursor.so.0 || n=$((n+1)); done; '
+             'echo "false=$n"; s=0; lib_known libnothing.so.9 || s=$?; echo "absent=$s"')
+    res = subprocess.run([bash, "-c", probe], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    assert "false=0" in out, f"installed library reported missing:\n{out[-400:]}"
+    assert "absent=1" in out, f"a missing library is no longer reported:\n{out[-400:]}"
+
+
+@test
 def test_shell_launcher_is_usable():
     """drum2midi.sh must be LF-terminated, or bash reports 'bad interpreter'."""
     sh = ROOT / "drum2midi.sh"
