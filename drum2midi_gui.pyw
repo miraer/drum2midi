@@ -244,6 +244,13 @@ class Choices:
     channels: dict = field(default_factory=lambda: {p: DRUM_CHANNEL for p, _ in KIT})
 
 
+def whole_song_available() -> bool:
+    """Whether drums can be pulled out of a whole song: htdemucs needs diffq, which is
+    optional on macOS (see requirements.txt)."""
+    import importlib.util
+    return importlib.util.find_spec("diffq") is not None
+
+
 def fuse_available(sep: str) -> bool:
     return sep == "uvr"
 
@@ -1478,7 +1485,11 @@ class Window(QMainWindow):
         self.drop_small.mousePressEvent = lambda e: self._pick_input()
         src.addWidget(self.drop_small)
 
-        self.opt_song = OptionRow("This is a whole song — extract drums first")
+        self.song_ok = whole_song_available()
+        self.opt_song = OptionRow(
+            "This is a whole song — extract drums first",
+            "" if self.song_ok else "needs diffq: xcode-select --install, then "
+                                    "pip install diffq")
         self.opt_song.toggle.toggled.connect(lambda v: self._set("song", v))
         src.addWidget(self.opt_song)
 
@@ -1901,6 +1912,9 @@ class Window(QMainWindow):
             # an unavailable option shows off, but the preference is kept for later
             row.toggle.setChecked(bool(getattr(c, key)) and avail)
             row.toggle.blockSignals(False)
+        if not self.song_ok:
+            c.song = False               # a saved "on" cannot run without diffq
+        self.opt_song.set_available(self.song_ok)
         for r, v in ((self.opt_song, c.song), (self.opt_trip, c.triplets)):
             r.toggle.blockSignals(True)
             r.toggle.setChecked(v)

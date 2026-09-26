@@ -1057,6 +1057,185 @@ def test_no_unguarded_windows_calls():
 
 
 @test
+def test_macos_installs_the_separator_without_diffq():
+    """On macOS audio-separator goes in without diffq, which only --from-song needs.
+
+    diffq has no macOS wheel above Python 3.10 and needs Xcode's command line tools to
+    build, and pip abandons a whole requirements file over one failed build. So
+    requirements.txt leaves audio-separator out on macOS and setup_env installs it
+    and every other dependency itself. This checks both halves: the file really
+    skips it there, and the dependency list setup_env builds drops only diffq.
+    """
+    import importlib.metadata
+    import setup_env
+
+    lines = [l.strip() for l in (ROOT / "requirements.txt").read_text(
+        encoding="utf-8").splitlines() if l.strip().startswith("audio-separator")]
+    assert lines and 'sys_platform != "darwin"' in lines[0], (
+        f"requirements.txt still installs audio-separator on macOS: {lines}")
+
+    try:
+        requires = importlib.metadata.requires("audio-separator") or []
+    except importlib.metadata.PackageNotFoundError:
+        skip("audio-separator is not installed, so its dependency list is unknown")
+    mac = {"sys_platform": "darwin", "platform_machine": "arm64", "os_name": "posix",
+           "platform_system": "Darwin", "python_version": "3.12"}
+    deps = setup_env.separator_requirements(requires, mac)
+    names = [d.split("<")[0].split(">")[0].split("=")[0].split("[")[0].lower()
+             for d in deps]
+    assert not {"diffq", "diffq-fixed"} & set(names), f"diffq still required: {deps}"
+    assert "torch" in names and "librosa" in names, f"lost real dependencies: {deps}"
+    assert not any(";" in d for d in deps), f"markers left on: {deps}"
+    # everything else audio-separator asks for on that platform is still asked for
+    from pip._vendor.packaging.requirements import Requirement
+    wanted = {Requirement(r).name.lower() for r in requires
+              if Requirement(r).marker is None
+              or Requirement(r).marker.evaluate(dict(mac, extra=""))}
+    assert wanted - {"diffq", "diffq-fixed"} == set(names), (
+        f"dropped more than diffq: {sorted(wanted - set(names))}")
+
+
+@test
+def test_from_song_without_diffq_says_what_to_install():
+    """Without diffq, --from-song stops at once with the fix, not deep in a separator.
+
+    Only the Demucs models import diffq, and on macOS it is optional. The run is real
+    -- drum2midi.py on the fixture -- with diffq hidden from the import system, which
+    is how an install without it looks. --no-separate keeps the separator's own
+    pre-flight (ffmpeg, absent on CI) out of the way: extraction is checked on its
+    own, and diffq first, because that is the part only it needs.
+    """
+    code = (
+        "import importlib.util as u, runpy, sys\n"
+        "real = u.find_spec\n"
+        "u.find_spec = lambda n, *a, **k: None if n == 'diffq' else real(n, *a, **k)\n"
+        f"sys.argv = ['drum2midi.py', r'{make_fixture()}', '-o', r'{_tmp / 'song.mid'}',"
+        " '--device', 'cpu', '--no-separate', '--from-song']\n"
+        f"runpy.run_path(r'{ROOT / 'drum2midi.py'}', run_name='__main__')\n")
+    res = subprocess.run([PY, "-c", code], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", cwd=str(ROOT), timeout=300)
+    out = res.stdout + res.stderr
+    assert res.returncode != 0, f"--from-song ran without diffq:\n{out[-400:]}"
+    assert "--from-song needs diffq" in out and "xcode-select --install" in out, (
+        f"the failure does not say what to install:\n{out[-600:]}")
+    assert "[1/4]" not in out, "it went on to transcribe instead of stopping"
+    assert "Traceback" not in out, f"crashed instead of reporting:\n{out[-600:]}"
+
+
+@test
+def test_from_song_checks_its_programs_before_any_work():
+    """--from-song runs audio-separator, so it needs ffmpeg even with --no-separate,
+    which the separator's own pre-flight rightly ignores."""
+    import argparse
+    import shutil as _shutil
+    import drum2midi
+
+    real_which, real_diffq = _shutil.which, drum2midi.diffq_available
+    _shutil.which = lambda name, *a, **k: None if name == "ffmpeg" else real_which(name, *a, **k)
+    drum2midi.diffq_available = lambda: True
+    try:
+        song = argparse.Namespace(from_song=True, extractor=None, no_separate=True)
+        missing = drum2midi.song_extraction_missing(song)
+        assert missing and missing[0] == "FFmpeg", f"ffmpeg not required: {missing}"
+        stem = argparse.Namespace(from_song=False, extractor=None, no_separate=True)
+        assert drum2midi.song_extraction_missing(stem) is None, "a drum stem was held up"
+    finally:
+        _shutil.which, drum2midi.diffq_available = real_which, real_diffq
+
+
+@test
+def test_gui_turns_whole_song_off_without_diffq():
+    """Without diffq the window cannot offer whole-song extraction, and says why."""
+    gui = load_gui()
+    real = gui.whole_song_available
+    gui.whole_song_available = lambda: False
+    try:
+        _, win = gui_window()
+    finally:
+        gui.whole_song_available = real
+    try:
+        win.c.input = str(make_fixture())
+        win.c.song = True                      # as a saved setting would leave it
+        win._sync()
+        assert not win.opt_song.toggle.isEnabled(), "the switch can still be turned on"
+        assert not win.c.song, "a saved 'whole song' survived without diffq"
+        assert "--from-song" not in gui.build_command(win.c)
+        hints = [w.text() for w in win.opt_song.findChildren(gui.QLabel)]
+        assert any("diffq" in h for h in hints), f"no hint says what is missing: {hints}"
+    finally:
+        win.close()
+
+
+@test
+def test_linux_menu_entry_launches_the_shell_script():
+    """make_shortcut's .desktop entry runs drum2midi.sh, quoted per the spec."""
+    from pathlib import PurePosixPath
+    import make_shortcut
+
+    entry = make_shortcut.desktop_entry(ROOT)
+    keys = dict(l.split("=", 1) for l in entry.splitlines() if "=" in l)
+    assert keys.get("Type") == "Application" and keys.get("Terminal") == "false"
+    assert keys["Exec"].startswith('"') and 'drum2midi.sh" %f' in keys["Exec"], keys
+    assert Path(keys["Icon"]).exists(), f"the icon it names is missing: {keys['Icon']}"
+
+    # a path with every character the Exec key escapes: " ` $ and a backslash, where
+    # the backslash takes both layers and ends up as four
+    odd = make_shortcut.desktop_entry(PurePosixPath('/home/a "b" `c` $d \\e'))
+    exec_line = next(l for l in odd.splitlines() if l.startswith("Exec="))
+    assert exec_line == ('Exec="/home/a \\\\"b\\\\" \\\\`c\\\\` \\\\$d '
+                         '\\\\\\\\e/drum2midi.sh" %f'), exec_line
+
+
+@test
+def test_shell_launcher_parses():
+    """drum2midi.sh must at least parse; bash -n reads it without running it."""
+    import shutil as _shutil
+    bash = _shutil.which("bash")
+    if bash is None:
+        skip("no bash on this machine to parse the launcher with")
+    res = subprocess.run([bash, "-n", str(ROOT / "drum2midi.sh")],
+                         capture_output=True, text=True)
+    assert res.returncode == 0, f"drum2midi.sh does not parse: {res.stderr}"
+
+
+@test
+def test_launcher_library_check_survives_a_long_listing():
+    """drum2midi.sh must not report libxcb-cursor missing when it is installed.
+
+    The first version piped `ldconfig -p` into `grep -q` under pipefail. grep quits
+    at its first match; ldconfig, still writing a listing larger than the 64 KB pipe
+    buffer, dies of SIGPIPE, and pipefail turns that into "missing" -- blocking a
+    window that would have opened. Found in review; measured in Ubuntu 24.04 with a
+    982-line, 80 KB cache and libxcb-cursor.so.0 on line 40: 190 false alarms in
+    200 runs. Here a stand-in ldconfig prints the library first and then 400,000
+    lines, the worst case, and the launcher's own function is asked 20 times.
+    """
+    import shutil as _shutil
+    import stat
+    bash = _shutil.which("bash")
+    if bash is None:
+        skip("no bash on this machine to run the launcher's check with")
+    fake = _tmp / "fake_ldconfig"
+    fake.mkdir(exist_ok=True)
+    tool = fake / "ldconfig"
+    tool.write_text("#!/usr/bin/env bash\n"
+                    "echo \"\tlibxcb-cursor.so.0 (libc6,x86-64) => /usr/lib/libxcb-cursor.so.0\"\n"
+                    "seq 1 400000\n", encoding="utf-8", newline="\n")
+    tool.chmod(tool.stat().st_mode | stat.S_IEXEC)
+    script = (ROOT / "drum2midi.sh").as_posix()
+    # Git Bash splits PATH on the colon in "C:/", so a Windows path goes in as /c/...
+    probe = (f'd="{fake.as_posix()}"; command -v cygpath >/dev/null && d="$(cygpath -u "$d")"; '
+             f'export PATH="$d:$PATH"; source "{script}"; '
+             'n=0; for i in $(seq 20); do lib_known libxcb-cursor.so.0 || n=$((n+1)); done; '
+             'echo "false=$n"; s=0; lib_known libnothing.so.9 || s=$?; echo "absent=$s"')
+    res = subprocess.run([bash, "-c", probe], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace", timeout=300)
+    out = res.stdout + res.stderr
+    assert "false=0" in out, f"installed library reported missing:\n{out[-400:]}"
+    assert "absent=1" in out, f"a missing library is no longer reported:\n{out[-400:]}"
+
+
+@test
 def test_shell_launcher_is_usable():
     """drum2midi.sh must be LF-terminated, or bash reports 'bad interpreter'."""
     sh = ROOT / "drum2midi.sh"
@@ -2560,6 +2739,10 @@ def test_onset_trainer_reads_where_the_builder_writes():
 
     root = _tmp / "onset_pair"
     root.mkdir()
+    # The trainer resolves its own path, and on macOS the temp directory is under /var,
+    # a symlink to /private/var -- so an unresolved root named a different string for
+    # the same directory, and this failed on the first macOS run with nothing wrong.
+    root = root.resolve()
     for f in ("train_onset.py", "build_onset_dataset.py"):
         _shutil.copy(ROOT / f, root / f)
 

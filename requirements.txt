@@ -1,13 +1,23 @@
 # Core pipeline. Versions are the ones this was developed and measured against;
 # newer ones generally work, with the torchaudio caveat noted below.
 #
-# Python 3.10 - 3.13, and the ceiling is not ours. audio-separator depends on
-# diffq-fixed, which ships wheels for cp310-cp313 only; on 3.14 pip falls back to its
-# sdist and the build fails, so the default separator cannot be installed at all.
-# Its own metadata says `requires_python: >=3.7.0`, which is why the failure arrives
-# as a compiler error deep in a dependency rather than as a version check.
-# 3.13 has a Windows wheel but no manylinux one, so 3.12 is the safest everywhere and
-# is what CI uses.
+# Python 3.10 - 3.13, and the ceiling is not ours. audio-separator depends on a
+# compiled package whose name depends on the platform, per its own metadata:
+#   Windows       diffq-fixed  wheels for cp310-cp313; on 3.14 pip falls back to the
+#                              sdist and the build fails
+#   Linux, macOS  diffq        wheels up to cp310 only; above that pip compiles it,
+#                              which needs a C compiler (build-essential and
+#                              python3-dev on Debian/Ubuntu, Xcode's command line
+#                              tools on macOS)
+# Both say `requires_python: >=3.7.0`, which is why a failure arrives as a compiler
+# error deep in a dependency rather than as a version check. 3.12 is the safest
+# everywhere and is what CI uses.
+#
+# Only extracting drums from a whole song (--from-song, htdemucs) imports diffq; the
+# default MDX23C separator does not. So on macOS, where no wheel exists and a compiler
+# is often missing, it is optional: audio-separator is left out of this file there,
+# and setup_env.py installs it and its other dependencies itself, then tries diffq
+# and carries on without it. Use setup_env.py on macOS rather than this file alone.
 #
 # Install torch first if you want a specific build. The plain `pip install torch`
 # wheel on Windows has NO CUDA, so an NVIDIA card sits idle and everything runs on
@@ -49,7 +59,7 @@ mido>=1.3
 #   Windows:  winget install Gyan.FFmpeg    (then a new terminal, for PATH)
 #   macOS:    brew install ffmpeg
 #   Linux:    sudo apt install ffmpeg
-audio-separator>=0.30
+audio-separator>=0.30 ; sys_platform != "darwin"
 onnxruntime>=1.17
 # audioread was here and is gone. Nothing in this repository imports it, pip reports it
 # as required by nothing, and librosa stopped reaching for it at 1.0 -- so listing it

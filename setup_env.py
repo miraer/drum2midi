@@ -100,6 +100,69 @@ def ffmpeg_advice() -> str:
             "only read at launch)")
 
 
+SEPARATOR = "audio-separator>=0.30"
+# The compiled dependency only whole-song extraction needs; see requirements.txt.
+DIFFQ = ("diffq", "diffq-fixed")
+
+
+def separator_requirements(requires: list[str], environment: dict | None = None
+                           ) -> list[str]:
+    """audio-separator's dependencies for this platform, without diffq.
+
+    `requires` is its Requires-Dist, as importlib.metadata reports it. Markers are
+    evaluated for `environment` (this interpreter's, when None), so a line meant for
+    another platform or Python is dropped, and the survivors lose their markers.
+    """
+    try:
+        from packaging.requirements import Requirement
+    except ImportError:                       # pip always carries a copy
+        from pip._vendor.packaging.requirements import Requirement
+    env = dict(environment or {}, extra="")
+    kept = []
+    for line in requires:
+        req = Requirement(line)
+        if req.marker is not None and not req.marker.evaluate(env):
+            continue
+        if req.name.lower() in DIFFQ:
+            continue
+        req.marker = None
+        kept.append(str(req))
+    return kept
+
+
+def install_separator() -> bool:
+    """audio-separator on macOS, with diffq made optional.
+
+    requirements.txt leaves it out on macOS, because installing it there pulls in
+    diffq, which has no macOS wheel above Python 3.10 and cannot build without Xcode's
+    command line tools -- and pip would abandon the whole install over it. So it goes
+    in without its dependencies, those go in without diffq, and diffq is tried last:
+    if it builds, whole-song extraction works; if not, everything else still does.
+    """
+    print("    audio-separator, without diffq (optional on macOS)")
+    if pip("--no-deps", SEPARATOR) != 0:
+        return False
+    probe = subprocess.run(
+        [PY, "-c", "import importlib.metadata as m, json; "
+                   "print(json.dumps(m.requires('audio-separator') or []))"],
+        capture_output=True, text=True, cwd=str(ROOT))
+    try:
+        import json
+        requires = json.loads(probe.stdout)
+    except ValueError:
+        print(f"{BAD}could not read audio-separator's dependencies")
+        return False
+    if pip(*separator_requirements(requires)) != 0:
+        return False
+    print("    diffq, for extracting drums from a whole song (--from-song)")
+    if pip("diffq>=0.2") != 0:
+        print(f"{WARN}diffq did not build, so --from-song is unavailable; everything")
+        print("       else works. To add it later:")
+        print("           xcode-select --install")
+        print(f"           {interpreter()} -m pip install diffq")
+    return True
+
+
 def install_core() -> bool:
     """Installs the core packages; False if the requirements install did not finish.
 
@@ -112,6 +175,8 @@ def install_core() -> bool:
     """
     print("\n[1/3] Python packages")
     ok = pip("-r", str(ROOT / "requirements.txt")) == 0
+    if sys.platform == "darwin":
+        ok = install_separator() and ok
     if not ok:
         print()
         print(f"{BAD}requirements.txt did not install cleanly")
@@ -295,7 +360,9 @@ def check(install_failed: bool = False) -> int:
                              ("PySide6", "the window only; the CLI runs without", False),
                              ("PIL", "make_logo.py and drum_icons.py only", False),
                              ("tqdm", "benchmark and training scripts only", False),
-                             ("yaml", "LarsNet only", False)):
+                             ("yaml", "LarsNet only", False),
+                             # only htdemucs imports it, and on macOS it is optional
+                             ("diffq", "extracting drums from a whole song only", False)):
         ok = have(mod)
         if ok:
             print(f"{OK}{mod}")

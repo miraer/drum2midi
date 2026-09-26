@@ -56,6 +56,38 @@ jobs:
       - name: Run smoke tests
         run: python test_smoke.py
 
+  smoke-macos:
+    # Apple Silicon. requirements.txt leaves audio-separator out on macOS, and
+    # setup_env.install_separator() adds it with diffq optional -- the path a Mac
+    # user's `python setup_env.py` takes, so that is what runs here.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch
+          python -m pip install -r requirements.txt
+          python -c "import setup_env, sys; sys.exit(0 if setup_env.install_separator() else 1)"
+
+      - name: Report whether diffq built (optional on macOS)
+        run: python -c "import importlib.util as u; print('diffq:', 'installed' if u.find_spec('diffq') else 'absent, so --from-song is off')"
+
+      - name: Install ADTOF-pytorch
+        run: |
+          git clone --depth 1 https://github.com/xavriley/ADTOF-pytorch.git
+          python -m pip install -e ./ADTOF-pytorch
+
+      - name: Run smoke tests
+        run: python test_smoke.py
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
