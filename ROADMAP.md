@@ -68,9 +68,11 @@ been measured against it, and it lost by 0.204 [−0.274, −0.137] ([Queued](#q
 
 ### Pedal hi-hat
 
-19 correct of the 230 events we label pedal; 3 of 513 for ReStem. Those denominators are
-each system's own pedal output rather than the reference, which carries 523 pedal onsets —
-a reader took them for reference counts, so they are spelled out here. A separate
+Of the annotated pedal onsets each system detects, we label 13 of 436 as pedal and ReStem 2
+of 507; the reference carries 523. This used to read 19 of 230 and 3 of 513 and called the
+denominators each system's own pedal output. Both were wrong: the figures came from an
+unreproducible run of ours and ReStem's weaker mode, and the denominators are annotated
+onsets. Restated 26 September. A separate
 measurement on a different corpus suggests it may not be there
 to find: across the 1102 hi-hat hits in eight Groove MIDI recordings the pedal chick and the
 closed hat differ by peak

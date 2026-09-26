@@ -59,8 +59,8 @@ Per class on MDB, which is the corpus the rest of this section examines in detai
 | Hi-hat | **0.892** | 0.779 | **[+0.049, +0.216]** |
 | Cymbals | **0.869** | 0.759 | **[+0.013, +0.382]** |
 | Toms | 0.589 | 0.651 | [−0.268, +0.193] |
-| Ghost notes (recall) | 0.718 | 0.747 | — |
-| Ride vs crash | 0.917 | 0.953 | — |
+| Ghost notes (recall) | 0.718 | 0.790 | — |
+| Ride vs crash | 0.917 | 0.954 | — |
 | Hi-hat articulation | 0.690 | 0.691 | — |
 
 > **This table was restated on 20 September and the earlier one flattered us.** Every
@@ -72,6 +72,12 @@ Per class on MDB, which is the corpus the rest of this section examines in detai
 > +0.113. One row moved the other way: cymbals now clears zero. The comparison is against
 > their strongest configuration from here on, and the weaker number is not quoted anywhere
 > without this note.
+>
+> **The last three rows were missed by that restatement and corrected on 26 September.**
+> They still showed the weaker mode. In the best mode ReStem's ghost-note recall is
+> **0.790, not 0.747**, which widens its lead on that row. Ride vs crash moves from 0.953
+> to 0.954, and hi-hat articulation is 0.691 in both modes. The same pass corrected every
+> other figure below that had kept the weaker mode; each one says so where it stands.
 
 ![The same table as a plot: Overall, Hi-hat and Cymbals exclude zero, the other three straddle it](docs/comparison.png)
 
@@ -1328,12 +1334,13 @@ people with an obvious stake in the answer. Eight specific reasons to hold it lo
   third of them; cymbals have 1,002 onsets but an effective sample of 4.5 recordings, with
   37% in a single track. Even hi-hat — the row carrying the headline — is 8.9 effective
   recordings, 27.6% of it one Disco excerpt. The bootstrap already reflects this, which is
-  why the tom interval is [−0.313, +0.129], but any sentence that says "23 recordings"
+  why the tom interval is [−0.268, +0.193], but any sentence that says "23 recordings"
   about a per-class row is saying more than is there. Measured by
   `corpus_representativeness.py`, which also drops each class's largest contributor and
-  recomputes: every conclusion survives, and the hi-hat advantage *grows* from +0.139 to
-  +0.173. So the result is not an artefact of one recording — and the tom and cymbal rows
-  are still carried by about four apiece, which no robustness check can fix.
+  recomputes: every conclusion survives, and the hi-hat advantage *grows* from +0.113 to
+  +0.143. So the result is not an artefact of one recording — and the tom and cymbal rows
+  are still carried by about four apiece, which no robustness check can fix. (Against the
+  weaker mode these read [−0.313, +0.129] and +0.139 to +0.173; restated 26 September.)
 - **The corpus is 21.8 minutes long and comes from one place.** All 23 recordings are
   `MusicDelta_*` excerpts — one production series, median length 37 seconds, shortest 13.
   They are not 23 independent sources; drummer, room and engineer are unknown and
@@ -1341,8 +1348,9 @@ people with an obvious stake in the answer. Eight specific reasons to hold it lo
   them as 23 independent draws because there is no other option, not because it is known
   to be true. `corpus_representativeness.py` reports this and tests what can be tested:
   regrouping the tracks by genre and dropping a whole genre moves the delta by at most
-  0.015, against a published interval of ±0.032 — so *that* form of unrepresentativeness
-  does not reach the answer. Which is a narrower reassurance than it sounds.
+  0.017, against a published interval of ±0.030 — so *that* form of unrepresentativeness
+  does not reach the answer. Which is a narrower reassurance than it sounds. (0.015
+  against ±0.032 in the weaker mode.)
 - **~~It has not been established that ReStem ran in its best mode.~~ Settled, and we
   were using the weaker one.** All three offline modes have now been rendered across all
   23 recordings on a single machine. Better and Best (Offline) are byte-identical on
@@ -1385,11 +1393,11 @@ Method: ReStem 2.0.18 on trial, driven through UI automation (`restem_ui.ps1`,
 `restem_batch.ps1`). No weights were extracted — only the product's normal output.
 
 **Which quality mode, and what is actually known about it.** ReStem offers Better
-(Offline) and Best (Offline), the latter with an optional Bleed Reduction. The runs above
-used Better, and that was not recorded at the time — the export does not carry the mode,
-so it had to be established afterwards by re-transcribing tracks and matching the exports
-event for event (`restem_one.ps1`, `compare_restem_runs.py`). What the evidence covers is
-counted by `verify_restem_modes.py`, which hashes every render on disk:
+(Offline) and Best (Offline), the latter with an optional Bleed Reduction. The runs first
+published used Better, and that was not recorded at the time — the export does not carry
+the mode, so it had to be established afterwards by re-transcribing tracks and matching
+the exports event for event (`restem_one.ps1`, `compare_restem_runs.py`). What the
+evidence covers is counted by `verify_restem_modes.py`, which hashes every render on disk:
 
 | | MusicDelta_Rock_Drum | MusicDelta_Beatles_Drum |
 |---|---|---|
@@ -1403,13 +1411,16 @@ one with the most. Only Bleed Reduction changed anything, and it lost on both: o
 emits 7 toms where the reference has none; on Beatles it gains 0.009 on toms and loses
 0.011 on snare.
 
-**Say what that rests on, because it is less than it reads like.** Three tracks have been
-rendered in both modes — FunkJazz at 367 events, Beatles at 123, Rock at 24. Every one
-agreed byte for byte, with no differing byte anywhere. But 514 events is **5.6% of the
-9,168 ReStem emitted across this corpus**, and 71% of that sample is a single recording.
-"The mode does not reach the transcription" is a generalisation from three tracks, and it
-is stated here as one. The other 20 recordings were rendered in Better and never rendered
-in Best, so for those the claim is an extrapolation and nothing else.
+**Say what that rests on, because it is less than it reads like.** *Superseded on 20
+September: all 23 recordings have since been rendered in all three modes, and Better and
+Best are byte-identical on every one. The paragraph is kept as what was known before
+that.* Three tracks have been rendered in both modes — FunkJazz at 367 events, Beatles at
+123, Rock at 24. Every one agreed byte for byte, with no differing byte anywhere. But 514
+events is **5.6% of the 9,168 ReStem emitted across this corpus** in Better, and 71% of
+that sample is a single recording. "The mode does not reach the transcription" is a
+generalisation from three tracks, and it is stated here as one. The other 20 recordings
+were rendered in Better and never rendered in Best, so for those the claim is an
+extrapolation and nothing else.
 
 **One thing that was not being looked for.** The same track rendered on different days is
 also byte-identical — three such comparisons, all exact. ReStem's pipeline is
@@ -1482,14 +1493,17 @@ an earlier version of this section used Better and reported a larger margin.
 
 > **⚠ The hi-hat gap is over-firing, not articulation — and an earlier version of this
 > box said otherwise.**
-> ReStem finds nearly as many real hi-hats as we do (recall 0.893 against 0.928). The
-> difference is precision: **0.652 against 0.860**. It emits hi-hat onsets that are not
-> there, most visibly on jazz — 212 events against 7 in the reference on FreeJazz.
+> ReStem finds nearly as many real hi-hats as we do (recall 0.889 against 0.928). The
+> difference is precision: **0.694 against 0.860**. It emits hi-hat onsets that are not
+> there, most visibly on jazz — 178 events against 7 in the reference on FreeJazz. In
+> the weaker mode these were 0.893, 0.652 and 212: Bleed Reduction removes some of the
+> extra hits and leaves the pattern.
 >
 > On articulation the two systems are level. Scored against MDB's own open/closed/pedal
 > labels, accuracy is **0.691 for ReStem and 0.690 for us** — a tie to within a
-> thousandth. Their MDB exports contain 3113 closed, 370 pedal and 133 open hi-hats,
-> across 12 of the 23 files.
+> thousandth. Their MDB exports contain 2931 closed, 330 pedal and 122 open hi-hats, and
+> the open ones appear in 11 of the 23 files (3113, 370 and 133 across 12 files in the
+> weaker mode).
 >
 > This box previously claimed their exports contained no open hi-hat at all and blamed a
 > default threshold. That came from one song — a single recording where their export
@@ -1498,9 +1512,10 @@ an earlier version of this section used Better and reported a larger margin.
 >
 > What survives is narrower and still worth saying: ReStem's articulation boundaries are
 > user-adjustable and we left them at their defaults, as we left ours. On this corpus
-> that costs them the open class specifically — 37 correct of 251, against our 174 of
-> 246 — while they take the pedal class no more successfully than we do. But articulation
-> is scored separately from onset F1, so none of it explains the hi-hat row.
+> that costs them the open class specifically — 28 correct of 244, against our 174 of
+> 246 (37 of 251 in the weaker mode) — while they take the pedal class no more
+> successfully than we do. But articulation is scored separately from onset F1, so none
+> of it explains the hi-hat row.
 >
 > **The defaults were verified rather than assumed**, by opening both trigger-range
 > editors: the hi-hat shows 0.47 and 0.8 and the toms show 115, 155 and 210 Hz, which are
@@ -1515,11 +1530,13 @@ an earlier version of this section used Better and reported a larger margin.
 > An earlier version of this paragraph said the thresholds were nowhere in the tree at
 > all. That was wrong and was our own tooling: the probe was not reading help text.
 
-**Nothing else separates them on this test set.** Kick, snare, cymbals and toms all have
-intervals that cross zero. The tom row is the starkest: the nominal 0.589 vs 0.699 looks
+**Nothing else separates them on this test set.** Kick, snare and toms all have
+intervals that cross zero. The tom row is the starkest: the nominal 0.589 vs 0.651 looks
 like a clear loss for us, but with only 90 tom onsets in the whole corpus the interval is
-[−0.313, +0.129]. We do not know who is better at toms, and neither does anyone else
-using MDB alone — which is the reason a corpus that *can* measure toms was added, and
+[−0.268, +0.193]. (This paragraph was written against the weaker mode, where the tom row
+read 0.699 and [−0.313, +0.129] and cymbals was unresolved too; restated 26 September.)
+We do not know who is better at toms, and neither does anyone else using MDB alone —
+which is the reason a corpus that *can* measure toms was added, and
 [what it found there](#-adaptive-tom-threshold-and-the-ceiling-it-was-missing-for-months)
 is the largest change this pipeline has had.
 
@@ -1579,14 +1596,16 @@ The retractions are left in the text rather than quietly edited out, because a w
 that shows only the surviving claims tells you nothing about how hard they were tested.
 
 The strategies do differ, and that part is visible in the aggregate: ReStem leans towards
-recall (P 0.764 / R 0.884), we sit closer to balanced (P 0.853 / R 0.914).
+recall (P 0.783 / R 0.892), we sit closer to balanced (P 0.853 / R 0.914). In the weaker
+mode ReStem's figures were P 0.764 / R 0.884.
 
 ### Where ReStem breaks
 
 TrigNet sometimes matches the annotation exactly — Disco: kick 118/118, snare 147/147.
 But it **loses the hi-hat entirely on 4 of 23 tracks** (Hendrix, Reggae, Rock, Zeppelin),
 which is the same "separator returned an empty stem" failure we handle explicitly, and it
-**over-fires on jazz**: 212 hi-hat events against 7 in the reference on FreeJazz.
+**over-fires on jazz**: 178 hi-hat events against 7 in the reference on FreeJazz (212 in
+the weaker mode). All of this holds in both modes.
 
 ### Pedal hi-hat: nobody solves it
 
@@ -1598,12 +1617,24 @@ But in practice:
 
 | | articulation accuracy | closed | open | **pedal** |
 |---|---|---|---|---|
-| drum2midi | **0.754** | 1495/1747 | 156/238 | **19/230** |
-| ReStem | 0.691 | 1591/1595 | 37/251 | **3/513** |
+| drum2midi | 0.690 | 1504/1768 | 174/246 | **13/436** |
+| ReStem | 0.691 | 1592/1598 | 28/244 | **2/507** |
 
-Each cell is correct over *that system's own* events in the class, not over the reference:
-the annotation carries 1847 closed, 269 open and 523 pedal onsets. A reader took the 513
-for a reference count, so it is worth stating.
+Each cell counts the annotated onsets of that class that the system detected as a hi-hat
+at all, and how many of those it labelled correctly. The annotation carries 1847 closed,
+269 open and 523 pedal onsets, and each system detects a different subset of them, which
+is why the denominators differ. Counted the other way round, by the label each system
+chose: of the detected hits, we call 24 pedal and 13 of them are; ReStem calls 89 pedal
+and 2 of them are.
+
+**This table was restated on 26 September, and its note had it backwards.** It used to
+read 0.754, 1495/1747, 156/238 and **19/230** for us against 0.691, 1591/1595, 37/251
+and **3/513** for ReStem. The ReStem row was its weaker mode. Our row could not be
+reproduced from any export on disk: both sets give 0.690, the accuracy the rest of this
+README already quoted, and 13/436 for pedal. The note under the table said each
+denominator was that system's own pedal output. That was wrong. When a reader took 513
+for a reference count, they were closer than the correction: it is the number of the 523
+annotated pedal onsets that ReStem detected.
 
 Both fail on pedal. Our own measurement independently agrees, and on a different corpus:
 across the 1102 hi-hat hits in eight Groove MIDI recordings — not MDB — the pedal chick is
@@ -2362,7 +2393,7 @@ soft mallets or brushes as the usual cause.
 ### ❌ A learned ride/crash classifier, and a tuned margin
 
 The largest remaining gap against ReStem that is our own doing rather than a data
-shortage: ride vs crash, 0.917 against 0.953. ADTOF emits one cymbal class and the
+shortage: ride vs crash, 0.917 against 0.954. ADTOF emits one cymbal class and the
 pipeline splits it with a single rule — "the ride stem peaks 1.2x above the crash stem".
 MDX23C provides separate ride and crash stems, so a model should be able to do better.
 
@@ -2844,10 +2875,11 @@ python setup_env.py --check
 1. **Speed.** MDX23C runs ~15x slower than real time on a CPU; ~1.9x on an Intel GPU.
 2. **Toms** — F1 0.589 on MDB's 90 annotated onsets, and 0.539 on ENST's 2617, which
    is the figure to trust. Still the weakest class by a wide margin.
-3. **Pedal hi-hat** — 19 correct of the 230 events we label pedal, against ReStem's 3 of
-   513. The denominators are each system's own pedal output, not the reference, which
-   carries 523 pedal onsets. Not solved by anyone.
-4. **Ghost notes** — 0.718 vs ReStem's 0.747.
+3. **Pedal hi-hat** — of the annotated pedal onsets each system detects, we label 13 of
+   436 correctly and ReStem 2 of 507; the reference carries 523. Not solved by anyone.
+   This used to say 19 of 230 against 3 of 513, from an unreproducible run of ours and
+   ReStem's weaker mode ([restated](#pedal-hi-hat-nobody-solves-it)).
+4. **Ghost notes** — 0.718 vs ReStem's 0.790 (0.747 in its weaker mode).
 5. **Empty stems.** A separator can return silence instead of an instrument. The pipeline
    detects this, warns, and falls back to reading velocity from the mix.
 6. **Jazz brushes — over-firing, not deafness.** MICRO 0.616 across 32 brush recordings
