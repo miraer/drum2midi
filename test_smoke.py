@@ -2739,6 +2739,10 @@ def test_onset_trainer_reads_where_the_builder_writes():
 
     root = _tmp / "onset_pair"
     root.mkdir()
+    # The trainer resolves its own path, and on macOS the temp directory is under /var,
+    # a symlink to /private/var -- so an unresolved root named a different string for
+    # the same directory, and this failed on the first macOS run with nothing wrong.
+    root = root.resolve()
     for f in ("train_onset.py", "build_onset_dataset.py"):
         _shutil.copy(ROOT / f, root / f)
 
