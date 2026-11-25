@@ -2951,11 +2951,21 @@ What it means is narrower and worth stating plainly:
 | ADTOF-pytorch | **no license file** | ❌ all rights reserved by default |
 | LarsNet weights | CC BY-NC 4.0 | ❌ |
 | MDX23C DrumSep | not stated | ⚠️ unclear |
+| htdemucs weights (`--from-song` only) | not stated; their author calls it unclear | ⚠️ unclear |
 | MDB Drums (benchmark) | CC BY-NC-SA 4.0 | ❌ |
 | IDMT-SMT-Drums (benchmark) | CC BY-NC-ND 4.0 | ❌ |
-| Demucs, audio-separator, DrumSep code | MIT | ✅ |
+| Demucs, audio-separator and DrumSep code, not their weights | MIT | ✅ |
 | PySide6 (the window only) | LGPL-3.0 / GPL-2.0 / GPL-3.0 | ✅ with conditions on bundles |
 | GMD / E-GMD / StemGMD (datasets) | CC BY 4.0 | ✅ |
+
+**The htdemucs row was added on 25 November 2026.** The Demucs README
+([adefossez/demucs](https://github.com/adefossez/demucs)) has said since 26 October that MIT
+covers the code only. Its author calls the licence of the weights unclear, because MusDB
+includes material that was only usable for research, and expects the 6-source variant,
+trained only on Meta's internal data, to fall under CC BY-NC like every model FAIR released.
+This repository uses the 4-source `htdemucs`, and only for `--from-song`. The verdict above
+does not move, since ADTOF is already non-commercial, but the table used to suggest that the
+whole-song stage came without conditions, and that is not known.
 
 PySide6 is the only copyleft entry, and it is the one thing in this table that is **not** a
 model. It arrived with the window redesign; the previous toolkit was tkinter, which ships
@@ -2974,8 +2984,9 @@ redistribution — running an NC model on your own server and charging users is 
 commercial use that is prohibited. A SaaS wrapper does not work around it.
 
 A clean commercial path exists, because the **training data is free**: GMD, E-GMD and
-StemGMD are all CC BY 4.0, and Demucs is MIT. It requires training a separator and a
-transcriber from scratch.
+StemGMD are all CC BY 4.0, and the Demucs code is MIT. It requires training a separator and
+a transcriber from scratch, and the whole-song extractor as well, because the published
+Demucs weights are not clearly licensed.
 
 ---
 

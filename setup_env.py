@@ -100,7 +100,7 @@ def ffmpeg_advice() -> str:
             "only read at launch)")
 
 
-SEPARATOR = "audio-separator>=0.30"
+SEPARATOR = "audio-separator>=0.48"  # why this floor: see requirements.txt
 # The compiled dependency only whole-song extraction needs; see requirements.txt.
 DIFFQ = ("diffq", "diffq-fixed")
 

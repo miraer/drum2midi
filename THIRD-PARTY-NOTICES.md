@@ -41,11 +41,19 @@ neither ships a model file, so nothing derived from those datasets is distribute
 | ADTOF-pytorch | no licence file | all rights reserved by default |
 | LarsNet weights | CC BY-NC 4.0 | non-commercial |
 | MDX23C DrumSep | not stated | unclear |
+| htdemucs weights (`--from-song` only) | not stated; their author calls it unclear | unclear |
 | MDB Drums | CC BY-NC-SA 4.0 | non-commercial, benchmark only |
 | IDMT-SMT-Drums | CC BY-NC-ND 4.0 | non-commercial, benchmark only |
-| Demucs, audio-separator, DrumSep code | MIT | commercial use allowed |
+| Demucs, audio-separator and DrumSep code, not their weights | MIT | commercial use allowed |
 | PySide6 (the window only) | LGPL-3.0 / GPL-2.0 / GPL-3.0 | commercial use allowed, with conditions — see below |
 | GMD / E-GMD / StemGMD | CC BY 4.0 | commercial use allowed, attribution required |
+
+The htdemucs row was added on 25 November 2026. Since 26 October the Demucs README
+(github.com/adefossez/demucs) has said that MIT covers the code only. Its author calls the
+licence of the weights unclear, because MusDB includes material that was only usable for
+research, and expects the 6-source variant, trained only on Meta's internal data, to fall
+under CC BY-NC like every model FAIR released. This repository uses the 4-source `htdemucs`,
+and only for `--from-song`.
 
 PySide6 is the one copyleft dependency in the list, and it arrived with the window
 redesign; the previous toolkit was tkinter, which ships with Python under the PSF licence.
@@ -60,9 +68,10 @@ inside it, has to keep the LGPL parts replaceable by the recipient and carry the
 text. Using the window, or building it from this repository, carries no such obligation.
 
 A commercial path exists and does not require relicensing anything: the training data is
-already free. GMD, E-GMD and StemGMD are CC BY 4.0 and Demucs is MIT, so a separator and
-a transcriber trained from scratch on those would carry no NC terms. That is work, not a
-licensing trick.
+already free. GMD, E-GMD and StemGMD are CC BY 4.0 and the Demucs code is MIT, so a
+separator, a transcriber and a whole-song extractor trained from scratch on those would
+carry no NC terms. The published Demucs weights are not part of that path, since their
+author calls their licence unclear. That is work, not a licensing trick.
 
 See the Licensing section of `README.md` for the same table in context.
 

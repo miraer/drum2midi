@@ -59,7 +59,13 @@ mido>=1.3
 #   Windows:  winget install Gyan.FFmpeg    (then a new terminal, for PATH)
 #   macOS:    brew install ffmpeg
 #   Linux:    sudo apt install ffmpeg
-audio-separator>=0.30 ; sys_platform != "darwin"
+#
+# 0.48 is the floor because the DrumSep checkpoint's original hosting is gone: the
+# jarredou/models repository no longer exists and the UVR release URL answers 404 for it.
+# 0.48 downloads from audio-separator's own mirror first and checks every model file
+# against a published SHA-256, and 0.47.2 refuses untrusted globals when it loads a
+# checkpoint.
+audio-separator>=0.48 ; sys_platform != "darwin"
 onnxruntime>=1.17
 # audioread was here and is gone. Nothing in this repository imports it, pip reports it
 # as required by nothing, and librosa stopped reaching for it at 1.0 -- so listing it
